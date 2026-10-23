@@ -1,0 +1,171 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="theme-color" content="#1b1423">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>Heróis de Pixel</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<canvas id="game" width="640" height="360"></canvas>
+<div id="banner"><b></b><span></span></div>
+
+<!-- Controles de toque -->
+<div id="touch">
+  <div class="pad pl">
+    <button data-k="left">◀</button>
+    <button data-k="right">▶</button>
+  </div>
+  <div class="pad pr">
+    <button data-k="c" id="tb-c"></button>
+    <button data-k="b" id="tb-b"></button>
+    <button data-k="a" id="tb-a"></button>
+    <button data-k="jump" class="jump">▲</button>
+  </div>
+  <button data-k="pause" class="pausebtn">❚❚</button>
+</div>
+<div id="rotate"><div>↻</div><p>Gire o aparelho para jogar na horizontal</p></div>
+
+<!-- Título -->
+<section id="s-title" class="screen">
+  <div class="panel center">
+    <h1>HERÓIS<br>DE PIXEL</h1>
+    <p class="sub">Crie seu herói. Enfrente o Rei Golem.</p>
+    <button class="btn big" id="b-play">▶ Jogar</button>
+    <button class="btn" id="b-mp">👥 Multiplayer</button>
+    <button class="btn" id="b-create">🎨 Meu personagem</button>
+    <button class="btn" id="b-controls">⌨ Controles</button>
+    <button class="btn small" id="b-sound">🔊 Som: ligado</button>
+    <p class="hint">Setas/WASD mover · Espaço pular · J / K / L habilidades · Mouse/Q/E mirar (arqueiro) · Esc pausa</p>
+  </div>
+</section>
+
+<!-- Seleção de fase -->
+<section id="s-levels" class="screen">
+  <div class="panel">
+    <h2>Escolha a fase</h2>
+    <div id="lv-list"></div>
+    <div class="row"><button class="btn small" id="b-lv-back">← Voltar</button></div>
+  </div>
+</section>
+
+<!-- Criador de personagem -->
+<section id="s-creator" class="screen">
+  <div class="creator">
+    <div class="cr-left">
+      <canvas id="pv" width="96" height="96"></canvas>
+      <div class="chips" id="pv-pose"></div>
+      <input id="cr-name" maxlength="14" placeholder="Nome do herói" autocomplete="off">
+      <div class="row">
+        <button class="btn small" id="b-random">🎲 Aleatório</button>
+      </div>
+      <div class="presets" id="presets"></div>
+    </div>
+    <div class="cr-right">
+      <div class="tabs" id="cr-tabs"></div>
+      <div class="cr-panel" id="cr-panel"></div>
+      <div class="row end">
+        <button class="btn small" id="b-cr-back">← Voltar</button>
+        <button class="btn" id="b-cr-done">✔ Pronto!</button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Controles -->
+<section id="s-controls" class="screen">
+  <div class="panel">
+    <h2>Controles (PC)</h2>
+    <p class="hint" id="ctl-msg">Clique em uma tecla e pressione a nova. Esc cancela, Backspace limpa.</p>
+    <div id="ctl-presets" class="row"></div>
+    <div id="ctl-list"></div>
+    <h3 class="ctl-h">Botões do mouse</h3>
+    <div id="ctl-mouse"></div>
+    <div class="row end">
+      <button class="btn small" id="b-ctl-back">← Voltar</button>
+      <button class="btn small" id="b-ctl-reset">Restaurar padrão</button>
+    </div>
+  </div>
+</section>
+
+<!-- Multiplayer -->
+<section id="s-mp" class="screen">
+  <div class="panel center">
+    <h2>Multiplayer</h2>
+    <div id="mp-home" class="mp-box">
+      <p class="sub">Joguem juntos pela internet, cada um no seu aparelho (até 4).</p>
+      <p class="hint" id="mp-hero"></p>
+      <button class="btn big" id="b-mp-host">👑 Criar sala</button>
+      <p class="hint">ou entre na sala de um amigo:</p>
+      <div class="mp-join">
+        <input id="mp-code" maxlength="5" placeholder="CÓDIGO" autocomplete="off" autocapitalize="characters" spellcheck="false">
+        <button class="btn" id="b-mp-join">Entrar</button>
+      </div>
+      <p class="mp-msg" id="mp-msg"></p>
+      <div class="row">
+        <button class="btn small" id="b-mp-hero">🎨 Personalizar herói</button>
+        <button class="btn small" id="b-mp-back">← Voltar</button>
+      </div>
+    </div>
+    <div id="mp-room" class="mp-box" hidden>
+      <p class="sub">Código da sala</p>
+      <div class="mp-codeview" id="mp-codeview">-----</div>
+      <div class="row" id="mp-invite">
+        <button class="btn small" id="b-mp-share">📤 Convidar</button>
+        <button class="btn small" id="b-mp-copy">📋 Copiar link</button>
+      </div>
+      <div id="mp-players"></div>
+      <p class="hint" id="mp-status"></p>
+      <button class="btn big" id="b-mp-start">▶ Escolher fase</button>
+      <button class="btn small" id="b-mp-leave">Sair da sala</button>
+    </div>
+  </div>
+</section>
+
+<!-- Fim de fase -->
+<section id="s-win" class="screen">
+  <div class="panel center">
+    <h2 id="win-title">FASE COMPLETA!</h2>
+    <div id="win-stars"></div>
+    <p id="win-stats"></p>
+    <button class="btn big" id="b-next">Próxima fase ▶</button>
+    <button class="btn" id="b-retry">↺ Jogar de novo</button>
+    <button class="btn small" id="b-win-menu">Menu de fases</button>
+    <p class="hint" id="win-wait">Aguardando o anfitrião escolher...</p>
+    <button class="btn small" id="b-win-leave">Sair da sala</button>
+  </div>
+</section>
+
+<!-- Pausa -->
+<section id="s-pause" class="screen">
+  <div class="panel center">
+    <h2>PAUSADO</h2>
+    <p class="hint" id="pause-mp">Multiplayer: o jogo continua rodando para os outros!</p>
+    <button class="btn big" id="b-resume">▶ Continuar</button>
+    <button class="btn" id="b-restart">↺ Reiniciar fase</button>
+    <button class="btn small" id="b-controls2">⌨ Controles</button>
+    <button class="btn small" id="b-fs">⛶ Tela cheia</button>
+    <button class="btn small" id="b-sound2">🔊 Som: ligado</button>
+    <button class="btn small" id="b-quit">Sair para o menu</button>
+  </div>
+</section>
+
+<script src="js/util.js"></script>
+<script src="js/sprites.js"></script>
+<script src="js/enemies.js"></script>
+<script src="js/world.js"></script>
+<script src="js/levels.js"></script>
+<script src="js/game.js"></script>
+<script src="js/net.js"></script>
+<script src="js/ui.js"></script>
+</body>
+</html>

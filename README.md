@@ -3,6 +3,8 @@
 Plataforma 2D em pixel art (personagens e inimigos em alta resolução, 2x o cenário), feita em HTML5 Canvas + JavaScript puro (sem build, sem dependências).
 Funciona no navegador do PC e do celular, e pode ser instalada como app (PWA).
 
+**▶ Jogar online:** https://vasconcellosgabriel.github.io/herois-de-pixel/
+
 ## Como jogar localmente
 Abra `index.html` no navegador. Para testar no celular, o multiplayer ou o modo "instalável"/offline, sirva por HTTP:
 

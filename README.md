@@ -3,6 +3,8 @@
 Plataforma 2D em pixel art (personagens e inimigos em alta resolução, 2x o cenário), feita em HTML5 Canvas + JavaScript puro (sem build, sem dependências).
 Funciona no navegador do PC e do celular, e pode ser instalada como app (PWA).
 
+Feito do zero com vibe coding no **Claude Code**: a primeira versão jogável ficou pronta em 2 horas, e o jogo hoje tem cerca de 4.000 linhas de JavaScript.
+
 **▶ Jogar online:** https://vasconcellosgabriel.github.io/herois-de-pixel/
 
 ## Como jogar localmente

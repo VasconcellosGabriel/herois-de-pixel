@@ -1,6 +1,7 @@
 'use strict';
 // ---------- Constantes e utilitários ----------
-const W = 320, H = 180, T = 16;               // área visível (zoom): personagens e inimigos aparecem maiores
+let W = 320, H = 180;                          // área visível: muda com a opção "Distância da câmera" (setView)
+const T = 16;
 const BGW = 320, BGH = 180;                   // tamanho lógico dos fundos pré-renderizados
 
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
@@ -241,6 +242,12 @@ const Snd = (() => {
     life:  () => [659, 784, 988, 1319, 1568].forEach((f, i) => tone(f, 0.1, 'square', 0.25, 0, i * 0.08)),
     over:  () => [392, 330, 262, 196].forEach((f, i) => tone(f, 0.28, 'triangle', 0.35, -10, i * 0.2)),
     bossheal: () => [330, 392, 494].forEach((f, i) => tone(f, 0.18, 'sawtooth', 0.22, 0, i * 0.09)),
+    special: () => { noise(0.5, 0.45); tone(120, 0.5, 'sawtooth', 0.4, 600); [523, 784, 1047].forEach((f, i) => tone(f, 0.18, 'square', 0.22, 0, 0.08 + i * 0.06)); },
+    ready: () => [784, 1047, 1568].forEach((f, i) => tone(f, 0.09, 'triangle', 0.25, 0, i * 0.06)),
+    crate: () => { noise(0.16, 0.35); tone(180, 0.12, 'square', 0.25, -90); },
+    chest: () => [523, 659, 784, 1047, 1319, 1568].forEach((f, i) => tone(f, 0.12, 'triangle', 0.28, 0, i * 0.07)),
+    secret: () => { noise(0.3, 0.35); [392, 494, 587, 784].forEach((f, i) => tone(f, 0.16, 'square', 0.2, 0, 0.15 + i * 0.1)); },
+    lvup: () => [523, 659, 784, 1047, 784, 1047, 1568].forEach((f, i) => tone(f, 0.12, 'square', 0.25, 0, i * 0.08)),
   };
   function stop() { if (timer) { clearInterval(timer); timer = null; } }
   function music(name) {
@@ -277,29 +284,37 @@ const Snd = (() => {
   };
 })();
 
-// ---------- Entrada: teclado + toque ----------
+// ---------- Entrada: teclado, mouse, toque e controle (gamepad) ----------
 const Input = {
-  enabled: false, kb: {}, touch: {}, pressed: {}, aim: null, aimMode: 'keys', mouseHeld: {}, capture: null,
-  isDown(k) { return !!(this.kb[k] || this.touch[k]); },
+  enabled: false, kb: {}, touch: {}, pad: {}, pressed: {}, aim: null, aimMode: 'keys', mouseHeld: {}, capture: null,
+  stick: null, padAim: null, padAng: 0, padOn: false, padCapture: null,
+  isDown(k) { return !!(this.kb[k] || this.touch[k] || this.pad[k]); },
   hit(k) { return !!this.pressed[k]; },
   end() { this.pressed = {}; },
-  clear() { this.kb = {}; this.touch = {}; this.pressed = {}; $$('#touch [data-k]').forEach(b => b.classList.remove('on')); },
+  clear() {
+    this.kb = {}; this.touch = {}; this.pad = {}; this.pressed = {}; this.mouseHeld = {};
+    Touch.held = {}; Touch.taps = {}; endStick();
+    $$('#touch [data-k]').forEach(b => b.classList.remove('on'));
+  },
 };
 // ---------- Controles configuráveis (teclado + botões do mouse) ----------
 const ACTIONS = [
-  ['left', 'Mover para a esquerda'], ['right', 'Mover para a direita'], ['jump', 'Pular / planar'], ['down', 'Descer da plataforma'],
-  ['a', 'Habilidade 1'], ['b', 'Habilidade 2'], ['c', 'Habilidade 3'],
+  ['left', 'Mover para a esquerda'], ['right', 'Mover para a direita'], ['jump', 'Pular / planar'], ['down', 'Agachar / descer da plataforma'],
+  ['a', 'Habilidade 1'], ['b', 'Habilidade 2'], ['c', 'Habilidade 3 (escudo / esquiva / cura / mergulho)'], ['special', 'Ataque especial'],
   ['aimup', 'Mirar para cima'], ['aimdown', 'Mirar para baixo'], ['pause', 'Pausar'],
 ];
+const BIND_VERSION = 2;                         // mudou o padrão: controles salvos antes disso voltam ao novo padrão
 const BIND_PRESETS = {
-  padrao: { label: 'Padrão (setas/WASD + J K L)', keys: {
+  padrao: { label: 'Padrão (WASD/setas + J K · Q esquiva · E especial)', keys: {
     left: ['ArrowLeft', 'KeyA'], right: ['ArrowRight', 'KeyD'], jump: ['Space', 'ArrowUp'], down: ['ArrowDown', 'KeyS'],
-    a: ['KeyJ', 'KeyZ'], b: ['KeyK', 'KeyX'], c: ['KeyL', 'KeyC'], aimup: ['KeyQ', ''], aimdown: ['KeyE', ''], pause: ['Escape', 'KeyP'] },
-    mouse: { 0: 'a', 1: 'c', 2: 'b' } },
-  mouse: { label: 'WASD + mouse (habilidades em 1 2 3 e nos botões do mouse)', keys: {
+    a: ['KeyJ', 'KeyZ'], b: ['KeyK', 'KeyX'], c: ['KeyQ', 'KeyL'], special: ['KeyE', 'KeyC'],
+    aimup: ['KeyI', 'KeyR'], aimdown: ['KeyO', 'KeyF'], pause: ['Escape', 'KeyP'] },
+    mouse: { 0: 'a', 2: 'b', 1: 'special' } },
+  mouse: { label: 'WASD + mouse (Q esquiva/escudo · E especial · 1 2 3 4)', keys: {
     left: ['KeyA', 'ArrowLeft'], right: ['KeyD', 'ArrowRight'], jump: ['Space', 'KeyW'], down: ['KeyS', 'ArrowDown'],
-    a: ['Digit1', 'KeyJ'], b: ['Digit2', 'KeyK'], c: ['Digit3', 'KeyL'], aimup: ['KeyQ', ''], aimdown: ['KeyE', ''], pause: ['Escape', 'KeyP'] },
-    mouse: { 0: 'a', 1: 'c', 2: 'b' } },
+    a: ['Digit1', 'KeyJ'], b: ['Digit2', 'KeyK'], c: ['KeyQ', 'Digit3'], special: ['KeyE', 'Digit4'],
+    aimup: ['KeyR', ''], aimdown: ['KeyF', ''], pause: ['Escape', 'KeyP'] },
+    mouse: { 0: 'a', 2: 'b', 1: 'special' } },
 };
 const Binds = { keys: {}, mouse: {} };
 let KEYMAP = {};
@@ -336,6 +351,7 @@ addEventListener('keydown', e => {
   const k = KEYMAP[e.code];
   if (!k || !Input.enabled || e.target.tagName === 'INPUT') return;
   e.preventDefault();
+  Input.padOn = false;
   if (k === 'aimup' || k === 'aimdown') Input.aimMode = 'keys';
   if (!Input.kb[k] && !e.repeat) Input.pressed[k] = true;
   Input.kb[k] = true;
@@ -346,15 +362,17 @@ addEventListener('keyup', e => {
 });
 addEventListener('blur', () => Input.clear());
 
-// Mira livre (mouse e toque na tela do jogo): guarda o ponto em coordenadas do canvas lógico (320x180)
+// Mira livre com o mouse: guarda o ponto em coordenadas do canvas lógico (320x180)
 function aimFrom(cx, cy) {
   const c = $('#game'), r = c.getBoundingClientRect();
   Input.aim = { x: (cx - r.left) / r.width * W, y: (cy - r.top) / r.height * H };
   Input.aimMode = 'pointer';
 }
-addEventListener('mousemove', e => { if (Input.enabled) aimFrom(e.clientX, e.clientY); });
+// (no celular o "mouse" é emulado a partir do toque: ignorado, quem mira lá é o joystick)
+const realMouse = e => !e.sourceCapabilities || !e.sourceCapabilities.firesTouchEvents;
+addEventListener('mousemove', e => { if (Input.enabled && realMouse(e) && !document.body.classList.contains('touch')) { aimFrom(e.clientX, e.clientY); Input.padOn = false; } });
 addEventListener('mousedown', e => {
-  if (!Input.enabled || e.target.id !== 'game') return;
+  if (!Input.enabled || e.target.id !== 'game' || !realMouse(e)) return;
   aimFrom(e.clientX, e.clientY);
   const act = Binds.mouse[e.button];
   if (!act) return;
@@ -365,22 +383,172 @@ addEventListener('mousedown', e => {
 addEventListener('mouseup', e => { const act = Input.mouseHeld[e.button]; if (act) { Input.kb[act] = false; delete Input.mouseHeld[e.button]; } });
 addEventListener('contextmenu', e => { if (Input.enabled) e.preventDefault(); });
 addEventListener('auxclick', e => { if (Input.enabled && e.button === 1) e.preventDefault(); });
-['touchstart', 'touchmove'].forEach(n => addEventListener(n, e => {
-  if (!Input.enabled || e.target.id !== 'game') return;
-  const t = e.changedTouches[0]; aimFrom(t.clientX, t.clientY);
-  e.preventDefault();
-}, { passive: false }));
 addEventListener('pointerdown', () => Snd.init(), { passive: true });
 
-function updateTouch(e) {
-  const ks = {};
-  for (const t of e.touches) {
-    const el = document.elementFromPoint(t.clientX, t.clientY), b = el && el.closest('[data-k]');
-    if (b) ks[b.dataset.k] = true;
-  }
-  for (const k in ks) if (!Input.touch[k]) Input.pressed[k] = true;
-  Input.touch = ks;
-  $$('#touch [data-k]').forEach(b => b.classList.toggle('on', !!ks[b.dataset.k]));
+// ---------- Toque ----------
+// Cada dedo é tratado à parte (vários botões ao mesmo tempo) e cai no botão mais próximo dentro de uma área
+// 35% maior que o desenho. Nos heróis que miram, o botão de ataque vira joystick: segure e arraste para mirar;
+// o tiro sai só ao SOLTAR, na direção escolhida. Toque rápido sem arrastar = mira automática.
+// Arrastar e voltar o dedo para o centro antes de soltar cancela o tiro.
+const Touch = { btns: [], aimKeys: new Set(), held: {}, taps: {}, stick: null, layoutT: 0, keepAim: 0 };
+function touchLayout() {
+  Touch.btns = $$('#touch [data-k]').map(el => {
+    const r = el.getBoundingClientRect();
+    return { el, k: el.dataset.k, x: r.left + r.width / 2, y: r.top + r.height / 2, r: Math.max(18, r.width / 2) };
+  }).filter(b => b.r > 0 && b.el.offsetParent !== null);
 }
-['touchstart', 'touchmove', 'touchend', 'touchcancel'].forEach(n =>
-  $('#touch').addEventListener(n, e => { e.preventDefault(); Snd.init(); updateTouch(e); }, { passive: false }));
+addEventListener('resize', () => setTimeout(touchLayout, 60));
+addEventListener('orientationchange', () => setTimeout(touchLayout, 300));
+function touchBtnAt(x, y) {
+  let best = null, bd = 1.35;
+  for (const b of Touch.btns) { const d = Math.hypot(x - b.x, y - b.y) / b.r; if (d < bd) { bd = d; best = b; } }
+  return best;
+}
+const STICK_DEAD = 14, STICK_R = 46;
+function showStick(s, dx, dy) {
+  const el = $('#stick'); if (!el) return;
+  const d = Math.hypot(dx, dy), k = d > STICK_R ? STICK_R / d : 1;
+  el.style.left = s.ox + 'px'; el.style.top = s.oy + 'px'; el.classList.add('on');
+  $('i', el).style.transform = `translate(${dx * k}px, ${dy * k}px)`;
+}
+function endStick() {
+  Touch.stick = null; Input.stick = null; Touch.keepAim = 0;
+  if (Input.aimMode === 'stick') Input.aimMode = 'auto';
+  const el = typeof document !== 'undefined' && $('#stick'); if (el) el.classList.remove('on');
+}
+function touchTap(k) { Touch.taps[k] = performance.now() + 110; Input.pressed[k] = true; }
+// junta dedos + toques rápidos no estado dos botões (chamado a cada evento e a cada quadro)
+function touchSync() {
+  const now = performance.now(), ks = { ...Touch.held };
+  // a direção do tiro solto vale por alguns quadros (o tempo de o disparo acontecer), depois volta à mira automática
+  if (Touch.keepAim && now > Touch.keepAim && !Touch.stick) endStick();
+  for (const k in Touch.taps) { if (Touch.taps[k] < now) delete Touch.taps[k]; else ks[k] = true; }
+  if (Input.enabled) for (const k in ks) if (!Input.touch[k] && !Touch.taps[k]) Input.pressed[k] = true;
+  let changed = false;
+  for (const k in ks) if (!Input.touch[k]) changed = true;
+  for (const k in Input.touch) if (Input.touch[k] && !ks[k]) changed = true;
+  Input.touch = ks;
+  if (changed) for (const b of Touch.btns) b.el.classList.toggle('on', !!ks[b.k] || !!(Touch.stick && Touch.stick.k === b.k));
+}
+function onTouch(e) {
+  if (!document.body.classList.contains('playing') || !Input.enabled) return;
+  if (e.target.closest && e.target.closest('.screen')) return;
+  e.preventDefault(); Snd.init();
+  if (!Touch.btns.length || performance.now() - Touch.layoutT > 2000) { touchLayout(); Touch.layoutT = performance.now(); }
+  for (const t of e.changedTouches) {
+    if (e.type === 'touchstart' && !Touch.stick) {
+      const b = touchBtnAt(t.clientX, t.clientY);
+      if (b && Touch.aimKeys.has(b.k)) { Touch.stick = { id: t.identifier, k: b.k, ox: b.x, oy: b.y, drag: false }; Touch.keepAim = 0; showStick(Touch.stick, 0, 0); b.el.classList.add('on'); }
+    }
+    const s = Touch.stick;
+    if (!s || t.identifier !== s.id) continue;
+    if (e.type === 'touchend' || e.type === 'touchcancel') {
+      const btn = Touch.btns.find(b => b.k === s.k); if (btn) btn.el.classList.remove('on');
+      const dx = t.clientX - s.ox, dy = t.clientY - s.oy;
+      if (e.type === 'touchcancel' || (s.drag && Math.hypot(dx, dy) < STICK_DEAD)) { endStick(); continue; }   // cancelado
+      if (s.drag) {             // solta na direção arrastada: mantém a mira até o tiro sair
+        Touch.stick = null; Touch.keepAim = performance.now() + 140;
+        const el = $('#stick'); if (el) el.classList.remove('on');
+      } else endStick();
+      touchTap(s.k);
+      continue;
+    }
+    const dx = t.clientX - s.ox, dy = t.clientY - s.oy;
+    if (!s.drag && Math.hypot(dx, dy) > STICK_DEAD) s.drag = true;
+    showStick(s, dx, dy);
+    if (s.drag) { Input.stick = { x: dx, y: dy }; Input.aimMode = 'stick'; }
+  }
+  const held = {};
+  for (const t of e.touches) {
+    if (Touch.stick && t.identifier === Touch.stick.id) continue;    // segurando para mirar: não atira ainda
+    const b = touchBtnAt(t.clientX, t.clientY);
+    if (b) held[b.k] = true;
+  }
+  Touch.held = held;
+  touchSync();
+}
+['touchstart', 'touchmove', 'touchend', 'touchcancel'].forEach(n => addEventListener(n, onTouch, { passive: false }));
+
+// ---------- Controle (gamepad, layout padrão do Xbox/PlayStation) ----------
+// Botões configuráveis na tela de Controles (aba Controle), separados do teclado.
+// Fixos: analógico esquerdo/direcional movem · analógico direito mira (mago e arqueiro).
+// Nos menus: direcional/analógico escolhe, A confirma, B volta, Start fecha a pausa.
+const PAD_BTN = ['A', 'B', 'X', 'Y', 'LB', 'RB', 'LT', 'RT', 'Select', 'Start', 'L3', 'R3', '↑', '↓', '←', '→', 'Home'];
+const padName = i => i === undefined || i < 0 ? '—' : PAD_BTN[i] || 'Botão ' + i;
+const PAD_ACTIONS = [
+  ['jump', 'Pular / planar'], ['down', 'Agachar / descer da plataforma'], ['a', 'Habilidade 1'], ['b', 'Habilidade 2'],
+  ['c', 'Habilidade 3 (escudo / esquiva / cura / mergulho)'], ['special', 'Ataque especial'], ['pause', 'Pausar'],
+];
+const PAD_DEFAULT = { jump: [0, -1], down: [13, -1], a: [2, -1], b: [3, -1], c: [1, 4], special: [5, 7], pause: [9, -1] };
+// sens: 1 (mira gira devagar) a 10 (instantânea) · dead: zona morta dos analógicos · invY: inverte a mira vertical
+const PadCfg = { map: {}, sens: 7, dead: 0.3, invY: false, rumble: true };
+function setPadCfg(src) {
+  src = src && typeof src === 'object' ? src : {};
+  const ok = n => Number.isInteger(n) && n >= -1 && n < 32 ? n : -1;
+  PadCfg.map = {};
+  for (const [k] of PAD_ACTIONS) { const v = src.map && Array.isArray(src.map[k]) ? src.map[k] : PAD_DEFAULT[k]; PadCfg.map[k] = [ok(v[0]), ok(v[1])]; }
+  PadCfg.sens = clamp(Number(src.sens) || 7, 1, 10);
+  PadCfg.dead = clamp(Number(src.dead) || 0.3, 0.1, 0.6);
+  PadCfg.invY = !!src.invY; PadCfg.rumble = src.rumble !== false;
+}
+setPadCfg(null);
+// vibração do controle (quando o navegador suporta)
+function padRumble(ms, strong, weak) {
+  if (!PadCfg.rumble || !Input.padOn) return;
+  const pads = navigator.getGamepads ? navigator.getGamepads() : [];
+  for (const gp of pads) if (gp && gp.connected) {
+    try { if (gp.vibrationActuator) gp.vibrationActuator.playEffect('dual-rumble', { duration: ms, strongMagnitude: strong, weakMagnitude: weak }); } catch (e) {}
+    break;
+  }
+}
+const PadNav = { last: {}, rep: 0, prevBtn: [] };
+function pollPad(dt) {
+  const pads = navigator.getGamepads ? navigator.getGamepads() : [];
+  let gp = null;
+  for (const p of pads) if (p && p.connected) { gp = p; break; }
+  const st = {}, nav = {};
+  if (gp) {
+    const btn = i => i >= 0 && gp.buttons[i] && (gp.buttons[i].pressed || gp.buttons[i].value > 0.5);
+    const now = gp.buttons.map((b, i) => btn(i));
+    // tela de controles esperando "aperte um botão": pega o primeiro botão que acabou de ser apertado
+    if (Input.padCapture) {
+      const i = now.findIndex((v, j) => v && !PadNav.prevBtn[j]);
+      PadNav.prevBtn = now;
+      if (i >= 0) { const fn = Input.padCapture; Input.padCapture = null; PadNav.last = { ok: true, back: true, start: true }; fn(i); }
+      return;
+    }
+    PadNav.prevBtn = now;
+    for (const k in PadCfg.map) if (PadCfg.map[k].some(btn)) st[k] = true;
+    const dz = PadCfg.dead, ax = gp.axes[0] || 0, ay = gp.axes[1] || 0;
+    if (ax < -dz || btn(14)) st.left = true;
+    if (ax > dz || btn(15)) st.right = true;
+    if (ay > Math.max(0.6, dz)) st.down = true;
+    nav.up = ay < -0.6 || btn(12); nav.down = ay > 0.6 || btn(13); nav.left = ax < -0.6 || btn(14); nav.right = ax > 0.6 || btn(15);
+    nav.ok = btn(0); nav.back = btn(1); nav.start = btn(9);
+    // mira com o analógico direito: gira até a direção do analógico na velocidade da sensibilidade
+    const rx = gp.axes[2] || 0, ry = (gp.axes[3] || 0) * (PadCfg.invY ? -1 : 1);
+    if (Math.hypot(rx, ry) > dz) {
+      const tgt = Math.atan2(ry, rx);
+      if (!Input.padAim || PadCfg.sens >= 10) Input.padAng = tgt;
+      else {
+        const d = ((tgt - Input.padAng + Math.PI * 3) % (Math.PI * 2)) - Math.PI, mx = (1.5 + PadCfg.sens * 1.7) * dt;
+        Input.padAng += clamp(d, -mx, mx);
+      }
+      Input.padAim = { x: Math.cos(Input.padAng), y: Math.sin(Input.padAng) }; Input.aimMode = 'pad';   // soltar: a mira fica onde estava
+    }
+    if (Object.keys(st).length || Math.hypot(rx, ry) > dz) Input.padOn = true;
+  }
+  // menus: navegação por foco
+  if (!Input.enabled && Input.onPadMenu) {
+    const edge = k => nav[k] && !PadNav.last[k];
+    let dir = 0;
+    if (edge('up') || edge('left')) dir = -1; else if (edge('down') || edge('right')) dir = 1;
+    else if (nav.up || nav.left || nav.down || nav.right) { PadNav.rep -= dt; if (PadNav.rep <= 0) { PadNav.rep = 0.14; dir = nav.up || nav.left ? -1 : 1; } }
+    if (dir && (edge('up') || edge('left') || edge('down') || edge('right'))) PadNav.rep = 0.4;
+    Input.onPadMenu({ dir, h: edge('left') ? -1 : edge('right') ? 1 : 0, ok: edge('ok'), back: edge('back'), start: edge('start') });
+  }
+  PadNav.last = nav;
+  if (Input.enabled) for (const k in st) if (!Input.pad[k]) Input.pressed[k] = true;
+  Input.pad = Input.enabled ? st : {};
+}
+addEventListener('gamepadconnected', () => { Input.padOn = true; });

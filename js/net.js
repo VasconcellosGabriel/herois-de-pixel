@@ -5,7 +5,7 @@
 // 20x/s, que são suavizadas na tela. Partículas, sons e textos chegam como eventos.
 // O servidor público e gratuito do PeerJS só apresenta os aparelhos um ao outro; depois a conexão é direta
 // (ou passa por um "relay" TURN gratuito do PeerJS quando a rede não permite a ligação direta).
-const PROTO = 1, MAX_PLAYERS = 4, SNAP_EVERY = 3;
+const PROTO = 3, MAX_PLAYERS = 4, SNAP_EVERY = 3;
 const ID_PREFIX = 'heroisdepixel-v1-', CODE_CHARS = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789', CODE_LEN = 5;
 const PEERJS_URLS = ['https://cdnjs.cloudflare.com/ajax/libs/peerjs/1.5.4/peerjs.min.js', 'https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js'];
 
@@ -17,7 +17,8 @@ const Net = {
 
 // ---------- Campos sincronizados (as "fotos" do mundo são listas de números na ordem abaixo) ----------
 const PF = ['x', 'y', 'vx', 'vy', 'face', 'hp', 'maxHp', 'mana', 'manaDelay', 'act', 'actT', 'actDur', 'atkIdx', 'aimDeg', 'aimFace',
-  'hurtT', 'inv', 'dash', 'dashKind', 'flipT', 'landT', 'cd.a', 'cd.b', 'cd.c', 'ground', 'dead', 'deadT', 'out', 'block', 'glide', 'diving'];
+  'hurtT', 'inv', 'dash', 'dashKind', 'flipT', 'landT', 'cd.a', 'cd.b', 'cd.c', 'ground', 'dead', 'deadT', 'out', 'block', 'glide', 'diving',
+  'maxMana', 'sp', 'xpGot', 'h', 'crouch', 'flamer', 'flameDir'];
 const EF = ['x', 'y', 'vx', 'vy', 'dir', 'hp', 'flash', 'sq', 'hurt', 'slow', 'stun', 'st', 't', 'throwT', 'ground', 'sts.burn', 'sts.poison', 'sts.freeze'];
 const QF = ['type', 'x', 'y', 'vx', 'vy', 'g', 'life', 'eli', 'stuck'];
 const RF = ['type', 'x', 'y', 'vx', 'vy', 'g', 'rot'];
@@ -87,7 +88,7 @@ async function hostRoom() {
     try { peer = await openPeer(ID_PREFIX + code); }
     catch (e) { if (e.type !== 'unavailable-id' || tries > 4) throw netError(e); }
   }
-  Object.assign(Net, { role: 'host', peer, code, pid: 0, conns: [], inLevel: false, ev: [], roster: [{ id: 0, ch: Game.save.char }] });
+  Object.assign(Net, { role: 'host', peer, code, pid: 0, conns: [], inLevel: false, ev: [], roster: [{ id: 0, ch: Game.save.char, b: myBuild() }] });
   peer.on('connection', conn => {
     conn.lastMsg = performance.now();
     conn.on('data', m => hostMsg(conn, m));
@@ -112,7 +113,7 @@ function hostMsg(conn, m) {
     let id = 1; while (Net.roster.some(r => r.id === id)) id++;
     conn.pid = id; Net.conns.push(conn);
     const ch = cleanChar(m.ch);
-    Net.roster.push({ id, ch });
+    Net.roster.push({ id, ch, b: cleanBuild(m.b) });
     send(conn, { t: 'welcome', pid: id, code: Net.code });
     rosterChanged();
     if (Net.inLevel && Game.world) send(conn, startMsg(Game.world));
@@ -122,8 +123,11 @@ function hostMsg(conn, m) {
     if (!p) return;
     const c = p.inp;
     c.d = m.d | 0; c.h |= m.h | 0;                // toques rápidos se acumulam até o próximo passo da simulação
-    c.am = m.am === 'pointer' ? 'pointer' : 'keys';
+    c.am = m.am === 'pointer' || m.am === 'auto' ? m.am : 'keys';
     c.ad = clamp(+m.ad || 0, -90, 90); c.af = m.af < 0 ? -1 : 1;
+  } else if (m.t === 'build') {        // o convidado evoluiu o herói: vale a partir da próxima fase
+    const r = Net.roster.find(x => x.id === conn.pid);
+    if (r) { r.b = cleanBuild(m.b); rosterChanged(); }
   } else if (m.t === 'ping') send(conn, { t: 'pong', ts: m.ts });
   else if (m.t === 'bye') { try { conn.close(); } catch (e) {} dropConn(conn); }
 }
@@ -147,6 +151,7 @@ function fullState(w) {
   return {
     coins: w.coins.flatMap((c, i) => c.got ? [i] : []), checks: w.checks.flatMap((c, i) => c.on ? [i] : []),
     picks: w.picks, alive: w.enemies.filter(e => !e.dead).map(e => e.id),
+    broken: w.broken, chests: w.chests.flatMap((c, i) => c.open ? [i] : []),
   };
 }
 const startMsg = w => ({ t: 'start', idx: w.idx, roster: Net.roster, full: fullState(w) });
@@ -176,7 +181,7 @@ async function joinRoom(code) {
     const conn = Net.conn = peer.connect(ID_PREFIX + code, { serialization: 'json', reliable: true });
     const to = setTimeout(() => rej(new Error('O anfitrião não respondeu. Confira o código e se a sala ainda está aberta.')), 15000);
     peer.on('error', e => { clearTimeout(to); if (e.type === 'peer-unavailable') rej(new Error('Sala não encontrada. Confira o código.')); else if (!Net.pid) rej(netError(e)); });
-    conn.on('open', () => { Net.lastMsg = performance.now(); send(conn, { t: 'hello', v: PROTO, ch: Game.save.char }); });
+    conn.on('open', () => { Net.lastMsg = performance.now(); send(conn, { t: 'hello', v: PROTO, ch: Game.save.char, b: myBuild() }); });
     conn.on('data', m => {
       if (m && m.t === 'welcome') { clearTimeout(to); res(); }
       if (m && m.t === 'refuse') { clearTimeout(to); rej(new Error(m.msg)); }
@@ -212,6 +217,8 @@ function clientStart(m) {
   for (const i of f.coins) if (w.coins[i]) w.coins[i].got = true;
   for (const i of f.checks) if (w.checks[i]) w.checks[i].on = true;
   w.picks = f.picks;
+  for (const [tx, ty] of f.broken || []) breakTile(w, tx, ty, null, true);
+  for (const i of f.chests || []) if (w.chests[i]) w.chests[i].open = true;
   const alive = new Set(f.alive);
   w.enemies = w.enemies.filter(e => alive.has(e.id));
   if (w.boss && !alive.has(w.boss.id)) w.boss.dead = true;
@@ -233,6 +240,9 @@ function playEvent(w, ev) {
     case 'cg': if (w.coins[ev[1]]) w.coins[ev[1]].got = true; break;
     case 'ck': if (w.checks[ev[1]]) w.checks[ev[1]].on = true; break;
     case 'pk': w.picks = ev[1]; break;
+    case 'tb': breakTile(w, ev[1], ev[2], null, true); break;
+    case 'td': w.tileHp.set(ev[2] * w.lv.w + ev[1], 1); break;
+    case 'ch': if (w.chests[ev[1]]) w.chests[ev[1]].open = true; break;
   }
 }
 function unpack(o, F, a, from) {
@@ -317,3 +327,5 @@ function netError(e) {
   return new Error((e && e.message) || 'Erro de conexão.');
 }
 addEventListener('pagehide', () => { if (Net.role) { if (Net.role === 'client') send(Net.conn, { t: 'bye' }); else broadcast({ t: 'bye' }); } });
+// O convidado mudou a evolução (tela de Evolução) ou o herói: avisa o anfitrião
+Net.sendBuild = () => { if (Net.role === 'client') send(Net.conn, { t: 'build', b: myBuild() }); };

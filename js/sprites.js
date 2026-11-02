@@ -150,7 +150,7 @@ Object.assign(PX.prototype, {
 
 // ---------- Personagem do jogador ----------
 const CW = 96, CH = 96, CX = 48, FEET = 92;
-const POSES = { idle: 5, run: 8, jump: 3, land: 1, atk: 4, cast: 3, block: 1, hurt: 1, dash: 1, roll: 4, flip: 4, glide: 2, aim: 12 };
+const POSES = { idle: 5, run: 8, jump: 3, land: 1, crouch: 5, atk: 4, cast: 3, block: 1, hurt: 1, dash: 1, roll: 4, flip: 4, glide: 2, aim: 12 };
 const AIM_STEPS = 12;
 const aimDeg = i => -90 + i * 15;                       // quadro de mira -> ângulo (graus, 0 = frente, negativo = cima)
 const aimIdx = deg => clamp(Math.round((deg + 90) / 15), 0, AIM_STEPS - 1);
@@ -196,6 +196,15 @@ function skeletonFor(pose, f, cls, ang) {
     case 'glide':
       S.legF = [-2, 2]; S.legB = [-4, 3]; S.armF = [6, -2.5]; S.armB = [-5, -2.5]; S.lean = 1; S.flow = 4; S.wing = f ? 3 : 2; S.wAng = 120; break;
     case 'land': S.sq = 2; S.bob = 0; S.legF = [3, 0]; S.legB = [-3, 0]; S.armF = [5, 2]; S.armB = [-5, 2]; S.lean = 1; S.wAng = 125; break;
+    case 'crouch': {   // quadro 0 parado; 1-4 andando agachado (passinhos curtos)
+      S.sq = 6; S.bob = 1; S.hdy = 1; S.legF = [5, 0]; S.legB = [-4, 0]; S.armF = [5, 3]; S.armB = [-3, 4]; S.lean = 2; S.wAng = 112; S.bendMax = 4;
+      if (f > 0) {
+        const ph = (f - 1) / 4 * Math.PI * 2, s = Math.sin(ph), c = Math.cos(ph);
+        S.legF = [Math.round(4.5 + 2 * s), Math.round(Math.max(0, c) * 1.5)]; S.legB = [Math.round(-4 - 2 * s), Math.round(Math.max(0, -c) * 1.5)];
+        S.armF = [5 - s, 3]; S.armB = [-3 + s, 4]; S.bob = Math.abs(s) > 0.7 ? 2 : 1; S.flow = 1.5;
+      }
+      break;
+    }
     case 'hurt': S.lean = -2; S.bob = -1; S.legF = [3, 1]; S.legB = [-3, 0]; S.armF = [4, -4]; S.armB = [-4, -3]; S.flow = 3; S.eyes = 1; S.mouth = 1; S.wAng = 160; S.hdy = 1; break;
     case 'block': S.lean = 0; S.legF = [3, 0]; S.legB = [-3, 0]; S.armF = [5.5, 1]; S.armB = [-2, 6]; S.bob = 1; break;
     case 'dash':
@@ -273,6 +282,8 @@ function drawChar(ch, pose, f) {
   const hair = ch.hairColor, hairD = toneLo(hair, 0.32), hairL = toneHi(hair, 0.3), hairLL = toneHi(hair, 0.5);
   const metal = ch.weaponColor, metalD = toneLo(metal, 0.35), metalL = toneHi(metal, 0.45), acc = ch.accent, accL = toneHi(acc, 0.5), accD = toneLo(acc, 0.35);
   const wood = '#8a5a2b', woodD = '#5b3b20', woodL = '#b07a3e', gold = '#ffd23f', goldD = '#c9962a', goldL = '#fff2a0';
+  // cor do acessório (óculos, tapa-olho, máscara, cachecol); heróis antigos sem ela usam as cores de antes
+  const ax = ch.accColor || (ch.acc === 5 ? ch.secondary : ch.acc === 3 ? acc : ch.acc === 1 ? '#14101a' : '#16121c'), axD = toneLo(ax, 0.3), axL = toneHi(ax, 0.3);
   const cx = CX, feet = FEET, lean = S.lean, flow = S.flow;
   const hipY = feet - legH * 1 + S.sq, torsoH = 16, torsoTop = hipY - torsoH + S.bob;
   const tx = Math.round(cx - tw / 2 + lean * 0.5);
@@ -414,9 +425,9 @@ function drawChar(ch, pose, f) {
   }
   if (ch.cape) { g.rect(tx + 1, torsoTop, tw - 1, 4, ch.capeColor); g.rect(tx + 1, torsoTop, tw - 1, 1, toneHi(ch.capeColor, 0.25)); g.ell(cx + lean * 0.5, torsoTop + 3, 2.5, 2.5, acc, { depth: 1, hi: accL }); }
   if (ch.acc === 5) { // cachecol
-    g.poly([[tx - 2, torsoTop - 3], [tx + tw + 2, torsoTop - 3], [tx + tw + 2, torsoTop + 4], [tx - 2, torsoTop + 4]], sec, { depth: 1, hi: secL, lo: secD });
+    g.poly([[tx - 2, torsoTop - 3], [tx + tw + 2, torsoTop - 3], [tx + tw + 2, torsoTop + 4], [tx - 2, torsoTop + 4]], ax, { depth: 1, hi: axL, lo: axD });
     const w2 = Math.round(flow);
-    g.poly([[tx - 2, torsoTop - 1], [tx - 12 - w2, torsoTop + 1], [tx - 15 - w2, torsoTop + 8], [tx - 8 - w2, torsoTop + 10], [tx - 2, torsoTop + 5]], secD, { depth: 1, hi: sec });
+    g.poly([[tx - 2, torsoTop - 1], [tx - 12 - w2, torsoTop + 1], [tx - 15 - w2, torsoTop + 8], [tx - 8 - w2, torsoTop + 10], [tx - 2, torsoTop + 5]], axD, { depth: 1, hi: ax });
   }
 
   // ---------- cabeça ----------
@@ -473,9 +484,9 @@ function drawChar(ch, pose, f) {
 
   // ---------- acessórios do rosto ----------
   switch (ch.acc) {
-    case 1: g.rect(hx0 + 6, hy + 7, 9, 10, '#14101a'); g.rect(hx0 + 7, hy + 8, 7, 8, '#8fdcff'); g.rect(hx0 + 7, hy + 8, 3, 2, '#ffffff'); g.rect(hx0 + 14, hy + 7, 9, 10, '#14101a'); g.rect(hx0 + 15, hy + 8, 7, 8, '#8fdcff'); g.rect(hx0 + 15, hy + 8, 3, 2, '#ffffff'); g.rect(hx0 + 13, hy + 10, 2, 2, '#14101a'); g.rect(hx0 + 1, hy + 10, 6, 2, '#14101a'); break;
-    case 2: g.poly(H([[15, 6], [24, 6], [24, 17], [15, 17]]), '#16121c', { depth: 1, hi: '#3a3448' }); g.line(hx0 - 1, hy + 4, hx0 + 25, hy + 8, '#16121c'); g.line(hx0 - 1, hy + 5, hx0 + 25, hy + 9, '#16121c'); break;
-    case 3: g.poly(H([[1, 15], [26, 15], [26, 22], [18, 25], [8, 25], [2, 21]]), acc, { depth: 1, hi: accL, lo: accD }); g.line(hx0 + 14, hy + 16, hx0 + 14, hy + 24, accD); break;
+    case 1: g.rect(hx0 + 6, hy + 7, 9, 10, ax); g.rect(hx0 + 7, hy + 8, 7, 8, '#8fdcff'); g.rect(hx0 + 7, hy + 8, 3, 2, '#ffffff'); g.rect(hx0 + 14, hy + 7, 9, 10, ax); g.rect(hx0 + 15, hy + 8, 7, 8, '#8fdcff'); g.rect(hx0 + 15, hy + 8, 3, 2, '#ffffff'); g.rect(hx0 + 13, hy + 10, 2, 2, ax); g.rect(hx0 + 1, hy + 10, 6, 2, ax); break;
+    case 2: g.poly(H([[15, 6], [24, 6], [24, 17], [15, 17]]), ax, { depth: 1, hi: axL }); g.line(hx0 - 1, hy + 4, hx0 + 25, hy + 8, ax); g.line(hx0 - 1, hy + 5, hx0 + 25, hy + 9, ax); break;
+    case 3: g.poly(H([[1, 15], [26, 15], [26, 22], [18, 25], [8, 25], [2, 21]]), ax, { depth: 1, hi: axL, lo: axD }); g.line(hx0 + 14, hy + 16, hx0 + 14, hy + 24, axD); break;
     case 4: g.poly(H([[3, 14], [10, 19], [18, 20], [25, 15], [25, 20], [20, 28], [12, 31], [5, 26]]), hair, { depth: 2, hi: hairL, lo: hairD }); g.rect(hx0 + 15, hy + 18, 4, 1, mouth); break;
   }
 

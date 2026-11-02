@@ -23,16 +23,19 @@
 <div id="touch">
   <div class="pad pl">
     <button data-k="left">◀</button>
+    <button data-k="down" class="down"><span>▼</span><small>AGACHAR</small></button>
     <button data-k="right">▶</button>
   </div>
   <div class="pad pr">
-    <button data-k="c" id="tb-c"></button>
-    <button data-k="b" id="tb-b"></button>
-    <button data-k="a" id="tb-a"></button>
+    <button data-k="special" id="tb-sp" class="sp"><b></b><span>★</span></button>
+    <button data-k="c" id="tb-c" class="sk"></button>
+    <button data-k="b" id="tb-b" class="sk"></button>
+    <button data-k="a" id="tb-a" class="sk"></button>
     <button data-k="jump" class="jump">▲</button>
   </div>
   <button data-k="pause" class="pausebtn">❚❚</button>
 </div>
+<div id="stick"><i></i></div>
 <div id="rotate"><div>↻</div><p>Gire o aparelho para jogar na horizontal</p></div>
 
 <!-- Título -->
@@ -43,9 +46,10 @@
     <button class="btn big" id="b-play">▶ Jogar</button>
     <button class="btn" id="b-mp">👥 Multiplayer</button>
     <button class="btn" id="b-create">🎨 Meu personagem</button>
+    <button class="btn" id="b-up">⬆ Evolução</button>
     <button class="btn" id="b-controls">⌨ Controles</button>
     <button class="btn small" id="b-sound">🔊 Som: ligado</button>
-    <p class="hint">Setas/WASD mover · Espaço pular · J / K / L habilidades · Mouse/Q/E mirar (arqueiro) · Esc pausa</p>
+    <p class="hint">Setas/WASD mover · S/↓ agachar · Espaço pular · J / K habilidades (ou mouse) · Q esquiva/escudo · E especial · Esc pausa · Controle (gamepad) também funciona</p>
   </div>
 </section>
 
@@ -54,7 +58,7 @@
   <div class="panel">
     <h2>Escolha a fase</h2>
     <div id="lv-list"></div>
-    <div class="row"><button class="btn small" id="b-lv-back">← Voltar</button></div>
+    <div class="row"><button class="btn small" id="b-lv-back">← Voltar</button><button class="btn small" id="b-lv-up">⬆ Evolução</button></div>
   </div>
 </section>
 
@@ -83,16 +87,43 @@
 
 <!-- Controles -->
 <section id="s-controls" class="screen">
-  <div class="panel">
-    <h2>Controles (PC)</h2>
-    <p class="hint" id="ctl-msg">Clique em uma tecla e pressione a nova. Esc cancela, Backspace limpa.</p>
-    <div id="ctl-presets" class="row"></div>
-    <div id="ctl-list"></div>
-    <h3 class="ctl-h">Botões do mouse</h3>
-    <div id="ctl-mouse"></div>
-    <div class="row end">
-      <button class="btn small" id="b-ctl-back">← Voltar</button>
-      <button class="btn small" id="b-ctl-reset">Restaurar padrão</button>
+  <div class="ctl-card">
+    <aside class="ctl-side">
+      <h2>CONTROLES</h2>
+      <div class="ctl-tabs">
+        <button class="ctl-tab" data-tab="kb">⌨ Teclado</button>
+        <button class="ctl-tab" data-tab="pad">🎮 Controle</button>
+        <button class="ctl-tab" data-tab="game">📷 Câmera</button>
+      </div>
+      <div class="ctl-acts">
+        <button class="ctl-sbtn" id="b-ctl-back">✔ Pronto</button>
+        <button class="ctl-sbtn" id="b-ctl-reset">Restaurar padrão</button>
+        <button class="ctl-sbtn" id="b-pad-rumble">Vibração: LIGADA</button>
+      </div>
+      <div class="ctl-stamp">HERÓIS<br>DE PIXEL<small>painel de comandos</small></div>
+    </aside>
+    <div class="ctl-main">
+      <p class="ctl-msg" id="ctl-msg"></p>
+      <div id="ctl-kb">
+        <div id="ctl-presets" class="row"></div>
+        <div class="ctl-head"><span>AÇÃO</span><span>PRINCIPAL</span><span>ALTERNATIVA</span></div>
+        <div id="ctl-list"></div>
+        <div class="ctl-head m"><span>MOUSE</span><span>AÇÃO</span></div>
+        <div id="ctl-mouse"></div>
+      </div>
+      <div id="ctl-pad" hidden>
+        <p class="ctl-status" id="pad-status"></p>
+        <div class="ctl-head"><span>AÇÃO</span><span>CONTROLE</span><span>ALTERNATIVO</span></div>
+        <div id="pad-list"></div>
+        <div class="ctl-head m"><span>MIRA E ANALÓGICOS</span><span></span></div>
+        <div id="pad-opts"></div>
+        <p class="hint">Mesmo botão de novo = limpa o campo. Nos menus: direcional escolhe, A confirma, B volta.</p>
+      </div>
+      <div id="ctl-game" hidden>
+        <div class="ctl-head m"><span>CÂMERA</span><span></span></div>
+        <div id="ctl-game-list"></div>
+        <p class="hint">Longe e Muito longe mostram mais da fase ao redor do herói (os desenhos ficam um pouco menores). Também dá para trocar no menu de pausa.</p>
+      </div>
     </div>
   </div>
 </section>
@@ -131,6 +162,28 @@
   </div>
 </section>
 
+<!-- Evolução: pontos de atributo (XP) e melhorias (moedas) -->
+<section id="s-up" class="screen">
+  <div class="panel up">
+    <h2 id="up-title">Evolução</h2>
+    <p class="sub" id="up-sub"></p>
+    <div class="up-cols">
+      <div>
+        <h3 class="ctl-h">Atributos <small id="up-pts"></small></h3>
+        <p class="hint">Cada nível dá 1 ponto. Ganhe XP derrotando inimigos (guardado ao completar a fase).</p>
+        <div id="up-stats"></div>
+      </div>
+      <div>
+        <h3 class="ctl-h">Ferreiro <small id="up-coins"></small></h3>
+        <p class="hint">Gaste moedas para fortalecer o dano e as habilidades.</p>
+        <div id="up-shop"></div>
+      </div>
+    </div>
+    <p class="mp-msg" id="up-msg"></p>
+    <div class="row"><button class="btn small" id="b-up-back">← Voltar</button></div>
+  </div>
+</section>
+
 <!-- Fim de fase -->
 <section id="s-win" class="screen">
   <div class="panel center">
@@ -139,6 +192,7 @@
     <p id="win-stats"></p>
     <button class="btn big" id="b-next">Próxima fase ▶</button>
     <button class="btn" id="b-retry">↺ Jogar de novo</button>
+    <button class="btn small" id="b-win-up">⬆ Evolução</button>
     <button class="btn small" id="b-win-menu">Menu de fases</button>
     <p class="hint" id="win-wait">Aguardando o anfitrião escolher...</p>
     <button class="btn small" id="b-win-leave">Sair da sala</button>
@@ -153,6 +207,7 @@
     <button class="btn big" id="b-resume">▶ Continuar</button>
     <button class="btn" id="b-restart">↺ Reiniciar fase</button>
     <button class="btn small" id="b-controls2">⌨ Controles</button>
+    <button class="btn small" id="b-cam">📷 Câmera: Normal</button>
     <button class="btn small" id="b-fs">⛶ Tela cheia</button>
     <button class="btn small" id="b-sound2">🔊 Som: ligado</button>
     <button class="btn small" id="b-quit">Sair para o menu</button>

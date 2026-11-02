@@ -186,6 +186,61 @@ function platTile(name) {
   return (_tileCache[key] = outline(g.toCanvas(), th.edge));
 }
 
+// Caixa quebrável (tile 4): caixote, barril ou vaso conforme o tema. dmg = já levou golpe (rachada)
+function crateTile(name, variant, dmg) {
+  const key = 'crate' + name + variant + (dmg ? 'd' : '');
+  if (_tileCache[key]) return _tileCache[key];
+  const g = new PX(32, 32), kind = name === 'boss' ? 'pot' : name === 'cave' ? (variant ? 'pot' : 'crate') : (variant ? 'barrel' : 'crate');
+  if (kind === 'crate') {
+    const W5 = name === 'cave' ? ['#2a2440', '#4a3e6a', '#6a5a92', '#9a88c4', '#c8b8f0'] : ['#4a2a14', '#7a4a22', '#a06a38', '#c88a52', '#e8b47a'];
+    g.poly([[1, 1], [31, 1], [31, 31], [1, 31]], W5[2], { hi: W5[4], lo: W5[0], depth: 3 });
+    g.rect(5, 5, 22, 22, W5[1]);
+    for (let y = 6; y < 27; y += 5) g.rect(5, y, 22, 1, W5[0]);
+    g.line(6, 6, 26, 26, W5[3]); g.line(6, 7, 25, 26, W5[3]); g.line(26, 6, 6, 26, W5[3]);
+    for (const [x, y] of [[3, 3], [28, 3], [3, 28], [28, 28]]) g.rect(x, y, 2, 2, '#9aa0b4');
+  } else if (kind === 'barrel') {
+    g.poly([[5, 1], [27, 1], [30, 8], [30, 24], [27, 31], [5, 31], [2, 24], [2, 8]], '#8a5a30', { hi: '#c08a52', lo: '#4a2a14', depth: 3 });
+    for (const y of [6, 23]) { g.rect(2, y, 28, 3, '#6a6a80'); g.rect(2, y, 28, 1, '#b4b4cc'); }
+    g.rect(15, 2, 1, 29, '#4a2a14'); g.rect(9, 2, 1, 29, '#6a4020');
+  } else {
+    const P5 = name === 'boss' ? ['#3a1410', '#6a2a1c', '#9a4a2a', '#c87a4a', '#f0b080'] : ['#1a2a4a', '#2a4a7a', '#3a6aa8', '#6aa0d8', '#b0dcff'];
+    g.ell(16, 19, 13, 12, P5[2], { hi: P5[4], lo: P5[0], depth: 3 });
+    g.poly([[10, 2], [22, 2], [21, 8], [11, 8]], P5[1], { hi: P5[3], lo: P5[0], depth: 1 });
+    g.rect(5, 15, 22, 2, P5[3]); g.rect(7, 22, 18, 1, P5[1]);
+  }
+  if (dmg) { g.line(9, 4, 14, 14, '#1a0e08'); g.line(14, 14, 11, 22, '#1a0e08'); g.line(14, 14, 22, 18, '#1a0e08'); }
+  return (_tileCache[key] = outline(g.toCanvas(), '#0e0612'));
+}
+// Rachaduras discretas por cima do terreno: denunciam a parede falsa (tile 5) para quem presta atenção
+function crackTile(dmg) {
+  const key = 'crack' + (dmg ? 'd' : '');
+  if (_tileCache[key]) return _tileCache[key];
+  const g = new PX(32, 32), c = '#0a0612';
+  const path = [[6, 4], [11, 11], [9, 17], [15, 22], [13, 29]];
+  for (let i = 0; i < path.length - 1; i++) g.line(...path[i], ...path[i + 1], c);
+  g.line(11, 11, 18, 9, c); g.line(15, 22, 23, 24, c);
+  if (dmg) { g.line(18, 9, 26, 14, c); g.line(23, 24, 27, 30, c); g.line(9, 17, 3, 20, c); g.line(20, 4, 24, 12, c); }
+  return (_tileCache[key] = g.toCanvas());
+}
+// Baú do tesouro (alta resolução, 30x26); aberto = tampa levantada e brilho
+const _chest = {};
+function chestSprite(open) {
+  if (_chest[open]) return _chest[open];
+  const g = new PX(30, 26), W5 = ['#3a1a0a', '#6a3a18', '#9a5a28', '#c8823e', '#eab06a'], G = ['#8a5a10', '#c9962a', '#ffd23f', '#fff2a0'];
+  g.poly([[1, 11], [29, 11], [29, 25], [1, 25]], W5[2], { hi: W5[4], lo: W5[0], depth: 2 });
+  g.rect(1, 17, 28, 2, G[1]); g.rect(4, 11, 3, 14, G[1]); g.rect(23, 11, 3, 14, G[1]);
+  if (!open) {
+    g.poly([[1, 4], [5, 1], [25, 1], [29, 4], [29, 11], [1, 11]], W5[3], { hi: W5[4], lo: W5[1], depth: 2 });
+    g.rect(4, 1, 3, 10, G[2]); g.rect(23, 1, 3, 10, G[2]);
+    g.rect(12, 8, 6, 7, G[2]); g.rect(14, 10, 2, 3, W5[0]);
+  } else {
+    g.poly([[1, 3], [29, 3], [29, 9], [1, 9]], W5[1], { hi: W5[3], lo: W5[0], depth: 1 });
+    g.rect(3, 9, 24, 3, '#1a0a04');
+    for (const [x, y] of [[8, 9], [13, 8], [18, 9], [11, 10], [21, 10]]) g.ell(x, y, 2.5, 2, G[2], { hi: G[3], lo: G[0], depth: 1 });
+  }
+  return (_chest[open] = outline(g.toCanvas(), '#0e0612'));
+}
+
 function spikeTile(name) {
   const key = 'spike' + name;
   if (_tileCache[key]) return _tileCache[key];
@@ -358,7 +413,7 @@ function makeBg(name) {
 // vinheta escura nas bordas (pré-renderizada, resolução do cenário)
 let _vig = null;
 function vignette() {
-  if (_vig) return _vig;
+  if (_vig && _vig.width === W && _vig.height === H) return _vig;
   const c = mk(W, H), g = c.getContext('2d'), gr = g.createRadialGradient(W / 2, H / 2, H * 0.45, W / 2, H / 2, W * 0.62);
   gr.addColorStop(0, 'rgba(8,4,16,0)'); gr.addColorStop(1, 'rgba(8,4,16,0.5)');
   g.fillStyle = gr; g.fillRect(0, 0, W, H);
@@ -452,8 +507,6 @@ function decoSprites(name) {
       g.poly([[8, 14], [10 + fl[0], 2 + fl[1]], [15, 2 + fl[1] * 2], [20 + fl[0], 2], [22, 14]], '#ff7a2a', { hi: '#ffb04a', lo: '#c23a1a', depth: 2 });
       g.poly([[11, 14], [14 + fl[0], 5], [18, 14]], '#ffd27a', { flat: true }); g.poly([[13, 14], [15, 9], [17, 14]], '#fff6c8', { flat: true });
     }));
-    D.barrel = sp(32, 38, g => { g.poly([[3, 4], [29, 4], [31, 12], [31, 28], [29, 36], [3, 36], [1, 28], [1, 12]], '#8a5a30', { hi: '#c08a52', lo: '#4a2a14', depth: 3 }); for (const y of [9, 26]) { g.rect(1, y, 30, 3, '#6a6a80'); g.rect(1, y, 30, 1, '#b4b4cc'); } g.rect(15, 4, 1, 32, '#4a2a14'); });
-    D.crate = sp(36, 32, g => { g.poly([[0, 0], [36, 0], [36, 32], [0, 32]], '#a06a38', { hi: '#d8a468', lo: '#4a2a14', depth: 3 }); g.rect(4, 4, 28, 24, '#8a5a30'); g.line(5, 5, 31, 27, '#5a3a1c'); g.line(31, 5, 5, 27, '#5a3a1c'); g.rect(4, 4, 28, 2, '#c08a52'); });
     D.column = sp(34, 58, g => { g.poly([[5, 6], [29, 6], [29, 54], [5, 54]], '#7a7a96', { hi: '#b4b4d0', lo: '#3a3a52', depth: 3 }); g.poly([[0, 0], [34, 0], [34, 8], [0, 8]], '#9898b4', { hi: '#d4d4ec', lo: '#4a4a62', depth: 2 }); g.poly([[0, 50], [34, 50], [34, 58], [0, 58]], '#9898b4', { hi: '#d4d4ec', lo: '#4a4a62', depth: 2 }); g.line(14, 14, 16, 30, '#3a3a52'); g.line(16, 30, 22, 34, '#3a3a52'); for (let x = 17; x < 34; x++) for (let y = 0; y < 14; y++) g.clear(x, y); });
     D.bones = sp(40, 18, g => { g.poly([[4, 10], [20, 8], [20, 14], [4, 15]], '#ece8d6', { hi: '#ffffff', lo: '#a8a28a', depth: 1 }); g.ell(26, 9, 8, 7, '#ece8d6', { hi: '#ffffff', lo: '#a8a28a', depth: 2 }); g.rect(22, 6, 3, 4, '#1b1423'); g.rect(28, 6, 3, 4, '#1b1423'); g.rect(24, 12, 5, 2, '#1b1423'); g.ell(4, 11, 3, 3, '#ece8d6', { depth: 1 }); });
     D.flag = [0, 1].map(f => sp(40, 78, g => { g.poly([[4, 0], [8, 0], [8, 78], [4, 78]], '#7a7a96', { hi: '#b4b4d0', lo: '#3a3a52', depth: 1 }); g.ell(6, 3, 4, 4, '#ffcf6a', { hi: '#fff0a0', lo: '#b8862a', depth: 1 }); const pts = [[8, 8]]; for (let i = 0; i <= 8; i++) pts.push([8 + i * 3.6, 8 + Math.sin(i * 0.8 + f * 1.6) * 3]); for (let i = 8; i >= 0; i--) pts.push([8 + i * 3.6, 36 + Math.sin(i * 0.8 + f * 1.6) * 3 - (i > 6 ? (i - 6) * 3 : 0)]); g.poly(pts, '#8a1f36', { hi: '#d04a66', lo: '#4a0e1c', depth: 2 }); g.rect(16, 16 + f * 2, 8, 8, '#ffcf6a'); }));
@@ -475,7 +528,7 @@ function decoSprites(name) {
 // Monta a lista de decorações e luzes de uma fase
 function buildDecor(lv, name) {
   const D = decoSprites(name), items = [], lights = [];
-  const top = tx => { for (let y = 0; y < lv.h; y++) { const t = lv.tiles[y][tx]; if (t === 1) return y; if (t === 2) return -1; } return -1; };
+  const top = tx => { for (let y = 0; y < lv.h; y++) { const t = lv.tiles[y][tx]; if (t === 1 || t === 5) return y; if (t === 2 || t === 4) return -1; } return -1; };
   const add = o => items.push(o);
   const seed = THEMES[name].seed;
   let lastTree = -99, lastBig = -99;
@@ -502,8 +555,6 @@ function buildDecor(lv, name) {
       else if (r > 0.78) add({ spr: [D.rocks], x, y: y + 1, layer: 'mid' });
     } else if (name === 'castle') {
       if (flat && tx - lastTree > 7 && r < 0.17) { add({ spr: D.torch, x, y: y + 1, layer: 'back', sway: true, fast: true }); lights.push({ x, y: y - 24, r: 48, col: '#ff9a3a', a: 0.55, flick: true }); lastTree = tx; }
-      else if (flat && r > 0.9) add({ spr: [D.barrel], x, y: y + 1, layer: 'mid' });
-      else if (flat && r > 0.84) add({ spr: [D.crate], x, y: y + 1, layer: 'mid' });
       else if (r2 > 0.9 && r < 0.4) add({ spr: [D.column], x, y: y + 1, layer: 'back' });
       else if (r > 0.72 && r < 0.78) add({ spr: [D.bones], x, y: y + 1, layer: 'mid' });
       else if (flat && tx - lastBig > 14 && r > 0.3 && r < 0.34) { add({ spr: D.flag, x, y: y + 1, layer: 'back', sway: true, slow: true }); lastBig = tx; }

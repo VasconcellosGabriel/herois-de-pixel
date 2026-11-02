@@ -3,16 +3,16 @@
 const DEFAULT_CHAR = {
   name: 'Herói', cls: 'guerreiro', elem: 0, height: 1, build: 1, skin: '#f1c27d', face: 2, eyes: '#2b6cb0',
   hair: 1, hairColor: '#5a3825', outfit: 0, primary: '#3b6fd6', secondary: '#8a5a2b',
-  head: 0, headColor: '#9aa5b1', cape: 0, capeColor: '#c0392b', acc: 0, accent: '#ffd23f', weaponColor: '#cfd8e3',
+  head: 0, headColor: '#9aa5b1', cape: 0, capeColor: '#c0392b', acc: 0, accColor: '#c0392b', accent: '#ffd23f', weaponColor: '#cfd8e3',
 };
 const PRESETS = [
   { ...DEFAULT_CHAR, name: 'Sir Aço', build: 2, height: 2, face: 1, outfit: 1, head: 2, cape: 2, skin: '#e0ac69' },
   { ...DEFAULT_CHAR, name: 'Aurora', cls: 'mago', elem: 1, height: 0, build: 0, skin: '#ffe0c8', hair: 3, hairColor: '#e8e8ff', eyes: '#9b59b6', outfit: 2, primary: '#8e44ad', secondary: '#f2a900', head: 1, headColor: '#6d3fb8', accent: '#6fd8ff', weaponColor: '#8a5a2b' },
   { ...DEFAULT_CHAR, name: 'Robin', cls: 'arqueiro', skin: '#c68642', hair: 2, hairColor: '#d9a441', eyes: '#2f9e44', outfit: 3, primary: '#2e9c5a', secondary: '#5c3a1e', head: 7, headColor: '#2e9c5a', cape: 1, capeColor: '#1f6b3c', weaponColor: '#8a5a2b', accent: '#ff4d6d' },
-  { ...DEFAULT_CHAR, name: 'Kuro', skin: '#8d5524', face: 4, hair: 5, hairColor: '#c0392b', eyes: '#e63946', outfit: 3, primary: '#222831', secondary: '#c0392b', acc: 2, build: 2 },
+  { ...DEFAULT_CHAR, name: 'Kuro', skin: '#8d5524', face: 4, hair: 5, hairColor: '#c0392b', eyes: '#e63946', outfit: 3, primary: '#222831', secondary: '#c0392b', acc: 2, accColor: '#16121c', build: 2 },
   { ...DEFAULT_CHAR, name: 'Merlina', cls: 'mago', elem: 2, height: 0, hair: 4, hairColor: '#e86ab0', skin: '#ffe0c8', eyes: '#16a8a8', outfit: 2, primary: '#16a8a8', secondary: '#e8e8e8', head: 6, accent: '#7bff9a', weaponColor: '#e8e0c8' },
   { ...DEFAULT_CHAR, name: 'Ignis', cls: 'dragonico', build: 2, height: 2, skin: '#c0392b', face: 1, hair: 0, eyes: '#ffd23f', outfit: 1, primary: '#5a3a3a', secondary: '#2a2028', head: 0, acc: 0, accent: '#ffd23f', weaponColor: '#9aa5b1' },
-  { ...DEFAULT_CHAR, name: 'Rex', cls: 'arqueiro', skin: '#9be29b', build: 0, height: 2, face: 3, hair: 0, eyes: '#f2a900', outfit: 0, primary: '#ff8a1f', secondary: '#5c3a1e', head: 5, headColor: '#8a5a2b', acc: 5, capeColor: '#8a5a2b', weaponColor: '#b87333' },
+  { ...DEFAULT_CHAR, name: 'Rex', cls: 'arqueiro', skin: '#9be29b', build: 0, height: 2, face: 3, hair: 0, eyes: '#f2a900', outfit: 0, primary: '#ff8a1f', secondary: '#5c3a1e', head: 5, headColor: '#8a5a2b', acc: 5, accColor: '#5c3a1e', capeColor: '#8a5a2b', weaponColor: '#b87333' },
 ];
 const PAL = {
   skin: ['#ffe0c8', '#f1c27d', '#e0ac69', '#c68642', '#8d5524', '#5c3a1e', '#9be29b', '#a0c4ff', '#d9b3ff', '#f5a3a3'],
@@ -49,6 +49,7 @@ const TABS = [
     { k: 'cape', label: 'Capa', type: 'choice', opts: OPTS.capes },
     { k: 'capeColor', label: 'Cor da capa', type: 'color', pal: 'cloth', when: c => c.cape > 0 },
     { k: 'acc', label: 'Acessório', type: 'choice', opts: OPTS.accs },
+    { k: 'accColor', label: 'Cor do acessório', type: 'color', pal: 'cloth', when: c => [1, 2, 3, 5].includes(c.acc) },
   ] },
   { id: 'equip', label: 'Equipamento', fields: [
     { k: 'weaponColor', label: 'Cor da arma', type: 'color', pal: 'metal' },
@@ -107,7 +108,7 @@ function beginLevel(i) {
   if (Net.role === 'client') return;                 // no multiplayer quem escolhe a fase é o anfitrião
   if (!Game.save.char) { openCreator(); return; }
   hideScreens();
-  if (Net.role === 'host') { Net.roster[0].ch = Game.save.char; startLevel(i, Net.roster, 0); }
+  if (Net.role === 'host') { Net.roster[0].ch = Game.save.char; Net.roster[0].b = myBuild(); startLevel(i, Net.roster, 0); }
   else startLevel(i);
   goFullscreen();
 }
@@ -123,7 +124,9 @@ function showWin(r) {
   $('#win-title').textContent = last ? '🏆 VITÓRIA! 🏆' : 'FASE COMPLETA!';
   $('#win-stars').innerHTML = '★'.repeat(r.stars) + '<i>' + '★'.repeat(3 - r.stars) + '</i>';
   const m = Math.floor(r.secs / 60), s = String(r.secs % 60).padStart(2, '0');
-  $('#win-stats').innerHTML = `Moedas: ${r.coins}<br>Quedas: ${r.deaths}<br>Tempo: ${m}:${s}` + (last ? `<br><br>${Net.role ? 'Vocês derrotaram' : 'Você derrotou'} o Rei Golem!<br>Mais fases em breve...` : '');
+  const pr = progOf((Game.save.char || DEFAULT_CHAR).cls);
+  $('#win-stats').innerHTML = `Moedas: ${r.coins} <span class="gain">(carteira: ${Game.save.coins || 0})</span><br>XP: +${r.myXp || 0} <span class="gain">· Nível ${pr.lvl}${r.ups ? ' — SUBIU ' + r.ups + '!' : ''}</span><br>Vidas para a próxima fase: ${Game.save.lives}<br>Quedas: ${r.deaths} · Tempo: ${m}:${s}` + (last ? `<br><br>${Net.role ? 'Vocês derrotaram' : 'Você derrotou'} o Rei Golem!<br>Mais fases em breve...` : '');
+  $('#b-win-up').textContent = pr.pts ? `⬆ Evolução (${pr.pts} ponto${pr.pts > 1 ? 's' : ''}!)` : '⬆ Evolução';
   $('#b-next').style.display = last || guest ? 'none' : '';
   $('#b-retry').style.display = $('#b-win-menu').style.display = guest ? 'none' : '';
   $('#win-wait').style.display = $('#b-win-leave').style.display = guest ? '' : 'none';
@@ -140,18 +143,66 @@ function pauseGame() {
 function resumeGame() { if (Game.mode !== 'pause') return; hideScreens(); Game.mode = 'play'; Input.enabled = true; Input.clear(); }
 
 // ---------- Botões de toque ----------
+// Ícone da habilidade dentro do botão, custo de mana e a recarga escurecendo o botão
 function setupTouch(p) {
-  const sk = p.cls.skills.map(s => s.icon);
-  if (p.cls.id === 'mago') sk[0] = ELEMENTS[p.ch.elem || 0].icon;
-  ['a', 'b', 'c'].forEach((k, i) => { $('#tb-' + k).textContent = sk[i]; });
+  ['a', 'b', 'c'].forEach((k, i) => {
+    const b = $('#tb-' + k);
+    b.innerHTML = '';
+    const img = new Image(); img.src = skillIcon(p, i).toDataURL(); img.alt = p.cls.skills[i].name; b.appendChild(img);
+    b.appendChild(Object.assign(document.createElement('i'), { className: 'cd' }));
+    if (p.cost[i]) b.appendChild(Object.assign(document.createElement('small'), { textContent: p.cost[i] }));
+  });
+  // botão de agachar mostra o próprio herói agachado
+  const dn = $('#touch .down');
+  if (dn) { dn.innerHTML = ''; const img = new Image(); img.src = p.spr.get('crouch', 0).toDataURL(); img.alt = 'Agachar'; dn.append(img, Object.assign(document.createElement('small'), { textContent: 'AGACHAR' })); }
+  // mago mira a magia (J) e o arqueiro as flechas (J e K): segure para mirar, solte para atirar
+  Touch.aimKeys = new Set(p.cls.id === 'arqueiro' ? ['a', 'b'] : p.cls.id === 'mago' ? ['a'] : []);
+  if (document.body.classList.contains('touch')) Input.aimMode = 'auto';
+  endStick(); TouchHud.last = {};
+  requestAnimationFrame(touchLayout);
 }
+const TouchHud = { last: {} };
+function updateTouchHud(w) {
+  if (!document.body.classList.contains('touch') || !w || !w.p) return;
+  const p = w.p, L = TouchHud.last;
+  ['a', 'b', 'c'].forEach((k, i) => {
+    const h = Math.round(clamp(p.cd[k] / p.cdMax[i], 0, 1) * 100), low = !!(p.cls.mana && p.mana < p.cost[i]);
+    if (L[k] !== h) { L[k] = h; const el = $('#tb-' + k + ' .cd'); if (el) el.style.height = h + '%'; }
+    if (L[k + 'l'] !== low) { L[k + 'l'] = low; $('#tb-' + k).classList.toggle('low', low); }
+  });
+  const sp = Math.round(clamp((p.sp || 0) / SPECIAL_MAX, 0, 1) * 100);
+  if (L.sp !== sp) { L.sp = sp; $('#tb-sp b').style.height = sp + '%'; $('#tb-sp').classList.toggle('ready', sp >= 100); }
+}
+
+// ---------- Menus com o controle (gamepad) ----------
+function padMenu(m) {
+  const scr = $('.screen.on');
+  if (m.start && Game.mode === 'pause') { resumeGame(); return; }
+  if (!scr || (!m.dir && !m.ok && !m.back && !m.h)) return;
+  const items = $$('button, input, .custom', scr).filter(el => !el.disabled && el.offsetParent !== null && !el.closest('[hidden]'));
+  if (!items.length) return;
+  let cur = items.indexOf(document.activeElement);
+  if (cur < 0) cur = items.findIndex(el => el.classList.contains('padfocus'));
+  const fe = items[cur];
+  if (m.h && fe && fe.type === 'range') { if (m.h > 0) fe.stepUp(); else fe.stepDown(); fe.dispatchEvent(new Event('input')); return; }
+  if (m.dir) {
+    const nx = items[cur < 0 ? 0 : (cur + m.dir + items.length) % items.length];
+    $$('.padfocus').forEach(el => el.classList.remove('padfocus'));
+    nx.classList.add('padfocus'); nx.focus({ preventScroll: true }); nx.scrollIntoView({ block: 'nearest' });
+  } else if (m.ok && cur >= 0) items[cur].click();
+  else if (m.back) { const b = $('[id$="-back"], #b-resume, #b-mp-leave, #b-win-menu', scr); if (b && b.offsetParent !== null) b.click(); }
+}
+Input.onPadMenu = padMenu;
 
 // ---------- Criador de personagem ----------
 const Creator = { ch: null, tab: 'classe', pose: 0, spr: null, t: 0, from: 'title' };
 
 function openCreator(from = 'title') {
   Game.mode = 'creator'; Input.enabled = false; Creator.from = from;
-  Creator.ch = { ...(Game.save.char || DEFAULT_CHAR) };
+  const sv = Game.save.char || {};
+  // heróis salvos antes da cor do acessório existir: começa com a cor que já aparecia
+  const oldAcc = sv.acc === 5 ? sv.secondary : sv.acc === 3 ? sv.accent : sv.acc === 1 ? '#14101a' : sv.acc === 2 ? '#16121c' : undefined;
+  Creator.ch = { ...DEFAULT_CHAR, ...(sv.accColor || !oldAcc ? {} : { accColor: oldAcc }), ...sv };
   Creator.tab = 'classe'; Creator.pose = 0;
   $('#cr-name').value = Creator.ch.name;
   renderTabs(); renderPanel(); renderPoses(); renderPresets(); rebuildPreview();
@@ -222,16 +273,22 @@ function renderPanel() {
     } else {
       box.innerHTML = `<label>${f.label}</label>`;
       const sw = document.createElement('div'); sw.className = 'sw';
-      const input = document.createElement('input'); input.type = 'color'; input.value = ch[f.k];
+      const cur = String(ch[f.k] || '#ffffff').toLowerCase(), inPal = PAL[f.pal].includes(cur);
+      // quadrado vazio no fim: abre o seletor para escolher exatamente a cor deste item
+      const custom = document.createElement('label'); custom.className = 'custom' + (inPal ? '' : ' on'); custom.title = 'Escolher qualquer cor';
+      custom.innerHTML = '+<i></i>';
+      const input = document.createElement('input'); input.type = 'color'; input.value = cur;
+      const mark = $('i', custom); mark.style.background = cur;
+      custom.appendChild(input);
       const btns = [];
       PAL[f.pal].forEach(c => {
         const b = document.createElement('button');
-        b.style.background = c; b.className = ch[f.k].toLowerCase() === c ? 'on' : ''; b.title = c;
-        b.onclick = () => { ch[f.k] = c; input.value = c; btns.forEach(x => x.classList.toggle('on', x === b)); changed(false); };
+        b.style.background = c; b.className = cur === c ? 'on' : ''; b.title = c;
+        b.onclick = () => { ch[f.k] = c; input.value = c; btns.forEach(x => x.classList.toggle('on', x === b)); custom.classList.remove('on'); changed(false); };
         btns.push(b); sw.appendChild(b);
       });
-      input.oninput = () => { ch[f.k] = input.value; btns.forEach(x => x.classList.remove('on')); changed(false); };
-      sw.appendChild(input); box.appendChild(sw);
+      input.oninput = () => { ch[f.k] = input.value; mark.style.background = input.value; btns.forEach(x => x.classList.remove('on')); custom.classList.add('on'); changed(false); };
+      sw.appendChild(custom); box.appendChild(sw);
     }
     el.appendChild(box);
   }
@@ -243,7 +300,7 @@ function randomChar() {
     elem: ri(3), height: ri(3), build: ri(3), skin: pick(PAL.skin), face: ri(OPTS.faces.length), eyes: pick(PAL.eyes),
     hair: ri(OPTS.hairs.length), hairColor: pick(PAL.hair), outfit: ri(OPTS.outfits.length), primary: pick(PAL.cloth), secondary: pick(PAL.cloth),
     head: Math.random() < 0.5 ? 0 : 1 + ri(OPTS.heads.length - 1), headColor: pick(PAL.cloth), cape: ri(3), capeColor: pick(PAL.cloth),
-    acc: Math.random() < 0.5 ? 0 : 1 + ri(OPTS.accs.length - 1), weaponColor: pick(PAL.metal), accent: pick(PAL.accent),
+    acc: Math.random() < 0.5 ? 0 : 1 + ri(OPTS.accs.length - 1), accColor: pick(PAL.cloth), weaponColor: pick(PAL.metal), accent: pick(PAL.accent),
   });
   changed(true);
 }
@@ -333,15 +390,81 @@ async function mpCopy() {
   catch (e) { prompt('Copie o link do convite:', url); }
 }
 
-// ---------- Tela de controles ----------
-let ctlFrom = 'title';
+// ---------- Evolução: atributos (pontos de nível) e ferreiro (moedas) ----------
+let upFrom = 'title';
+function openUpgrades(from) {
+  upFrom = from; Game.mode = 'menu'; Input.enabled = false;
+  if (!Game.save.char) { Game.save.char = { ...DEFAULT_CHAR }; persist(); }
+  $('#up-msg').textContent = '';
+  renderUpgrades(); show('up');
+}
+const pips = (n, max) => '<b>' + '■'.repeat(n) + '</b>' + '■'.repeat(Math.max(0, max - n));
+function renderUpgrades() {
+  const ch = Game.save.char, cls = CLASSES[ch.cls], pr = progOf(ch.cls), coins = Game.save.coins || 0;
+  $('#up-title').textContent = `Evolução — ${cls.icon} ${cls.name}`;
+  $('#up-sub').textContent = `${ch.name} · Nível ${pr.lvl} · XP ${pr.xp}/${xpNeed(pr.lvl)}`;
+  $('#up-pts').textContent = pr.pts ? `(${pr.pts} ponto${pr.pts > 1 ? 's' : ''} para gastar)` : '(sem pontos)';
+  $('#up-coins').textContent = `(🪙 ${coins} moedas)`;
+  const stats = $('#up-stats'); stats.innerHTML = '';
+  for (const k in STAT_MAX) {
+    const v = pr.st[k], max = STAT_MAX[k], noMana = k === 'mana' && !cls.mana, row = document.createElement('div');
+    row.className = 'up-row' + (noMana ? ' off' : '');
+    row.innerHTML = `<span>${STAT_INFO[k][0]}<small>${noMana ? 'Só serve para quem usa mana' : STAT_INFO[k][1]}</small></span><span class="pips">${pips(v, max)}</span>`;
+    const b = document.createElement('button'); b.className = 'btn small'; b.textContent = v >= max ? 'Máx.' : '+1';
+    b.disabled = v >= max || !pr.pts || noMana;
+    b.onclick = () => { pr.st[k]++; pr.pts--; afterUpgrade('Atributo melhorado!'); };
+    row.appendChild(b); stats.appendChild(row);
+  }
+  const shop = $('#up-shop'); shop.innerHTML = '';
+  const items = [['dmg', '⚔ Dano geral', '+15% de dano em todos os ataques']].concat(cls.skills.map((sk, i) => [['a', 'b', 'c'][i], sk.icon + ' ' + sk.name, upgradeDesc(cls.id, i)]));
+  for (const [k, name, desc] of items) {
+    const lvl = pr.up[k], max = UP_MAX[k], cost = UP_COST[k][lvl], row = document.createElement('div');
+    row.className = 'up-row';
+    row.innerHTML = `<span>${name}<small>${desc}</small></span><span class="pips">${pips(lvl, max)}</span>`;
+    const b = document.createElement('button'); b.className = 'btn small';
+    b.textContent = lvl >= max ? 'Máx.' : `🪙 ${cost}`;
+    b.disabled = lvl >= max || coins < cost;
+    b.onclick = () => { Game.save.coins -= cost; pr.up[k]++; afterUpgrade('Melhoria comprada!'); };
+    row.appendChild(b); shop.appendChild(row);
+  }
+}
+function afterUpgrade(msg) { persist(); Snd.sfx('lvup'); renderUpgrades(); $('#up-msg').textContent = ''; banner(msg, '', 1000); if (Net.sendBuild) Net.sendBuild(); }
+function closeUpgrades() {
+  if (upFrom === 'levels') goLevels();
+  else if (upFrom === 'win') show('win');
+  else if (upFrom === 'mp') openMp();
+  else goTitle();
+}
+
+// ---------- Tela de controles (abas: Teclado · Controle · Câmera) ----------
+let ctlFrom = 'title', ctlTab = 'kb', padCapT = 0;
 function saveBinds() { Game.save.binds = { keys: Binds.keys, mouse: Binds.mouse }; persist(); }
+function savePad() { Game.save.pad = { map: PadCfg.map, sens: PadCfg.sens, dead: PadCfg.dead, invY: PadCfg.invY, rumble: PadCfg.rumble }; persist(); }
 function openControls(from) {
-  ctlFrom = from; Game.mode = 'menu'; Input.enabled = false; Input.capture = null;
+  ctlFrom = from; Game.mode = 'menu'; Input.enabled = false; Input.capture = null; Input.padCapture = null;
+  ctlTab = document.body.classList.contains('touch') ? 'game' : Input.padOn ? 'pad' : 'kb';
   renderControls(); show('controls');
 }
+const CTL_HINT = {
+  kb: 'Clique em uma tecla e pressione a nova. Esc cancela, Backspace limpa.',
+  pad: 'Clique (ou aperte A) em um campo e depois aperte o botão do controle.',
+  game: 'Ajustes da câmera durante as fases.',
+};
+function ctlRow(label, cls) {
+  const row = document.createElement('div'); row.className = 'ctl-row' + (cls ? ' ' + cls : '');
+  row.appendChild(Object.assign(document.createElement('span'), { textContent: label }));
+  return row;
+}
 function renderControls(msg) {
-  $('#ctl-msg').textContent = msg || 'Clique em uma tecla e pressione a nova. Esc cancela, Backspace limpa.';
+  Input.capture = null; Input.padCapture = null; clearTimeout(padCapT);
+  $$('.ctl-tab').forEach(b => b.classList.toggle('on', b.dataset.tab === ctlTab));
+  $('#ctl-kb').hidden = ctlTab !== 'kb'; $('#ctl-pad').hidden = ctlTab !== 'pad'; $('#ctl-game').hidden = ctlTab !== 'game';
+  $('#b-pad-rumble').hidden = ctlTab !== 'pad';
+  $('#b-pad-rumble').textContent = 'Vibração: ' + (PadCfg.rumble ? 'LIGADA' : 'DESLIGADA');
+  $('#ctl-msg').textContent = msg || CTL_HINT[ctlTab];
+  if (ctlTab === 'kb') renderKeys(); else if (ctlTab === 'pad') renderPad(); else renderCamOpts();
+}
+function renderKeys() {
   const pr = $('#ctl-presets'); pr.innerHTML = '';
   for (const id in BIND_PRESETS) {
     const b = document.createElement('button'); b.className = 'btn small'; b.textContent = BIND_PRESETS[id].label;
@@ -349,11 +472,8 @@ function renderControls(msg) {
     pr.appendChild(b);
   }
   const list = $('#ctl-list'); list.innerHTML = '';
-  const head = document.createElement('div'); head.className = 'ctl-row'; head.style.background = 'none'; head.style.border = 'none';
-  head.innerHTML = '<span></span><span style="color:var(--mute)">Principal</span><span style="color:var(--mute)">Alternativa</span>'; list.appendChild(head);
   for (const [act, label] of ACTIONS) {
-    const row = document.createElement('div'); row.className = 'ctl-row';
-    row.innerHTML = '<span>' + label + '</span>';
+    const row = ctlRow(label);
     [0, 1].forEach(slot => {
       const b = document.createElement('button'); b.className = 'kb'; b.textContent = keyName(Binds.keys[act][slot]);
       b.onclick = () => {
@@ -372,16 +492,83 @@ function renderControls(msg) {
     list.appendChild(row);
   }
   const ml = $('#ctl-mouse'); ml.innerHTML = '';
-  const OPT = [['a', 'Habilidade 1'], ['b', 'Habilidade 2'], ['c', 'Habilidade 3'], ['', 'Nenhuma']];
+  const OPT = [['a', 'Habilidade 1'], ['b', 'Habilidade 2'], ['c', 'Habilidade 3'], ['special', 'Ataque especial'], ['', 'Nenhuma']];
   for (const [btn, label] of [[0, 'Botão esquerdo'], [2, 'Botão direito'], [1, 'Botão do meio (roda)']]) {
-    const row = document.createElement('div'); row.className = 'ctl-row m'; row.innerHTML = '<span>' + label + '</span>';
-    const b = document.createElement('button'); b.className = 'kb'; b.textContent = (OPT.find(o => o[0] === (Binds.mouse[btn] || '')) || OPT[3])[1];
+    const row = ctlRow(label, 'm');
+    const b = document.createElement('button'); b.className = 'kb'; b.textContent = (OPT.find(o => o[0] === (Binds.mouse[btn] || '')) || OPT[4])[1];
     b.onclick = () => {
       const cur = OPT.findIndex(o => o[0] === (Binds.mouse[btn] || '')), nx = OPT[(cur + 1) % OPT.length][0];
       Binds.mouse[btn] = nx; saveBinds(); Snd.sfx('click'); renderControls();
     };
     row.appendChild(b); ml.appendChild(row);
   }
+}
+function renderPad() {
+  const pads = navigator.getGamepads ? [...navigator.getGamepads()].filter(p => p && p.connected) : [];
+  $('#pad-status').textContent = pads.length ? '🎮 Conectado: ' + pads[0].id.replace(/\(.*?\)/g, '').trim().slice(0, 48)
+    : 'Nenhum controle conectado: ligue por USB ou Bluetooth e aperte um botão.';
+  const list = $('#pad-list'); list.innerHTML = '';
+  const fixed = (label, a, b) => {
+    const row = ctlRow(label);
+    for (const t of [a, b]) row.appendChild(Object.assign(document.createElement('span'), { className: 'kb fixed', textContent: t }));
+    list.appendChild(row);
+  };
+  fixed('Mover', 'Analógico esq.', 'Direcional');
+  fixed('Mirar (mago e arqueiro)', 'Analógico dir.', '—');
+  for (const [act, label] of PAD_ACTIONS) {
+    const row = ctlRow(label);
+    [0, 1].forEach(slot => {
+      const b = document.createElement('button'); b.className = 'kb'; b.textContent = padName(PadCfg.map[act][slot]);
+      b.onclick = () => {
+        renderControls('Aperte o botão do controle para "' + label + '"...');
+        const nb = $$('#pad-list .kb:not(.fixed)')[PAD_ACTIONS.findIndex(a => a[0] === act) * 2 + slot];
+        if (nb) { nb.classList.add('wait'); nb.textContent = 'aperte...'; nb.focus({ preventScroll: true }); }
+        padCapT = setTimeout(() => { if (Input.padCapture) renderControls('Tempo esgotado: nenhum botão apertado.'); }, 6000);
+        Input.padCapture = i => {
+          clearTimeout(padCapT);
+          if (PadCfg.map[act][slot] === i) { PadCfg.map[act][slot] = -1; savePad(); Snd.sfx('click'); renderControls('Campo limpo.'); return; }
+          for (const [o] of PAD_ACTIONS) if (o !== act) PadCfg.map[o] = PadCfg.map[o].map(v => v === i ? -1 : v);   // um botão por ação
+          PadCfg.map[act][slot] = i; savePad(); Snd.sfx('click'); renderControls(padName(i) + ' → ' + label);
+        };
+      };
+      row.appendChild(b);
+    });
+    list.appendChild(row);
+  }
+  const op = $('#pad-opts'); op.innerHTML = '';
+  const slider = (label, min, max, step, val, fmt, set) => {
+    const row = ctlRow(label, 'm'), box = Object.assign(document.createElement('span'), { className: 'rng' });
+    const inp = Object.assign(document.createElement('input'), { type: 'range', min, max, step, value: val });
+    const out = Object.assign(document.createElement('span'), { className: 'val', textContent: fmt(val) });
+    inp.oninput = () => { const v = Number(inp.value); out.textContent = fmt(v); set(v); savePad(); };
+    box.append(inp, out); row.appendChild(box); op.appendChild(row);
+  };
+  slider('Sensibilidade da mira', 1, 10, 1, PadCfg.sens, v => v >= 10 ? 'Instantânea' : v + ' / 10', v => { PadCfg.sens = v; });
+  slider('Zona morta dos analógicos', 10, 60, 5, Math.round(PadCfg.dead * 100), v => v + '%', v => { PadCfg.dead = v / 100; });
+  const row = ctlRow('Inverter mira vertical', 'm'), box = document.createElement('button');
+  box.className = 'box'; box.textContent = PadCfg.invY ? '✕' : '';
+  box.onclick = () => { PadCfg.invY = !PadCfg.invY; savePad(); Snd.sfx('click'); renderControls(); };
+  row.appendChild(box); op.appendChild(row);
+}
+function renderCamOpts() {
+  const box = $('#ctl-game-list'); box.innerHTML = '';
+  const row = ctlRow('Distância da câmera', 'm'), chips = document.createElement('div'); chips.className = 'chips';
+  VIEWS.forEach((v, i) => {
+    const b = document.createElement('button'); b.className = 'chip' + ((Game.save.view | 0) === i ? ' on' : ''); b.textContent = v.name;
+    b.onclick = () => { setCamera(i); Snd.sfx('click'); renderControls('Câmera: ' + v.name); };
+    chips.appendChild(b);
+  });
+  row.appendChild(chips); box.appendChild(row);
+}
+function setCamera(i) {
+  Game.save.view = clamp(i | 0, 0, VIEWS.length - 1); persist(); setView(Game.save.view);
+  $('#b-cam').textContent = '📷 Câmera: ' + VIEWS[Game.save.view].name;
+}
+function resetControls() {
+  if (ctlTab === 'kb') { setBinds(null); saveBinds(); }
+  else if (ctlTab === 'pad') { const r = PadCfg.rumble; setPadCfg(null); PadCfg.rumble = r; savePad(); }
+  else setCamera(0);
+  Snd.sfx('click'); renderControls('Padrão restaurado.');
 }
 
 // ---------- Ligações ----------
@@ -400,10 +587,19 @@ click('#b-win-leave', () => leaveRoom());
 $('#mp-code').addEventListener('keydown', e => { if (e.key === 'Enter') mpJoin(); });
 $('#mp-code').addEventListener('input', e => { e.target.value = cleanCode(e.target.value); });
 click('#b-sound', toggleSound);
+click('#b-up', () => openUpgrades('title'));
+click('#b-lv-up', () => openUpgrades('levels'));
+click('#b-win-up', () => openUpgrades('win'));
+click('#b-up-back', closeUpgrades);
 click('#b-controls', () => openControls('title'));
 click('#b-controls2', () => openControls('pause'));
 click('#b-ctl-back', () => { Input.capture = null; if (ctlFrom === 'pause' && Game.world) { Game.mode = 'pause'; show('pause'); } else goTitle(); });
-click('#b-ctl-reset', () => { setBinds(null); saveBinds(); renderControls('Controles restaurados.'); });
+click('#b-ctl-reset', resetControls);
+click('#b-pad-rumble', () => { PadCfg.rumble = !PadCfg.rumble; savePad(); Snd.sfx('click'); renderControls(); if (PadCfg.rumble) padRumble(250, 0.6, 0.6); });
+$$('.ctl-tab').forEach(b => { b.onclick = () => { ctlTab = b.dataset.tab; Snd.sfx('click'); renderControls(); }; });
+click('#b-cam', () => setCamera(((Game.save.view | 0) + 1) % VIEWS.length));
+addEventListener('gamepadconnected', () => { if ($('#s-controls').classList.contains('on') && ctlTab === 'pad') renderControls(); });
+addEventListener('gamepaddisconnected', () => { if ($('#s-controls').classList.contains('on') && ctlTab === 'pad') renderControls(); });
 click('#b-sound2', toggleSound);
 click('#b-lv-back', () => { if (Net.role === 'host') openRoom(); else goTitle(); });
 click('#b-random', randomChar);
@@ -443,6 +639,7 @@ function frame(now) {
   requestAnimationFrame(frame);
   const dt = Math.min(0.1, (now - last) / 1000);
   last = now; Game.t += dt;
+  pollPad(dt); touchSync();
   // no multiplayer a pausa é só um menu por cima: o mundo continua rodando para os outros
   const live = Game.world && (Game.mode === 'play' || (Game.mode === 'pause' && Net.role));
   if (live) {
@@ -457,7 +654,7 @@ function frame(now) {
         if (Net.role === 'host' && Game.world) Net.hostTick(Game.world);
       }
     }
-    if (Game.world) render(Game.world);
+    if (Game.world) { render(Game.world); updateTouchHud(Game.world); }
   } else if (Game.mode === 'pause' && Game.world) {
     acc = 0; render(Game.world);
   } else if (Game.mode === 'creator') {
@@ -470,7 +667,10 @@ function frame(now) {
 // ---------- Início ----------
 function boot() {
   Game.save = loadSave();
+  if (Game.save.bindsV !== BIND_VERSION) { Game.save.binds = null; Game.save.bindsV = BIND_VERSION; persist(); }
   setBinds(Game.save.binds);
+  setPadCfg(Game.save.pad);
+  setCamera(Game.save.view | 0);
   Snd.setMuted(!!Game.save.mute);
   if ('ontouchstart' in window || matchMedia('(pointer: coarse)').matches) document.body.classList.add('touch');
   updateSoundLabels();

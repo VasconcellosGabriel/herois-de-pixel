@@ -24,21 +24,28 @@ O anfitrião roda a simulação inteira; os convidados mandam os comandos e rece
 Como tudo passa pelo anfitrião, o convidado sente um pequeno atraso (o ping aparece no canto da tela); entre amigos no mesmo país costuma ficar abaixo de 100 ms.
 
 ## Controles
-| Ação | Teclado / mouse | Celular |
-|---|---|---|
-| Mover | Setas / A D | ◀ ▶ |
-| Pular | Espaço / ↑ / W (↓ + pulo desce de plataforma) | ▲ |
-| Habilidades | J / K / L (ou Z / X / C) | botões à direita |
-| Mirar (Arqueiro) | Mouse (clique esquerdo atira) · ou Q / E para subir/descer a mira | arraste o dedo na tela |
-| Pausa | Esc / P | ❚❚ |
+| Ação | Teclado / mouse | Controle (gamepad) | Celular |
+|---|---|---|---|
+| Mover | Setas / A D | analógico esquerdo / direcional | ◀ ▶ |
+| Pular | Espaço / ↑ | A | ▲ |
+| Agachar (↓ + pulo desce de plataforma) | ↓ / S | ↓ do direcional | botão AGACHAR |
+| Habilidades 1 e 2 | J / K · botões esquerdo/direito do mouse | X / Y | botões à direita (com ícone e recarga) |
+| Esquiva / escudo / cura / mergulho | **Q** (ou L) | B ou LB | botão pequeno à direita |
+| Ataque especial | **E** (ou C, botão do meio do mouse) | RB ou RT | ★ |
+| Mirar (Mago e Arqueiro) | Mouse · ou I / O | analógico direito | **segure e arraste o botão de ataque**: o tiro sai ao **soltar**; toque rápido = mira automática; voltar o dedo ao centro cancela |
+| Pausa | Esc / P | Start | ❚❚ |
 
-**Controles configuráveis (PC):** menu *Controles* no título e na pausa. Cada ação tem tecla principal e alternativa; há o esquema "WASD + mouse" (habilidades em 1 2 3). Os botões esquerdo/direito/do meio do mouse também podem disparar as habilidades 1/2/3 (padrão: esquerdo=1, direito=2, meio=3). O Mago e o Arqueiro miram com o mouse.
+**Tela de Controles** (no título e na pausa), com três abas:
+- **Teclado**: tecla principal e alternativa de cada ação, botões do mouse e o esquema "WASD + mouse".
+- **Controle**: botões do gamepad configuráveis separadamente do teclado, **sensibilidade da mira**, zona morta dos analógicos, inverter a mira vertical e vibração. Nos menus, o controle navega com o direcional (A confirma, B volta).
+- **Câmera**: distância da câmera (Normal / Longe / Muito longe). Também troca pelo botão 📷 na pausa.
+No celular cada dedo é tratado à parte (dá para andar, pular e atacar ao mesmo tempo) e cada botão tem uma área de toque maior que o desenho.
 
 ## Classes
-- **Guerreiro** (6 ♥): J espada (curto alcance, rebate projéteis) · K lança arremessável (atravessa inimigos) · L escudo (segure)
-- **Mago** (4 ♥, mana): J magia elemental (10 mana) · K raio (40 mana, 10 de dano, atordoa) · L cura (45 mana, +1 ♥).
+- **Guerreiro** (6 ♥): J espada (curto alcance, rebate projéteis) · K lança arremessável (atravessa inimigos) · L escudo (segure: defende pela frente e pelas costas; só passa o que vem de cima ou de baixo)
+- **Mago** (4 ♥, mana): J magia elemental (10 mana; dano 3 fogo / 2 gelo / 2 veneno) · K raio (40 mana, 10 de dano, atordoa) · L cura (35 mana, +2 ♥ e +1 ♥ nos aliados por perto).
   A mana recarrega devagar (4,5/s) e só depois de ~1 s sem gastar.
-- **Arqueiro** (5 ♥): J flecha mirada · K tiro triplo (3 flechas que atravessam o primeiro alvo) · L rolamento invulnerável
+- **Arqueiro** (4 ♥, foco em mobilidade): J flecha mirada (2 de dano; quanto mais longe o alvo, maior a chance de crítico e o crítico chega a ×3) · K tiro triplo (3 flechas que atravessam o primeiro alvo) · L rolamento invulnerável. Passivo: **pulo duplo** (cambalhota).
 - **Dragônico** (6 ♥): J garras (combo de 3, a última é mais forte) · K sopro de fogo (jato de chamas que queima) · L mergulho (despenca e explode ao pousar). Passivo: pulo duplo com batida de asas e **planar** segurando o pulo.
 
 ## Inimigos
@@ -50,14 +57,22 @@ Como tudo passa pelo anfitrião, o convidado sente um pequeno atraso (o ping apa
 ## Mecânicas
 - **Status**: as magias do Mago têm chance de **queimar** (Fogo), **congelar** (Gelo, o inimigo congelado leva +50% e quebra) ou **envenenar** (Veneno). O chefe não congela de vez: só fica lento.
 - **Críticos**: todo ataque pode ser crítico (dano ×2; Arqueiro 15%, Dragônico 12%). No **Rei Golem**, acertar o **núcleo brilhante** no peito é sempre crítico, e ele fica exposto (dano ×3) quando bate na parede e fica atordoado.
-- **Vidas** (estilo Sonic): você começa cada fase com 3 vidas. Zerar os corações custa 1 vida; sem vidas, é *game over* e a fase recomeça. A cada 50 moedas, +1 vida.
+- **Vidas** (estilo Sonic): você começa com 3 vidas. Zerar os corações **ou cair num abismo** custa 1 vida; sem vidas, é *game over* e a fase recomeça (de volta a 3 vidas). A cada 50 moedas, +1 vida — e as **vidas extras passam para a próxima fase**.
+- **Ataque especial**: a barra dourada enche derrotando inimigos (e batendo no chefe). Cheia, cada classe solta o seu: Fúria giratória (Guerreiro), Tempestade arcana (Mago), Chuva de flechas (Arqueiro), **Lança-chamas** contínuo para um lado (Dragônico). A barra **passa para a próxima fase**.
+- **Agachar**: corpo mais baixo, projéteis altos passam por cima. Agachado dá para andar (mais devagar) e pular sem se levantar.
+- **Caixas, barris e vasos**: sólidos e quebráveis; dão moedas e às vezes poções de mana ou corações.
+- **Segredos**: toda fase tem um morro com **túnel escondido** — quebre a parede rachada para entrar e a do outro lado para sair (moedas + baú). Há também baús em plataformas altas.
+- **Áreas por classe**: **prateleiras altas** com baú que só quem tem pulo duplo alcança (Arqueiro, Dragônico) e **ninhos de caixas** no alto que se quebram atirando para cima (Mago, Arqueiro).
+- **Relevo**: montes em degraus e vales afundados (com moedas e baús) em todas as fases.
+- **XP e Evolução**: inimigos dão XP (para o time todo). Cada nível dá 1 ponto para Vida, Mana, Velocidade ou Pulo. No **Ferreiro**, as moedas compram mais dano e melhorias de cada habilidade. A evolução é guardada por classe; moedas e XP são guardados ao completar a fase.
 - **Chefe**: cada vez que você perde uma vida, o Rei Golem recupera 20% da vida.
 - **Impacto**: rastro em meia-lua nos golpes (cor da joia do herói), pausas curtas, números de dano, inimigos que "amassam" ao apanhar, moedas que saltam, partículas e tremida de tela.
 - **Ambiente**: partículas por fase (vaga-lumes, esporos, brasas), luzes de tochas e cristais, faixas de cinema na entrada do chefe.
 
 ## Personalização
 Classe, altura, porte, pele, expressão, olhos, 8 cabelos + cor, 4 roupas + 2 cores, 8 chapéus + cor,
-3 capas + cor, 6 acessórios, cor da arma e da magia (seletor de cor livre) — mais personagens prontos e botão aleatório.
+3 capas + cor, 6 acessórios + cor (na aba Extras), cor da arma e da magia — mais personagens prontos e botão aleatório.
+Em cada cor, o quadrado vazio com "+" abre o seletor para escolher exatamente a cor do item.
 O personagem fica salvo no aparelho (localStorage).
 
 ## Para os amigos jogarem (grátis)
@@ -69,10 +84,10 @@ No celular: abrir o link → menu do navegador → "Adicionar à tela inicial".
 - `js/sprites.js`: motor de pixels com sombreamento automático (`PX`) e personagem desenhado por **esqueleto** (cinemática inversa) a 2x de resolução, poses/animações, ícones
 - `js/enemies.js`: sprites e animações dos inimigos e do chefe
 - `js/world.js`: tiles e cenário em alta resolução (terreno com ruído, bordas/cantos, árvores, cristais, tochas), fundos em camadas (parallax, nuvens), decoração, luzes
-- `js/levels.js`: **lista de fases** e gerador de fases
+- `js/levels.js`: **lista de fases** e gerador de fases (túneis secretos, paredes falsas, baús, caixas)
 - `js/game.js`: física, combate, status, críticos, vidas, inimigos, chefe, renderização, HUD. Suporta vários heróis (`w.players`; `w.p` é o deste aparelho); cada herói lê o próprio controle (`p.inp`)
 - `js/net.js`: multiplayer (salas, conexão P2P, "fotos" do mundo, eventos de efeitos)
-- `js/ui.js`: menus, criador de personagem, laço principal
+- `js/ui.js`: menus, criador de personagem, tela de Evolução, botões de toque, laço principal
 
 ## Adicionando conteúdo
 - **Nova fase**: adicione um objeto em `LEVELS` (`levels.js`): tema, tamanho, semente, inimigos, densidade. Coloque-a antes do chefe.

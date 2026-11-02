@@ -36,6 +36,15 @@
   <button data-k="pause" class="pausebtn">❚❚</button>
 </div>
 <div id="stick"><i></i></div>
+<!-- Mini-chat do multiplayer (mensagens e avisos do jogo) -->
+<div id="chat" hidden>
+  <div id="chat-log"></div>
+  <form id="chat-form" hidden autocomplete="off">
+    <input id="chat-in" maxlength="80" placeholder="Mensagem..." enterkeyhint="send">
+    <div id="chat-quick"></div>
+  </form>
+  <button id="chat-btn" type="button" title="Chat (Enter)">💬</button>
+</div>
 <div id="rotate"><div>↻</div><p>Gire o aparelho para jogar na horizontal</p></div>
 
 <!-- Título -->

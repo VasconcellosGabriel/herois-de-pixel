@@ -171,7 +171,25 @@ function moveBody(b, dt, lv) {
 // No multiplayer o anfitrião simula o mundo; efeitos pontuais (partículas, sons, textos) viram eventos para os outros jogadores.
 const r1 = v => Math.round(v * 10) / 10;
 function emit(ev) { if (Net.role === 'host') Net.ev.push(ev); }
-function sfx(n) { Snd.sfx(n); emit(['s', n]); }
+// Sons por jogador: cada aparelho toca os sons do próprio herói e os do mundo (sndBy = herói que causou o som; null = mundo)
+let sndBy = null;
+function sfx(n) {
+  const me = Game.world && Game.world.p, by = sndBy;
+  if (!Net.role || !by || by === me) Snd.sfx(n);
+  if (by !== me) emit(['s', n, by ? by.id : -1]);
+}
+function asOwner(by, fn) { const o = sndBy; sndBy = by || null; try { return fn(); } finally { sndBy = o; } }
+// Clarão, tremida e "congelada" de impacto: só na tela de quem causou (by); by = null vale para todos
+function feel(w, by, fl = 0, sh = 0, hs = 0) {
+  if (!Net.role || !by || by === w.p) {
+    if (fl) w.flash = Math.max(w.flash || 0, fl);
+    if (sh) w.shake = Math.max(w.shake || 0, sh);
+    if (hs) w.hitstop = Math.max(w.hitstop || 0, hs);
+  }
+  if (by !== w.p) emit(['fe', by ? by.id : -1, fl, sh, hs]);
+}
+// Mensagem no mini-chat do multiplayer (avisos do jogo); no modo solo não aparece
+function sysMsg(txt) { if (Net.role === 'host') Net.sys(txt); }
 function announce(t, s = '', ms) { banner(t, s, ms); emit(['bn', t, s, ms]); }
 function music(n) { Snd.music(n); emit(['m', n]); }
 function addFx(w, f) {
@@ -270,7 +288,7 @@ function addPlayer(w, r) {
     ground: false, coyote: 0, jbuf: 0, hp: maxHp, maxHp, mana: maxMana, maxMana, manaDelay: 0,
     cd: { a: 0, b: 0, c: 0 }, act: null, actT: 0, actDur: 0, inv: 0, hurtT: 0, block: false, dash: 0, dashSpd: 0, dashKind: null, dashHit: null,
     melee: null, anim: 0, dead: false, deadT: 0, out: false, drop: 0, landT: 0, flipT: 0, jumps: 0, glide: false, diving: false, diveWait: false, combo: 0, comboT: 0, atkIdx: 0, dustT: 0,
-    kaim: 0, aimDeg: 0, aimFace: 1, lastVy: 0, shotAim: false, sp, xpGot: 0, crouch: false, flamer: 0, flameDir: 1, flameTk: 0,
+    kaim: 0, aimDeg: 0, aimFace: 1, lastVy: 0, shotAim: false, sp, xpGot: 0, crouch: false, flamer: 0, flameDir: 1, flameTk: 0, ep: 0, rp: null, remote: false, stompT: 0,
     // evolução: atributos (XP) e melhorias (moedas)
     spdK: 1 + st.spd * 0.06, jumpK: 1 + st.jump * 0.05, dmgK: 1 + up.dmg * 0.15,
     skLvl: skUp, skK: skUp.map(lvK), cdK: skUp.map(cdK), cost: COST[cls.id].map((c, k) => Math.round(c * cdK(skUp[k]))),
@@ -347,10 +365,11 @@ function damageEnemy(w, e, dmg, o = {}) {
   const sz = crit ? 2 : 1;
   floatText(w, cxOf(e) + rnd(-4, 4), e.y - 4, Math.max(1, Math.round(dmg)) + (crit ? '!' : ''), crit ? (weak ? '#ff9a3a' : '#ffe94d') : '#fff', crit);
   burst(w, cxOf(e), cyOf(e), crit ? '#ffe94d' : '#fff', crit ? 10 : 4, crit ? 110 : 60, crit ? 0.4 : 0.3);
-  if (crit) { w.flash = Math.max(w.flash, 0.04); w.shake = Math.max(w.shake, e.boss ? 0.2 : 0.08); }
+  const by = o.by || e.lastBy || null;
+  if (crit) feel(w, by, 0.04, e.boss ? 0.2 : 0.08);
   if (e.boss && o.by && !o.special) o.by.sp = Math.min(SPECIAL_MAX, o.by.sp + dmg);   // bater no chefe também enche o especial
-  if (!o.quiet || crit) w.hitstop = Math.max(w.hitstop, crit ? 0.07 : 0.032);
-  if (e.hp <= 0) { w.hitstop = Math.max(w.hitstop, 0.09); killEnemy(w, e); }
+  if (!o.quiet || crit) feel(w, by, 0, 0, crit ? 0.07 : 0.032);
+  if (e.hp <= 0) { feel(w, by, 0, 0, 0.09); killEnemy(w, e); }
 }
 function killEnemy(w, e) {
   if (e.dead) return;
@@ -371,20 +390,25 @@ function killEnemy(w, e) {
     if (k.sp >= SPECIAL_MAX) { sfx('ready'); floatText(w, cxOf(k), k.y - 14, 'ESPECIAL PRONTO!', '#ffd23f'); }
   }
   if (e.boss) {
-    w.state = 'win'; w.winT = 2.8; w.shake = 1.2; w.eproj = []; sfx('boom');
-    for (let i = 0; i < 7; i++) setTimeout(() => { if (Game.world === w) { burst(w, cxOf(e) + rnd(-18, 18), cyOf(e) + rnd(-20, 20), '#ffb347', 14, 110, 0.7); sfx('boom'); w.shake = 0.5; } }, i * 300);
+    w.state = 'win'; w.winT = 2.8; w.eproj = []; asOwner(null, () => { feel(w, null, 0, 1.2); sfx('boom'); });
+    sysMsg((k ? k.ch.name : 'O time') + ' derrotou o Rei Golem!');
+    for (let i = 0; i < 7; i++) setTimeout(() => { if (Game.world === w) asOwner(null, () => { burst(w, cxOf(e) + rnd(-18, 18), cyOf(e) + rnd(-20, 20), '#ffb347', 14, 110, 0.7); sfx('boom'); feel(w, null, 0, 0.5); }); }, i * 300);
   }
 }
 function checkLifeUp(w, p) {
   p = p || w.p;
   while (w.coinsGot >= w.nextLife) {
     w.nextLife += COINS_PER_LIFE;
-    if (w.lives < MAX_LIVES) { w.lives++; w.lifeT = 1.8; sfx('life'); floatText(w, cxOf(p), p.y - 10, '1UP!', '#7bff9a', true); }
+    if (w.lives < MAX_LIVES) {
+      w.lives++; w.lifeT = 1.8; asOwner(null, () => sfx('life')); floatText(w, cxOf(p), p.y - 10, '1UP!', '#7bff9a', true);
+      sysMsg(p.ch.name + ' ganhou uma vida para o time! (' + w.lives + ')');
+    }
   }
 }
 
 // srcY: altura de onde veio o golpe. O escudo do guerreiro defende dos dois lados; só passa o que vem de cima ou de baixo.
-function hurtPlayer(w, p, dmg, srcX, srcY) {
+function hurtPlayer(w, p, dmg, srcX, srcY) { return asOwner(p, () => hurtPlayer0(w, p, dmg, srcX, srcY)); }
+function hurtPlayer0(w, p, dmg, srcX, srcY) {
   if (p.inv > 0 || p.dead || w.state !== 'play') return false;
   const pc = cxOf(p), dx = srcX - pc, dy = (srcY === undefined ? cyOf(p) : srcY) - cyOf(p);
   const vertical = Math.abs(dy) > 9 && Math.abs(dy) > Math.abs(dx) * 1.1;
@@ -396,8 +420,8 @@ function hurtPlayer(w, p, dmg, srcX, srcY) {
   }
   if (p.crouch) standUp(p, true);
   p.hp -= dmg; p.inv = 1.3; p.hurtT = 0.3; p.act = null; p.melee = null; p.dash = 0; p.diving = false; p.diveWait = false;
-  p.vx = (pc < srcX ? -1 : 1) * 130; p.vy = -170;
-  w.shake = 0.18; w.hitstop = Math.max(w.hitstop, 0.05); sfx('hurt');
+  p.vx = (pc < srcX ? -1 : 1) * 130; p.vy = -170; force(p);
+  feel(w, p, 0, 0.18, 0.05); sfx('hurt');
   burst(w, pc, p.y + 10, '#e63946', 8, 90, 0.5);
   if (p.hp <= 0) { p.hp = 0; playerDie(w, p); }
   return true;
@@ -406,13 +430,15 @@ function hurtPlayer(w, p, dmg, srcX, srcY) {
 function playerDie(w, p) {
   w.lives = Math.max(0, w.lives - 1); w.deaths++; p.diving = false; p.diveWait = false; p.flamer = 0;
   if (p.crouch) standUp(p, true);
-  p.dead = true; p.deadT = 1.6; p.vy = -230; p.vx = 0; p.dash = 0; p.melee = null; p.act = null; p.glide = false; p.block = false;
-  sfx('die');
+  p.dead = true; p.deadT = 1.6; p.vy = -230; p.vx = 0; p.dash = 0; p.melee = null; p.act = null; p.glide = false; p.block = false; force(p);
+  asOwner(p, () => sfx('die'));
+  sysMsg(w.lives > 0 ? `${p.ch.name} perdeu uma vida (restam ${w.lives})` : `${p.ch.name} caiu sem vidas! Juntem moedas para trazer de volta`);
 }
 // noHeal: volta de quem estava esperando uma vida (não cura o chefe de novo)
 function respawn(w, p, keepHp, noHeal) {
   if (p.crouch) standUp(p, true);
-  p.flamer = 0;
+  p.flamer = 0; force(p);
+  if (p.out) sysMsg(p.ch.name + ' voltou ao jogo!');
   p.x = w.respawn.x - p.w / 2; p.y = w.respawn.y - p.h; p.vx = p.vy = 0; p.inv = 1.8; p.dead = false; p.out = false; p.hurtT = 0;
   if (!keepHp) {
     p.hp = p.maxHp; p.mana = p.maxMana;
@@ -531,7 +557,7 @@ function skillB(w, p) {
     const pts = [];
     for (let i = 0; i <= 9; i++) pts.push([r1(hx + (x1 - hx) * i / 9), r1(y + (i && i < 9 ? rnd(-5, 5) : 0))]);
     addFx(w, { type: 'bolt', pts, t: 0.26, max: 0.26 });
-    w.flash = 0.07; w.shake = Math.max(w.shake, 0.12);
+    feel(w, p, 0.07, 0.12);
     burst(w, x1, y, '#fff7a0', 8, 100, 0.3, 0);
   } else if (id === 'arqueiro') {
     p.face = p.aimFace; setCd(p, 'b', 0.9); act(p, 'aim', 0.26); p.shotAim = true; sfx('arrow');
@@ -565,19 +591,22 @@ function skillC(w, p) {
     for (const q of allies) { q.hp = Math.min(q.maxHp, q.hp + HEAL_ALLY); floatText(w, cxOf(q), q.y - 6, '+' + HEAL_ALLY, '#7bff9a'); rise(w, cxOf(q), q.y, 7, 20, 8, 0.6); }
   } else if (id === 'arqueiro') {
     const k = 1 + 0.15 * p.skLvl[2];                                // melhoria: rolamento mais longo
-    setCd(p, 'c', 0.8); p.dash = 0.24 * k; p.dashSpd = 250 * p.spdK; p.dashKind = 'roll'; p.inv = Math.max(p.inv, 0.34 * k); sfx('dash');
+    setCd(p, 'c', 0.8); p.dash = 0.24 * k; p.dashSpd = 250 * p.spdK; p.dashKind = 'roll'; p.inv = Math.max(p.inv, 0.34 * k); sfx('dash'); force(p);
   } else if (id === 'dragonico') {
     setCd(p, 'c', 1.6); p.dashHit = new Set(); p.act = null; p.melee = null; sfx('dash');
     if (p.ground) { p.vy = -250; p.diveWait = true; } else { p.diving = true; p.vy = 520; }
+    force(p);
   }
 }
 
 // ---------- Ataque especial (barra cheia) ----------
+const SPECIAL_NAME = { guerreiro: 'Fúria giratória', mago: 'Tempestade arcana', arqueiro: 'Chuva de flechas', dragonico: 'Lança-chamas' };
 function special(w, p) {
   if (p.sp < SPECIAL_MAX || p.dead || p.hurtT > 0) return;
   p.sp = 0; p.inv = Math.max(p.inv, 0.9); p.melee = null; p.dash = 0; p.block = false;
   const id = p.cls.id, pc = cxOf(p), py = p.y + 10, f = p.face;
-  w.flash = Math.max(w.flash, 0.12); w.shake = Math.max(w.shake, 0.45); w.hitstop = Math.max(w.hitstop, 0.06); sfx('special');
+  feel(w, p, 0.12, 0.45, 0.06); sfx('special');
+  sysMsg(p.ch.name + ' usou o especial: ' + SPECIAL_NAME[id] + '!');
   floatText(w, pc, p.y - 14, 'ESPECIAL!', '#ffd23f', true);
   const hitArea = (rect, dmg) => {
     for (const e of w.enemies) if (!e.dead && e.active && overlap(rect, e)) damageEnemy(w, e, dmg, { by: p, dir: Math.sign(cxOf(e) - pc) || f, rect, kb: 1.6, special: true });
@@ -697,7 +726,7 @@ function openChest(w, c, i, p) {
 // ---------- Explosão da bomba ----------
 function explode(w, q) {
   const cx = q.x + q.w / 2, cy = q.y + q.h / 2, R = q.R || 30, rect = { x: cx - R, y: cy - R, w: R * 2, h: R * 2 };
-  sfx('bomb'); w.shake = Math.max(w.shake, 0.3); w.flash = Math.max(w.flash, 0.06);
+  sfx('bomb'); feel(w, q.by, 0.06, 0.3);
   const k = R / 30;
   burst(w, cx, cy, '#ffb347', 20 * k, 140 * k, 0.6, 100); burst(w, cx, cy, '#ff5a2a', 14 * k, 100 * k, 0.5, 60); burst(w, cx, cy, '#fff2b0', 8, 60, 0.3, 0);
   addFx(w, { type: 'ring', x: r1(cx), y: r1(cy), t: 0.3, max: 0.3, r: R });
@@ -708,33 +737,19 @@ function explode(w, q) {
   breakTilesIn(w, rect, q.special ? 3 : 2, q.by);
 }
 
-// ---------- Jogador ----------
-function updatePlayer(w, dt, p, ctl) {
-  const lv = w.lv, c = p.inp;
-  p.anim += dt;
-  if (p.inv > 0) p.inv -= dt;
-  if (p.hurtT > 0) p.hurtT -= dt;
-  if (p.drop > 0) p.drop -= dt;
-  if (p.landT > 0) p.landT -= dt;
-  if (p.flipT > 0) p.flipT -= dt;
-  if (p.comboT > 0) p.comboT -= dt;
-  for (const k in p.cd) if (p.cd[k] > 0) p.cd[k] -= dt;
-  if (p.act) { p.actT -= dt; if (p.actT <= 0) { p.act = null; p.shotAim = false; } }
-  if (p.cls.mana) {
-    if (p.manaDelay > 0) p.manaDelay -= dt;
-    else p.mana = Math.min(p.maxMana, p.mana + MANA_REGEN * dt);
-  }
-  if (ctl) updateAim(w, p, dt);
-
+// ---------- Movimento do herói ----------
+// Andar, agachar, pular, planar, gravidade e colisão. mode:
+//  'sim'    simulação normal (modo solo e o herói do anfitrião)
+//  'remote' anfitrião cuidando do herói de um convidado: a posição vem do convidado; aqui só segue a física até a próxima
+//  'pred'   convidado prevendo o próprio herói na hora (sem dano; quem decide golpes e dano continua sendo o anfitrião)
+function bodyStep(w, dt, p, ctl, mode) {
+  const lv = w.lv, c = p.inp, remote = mode === 'remote', pred = mode === 'pred';
   const dir = ctl ? (c.isDown('right') ? 1 : 0) - (c.isDown('left') ? 1 : 0) : 0;
   p.block = ctl && p.cls.id === 'guerreiro' && c.isDown('c') && p.ground && p.dash <= 0 && p.hurtT <= 0;
   // agachar (segurar baixo); começa no chão, continua no ar se pular agachado; levanta sozinho ao soltar, se houver espaço
-  const wantCrouch = ctl && c.isDown('down') && (p.ground || p.crouch) && p.dash <= 0 && !p.block && p.hurtT <= 0 && !p.diving;
-  if (wantCrouch) crouchDown(p); else if (p.crouch) standUp(p, false, lv);
-  // lança-chamas do dragônico: direção travada, anda devagar
-  if (p.flamer > 0) {
-    p.flamer = Math.max(0, p.flamer - dt); p.flameTk -= dt;
-    if (p.flameTk <= 0) { p.flameTk = 0.15; flameTick(w, p); if (Math.floor(p.flamer / 0.15) % 2) sfx('fire'); }
+  if (!remote) {
+    const wantCrouch = ctl && c.isDown('down') && (p.ground || p.crouch) && p.dash <= 0 && !p.block && p.hurtT <= 0 && !p.diving;
+    if (wantCrouch) crouchDown(p); else if (p.crouch) standUp(p, false, lv);
   }
 
   if (p.dash > 0) {
@@ -753,15 +768,15 @@ function updatePlayer(w, dt, p, ctl) {
     if (p.cls.id === 'dragonico') {
       p.glide = ctl && !p.ground && p.vy > 40 && c.isDown('jump') && !p.diving && p.hurtT <= 0;
       if (p.glide) p.vy = Math.min(p.vy, 48);
-      if (p.diveWait && p.vy > -30) { p.diveWait = false; p.diving = true; sfx('dash'); }
-      if (p.diving) {
+      if (!pred && p.diveWait && p.vy > -30) { p.diveWait = false; p.diving = true; sfx('dash'); }
+      if (!pred && p.diving) {
         p.vy = 540; p.vx *= 0.92; p.inv = Math.max(p.inv, 0.06);
         for (const e of w.enemies) if (!e.dead && e.active && !p.dashHit.has(e) && overlap(p, e)) { p.dashHit.add(e); damageEnemy(w, e, 3, { by: p, dir: p.face, rect: p, sk: 2 }); }
       }
     }
   }
 
-  if (ctl && p.hurtT <= 0) {
+  if (ctl && p.hurtT <= 0 && !remote) {
     if (p.ground) { p.coyote = 0.1; p.jumps = DJUMP[p.cls.id] ? 1 : 0; } else p.coyote -= dt;
     if (c.hit('jump')) p.jbuf = 0.12; else p.jbuf -= dt;
     if (p.jbuf > 0 && !p.block) {
@@ -778,7 +793,55 @@ function updatePlayer(w, dt, p, ctl) {
       }
     }
     if (!c.isDown('jump') && p.vy < -110 && p.dash <= 0) p.vy = -110;
+  }
 
+  const wasGround = p.ground, fallV = p.vy;
+  moveBody(p, dt, lv);
+  if (!pred && p.diving && p.ground) { p.diving = false; explode(w, { x: p.x, y: p.y + p.h - 6, w: p.w, h: 6, dmg: 4, noFire: true, by: p, sk: 2 }); }
+  if (p.ground && !wasGround && fallV > 140) { p.landT = 0.1; burst(w, cxOf(p), p.y + p.h, '#ddd', 5, 35, 0.3, 0); }
+  p.lastVy = p.vy;
+}
+// Estados em que só o anfitrião mexe no corpo do herói (empurrão, rolamento, mergulho, morte)
+const hostAuth = p => p.dash > 0 || p.hurtT > 0 || p.diving || p.diveWait || p.dead || p.out;
+// O anfitrião moveu o herói à força: as posições antigas que o convidado mandar são ignoradas
+function force(p) { p.ep = ((p.ep | 0) + 1) % 1000; p.rp = null; }
+// Anfitrião: aplica a última posição que o convidado mandou do próprio herói
+function applyRemoteBody(w, p) {
+  const b = p.rp; p.rp = null;
+  if (!b || b.ep !== p.ep) return;
+  if (b.crouch !== p.crouch) { p.crouch = b.crouch; p.h = b.crouch ? CROUCH_H : STAND_H; }
+  p.x = clamp(b.x, 0, w.lv.w * T - p.w); p.y = clamp(b.y, -300, w.lv.h * T + 60);
+  p.vx = b.vx; p.vy = b.vy; p.face = b.face; p.ground = b.ground; p.glide = b.glide; p.jumps = b.jumps;
+  if (b.flipT > p.flipT) p.flipT = b.flipT;
+  if (b.drop > p.drop) p.drop = b.drop;
+}
+
+// ---------- Jogador ----------
+function updatePlayer(w, dt, p, ctl) {
+  const lv = w.lv, c = p.inp;
+  p.anim += dt;
+  if (p.inv > 0) p.inv -= dt;
+  if (p.hurtT > 0) p.hurtT -= dt;
+  if (p.drop > 0) p.drop -= dt;
+  if (p.landT > 0) p.landT -= dt;
+  if (p.flipT > 0) p.flipT -= dt;
+  if (p.comboT > 0) p.comboT -= dt;
+  if (p.stompT > 0) p.stompT -= dt;
+  for (const k in p.cd) if (p.cd[k] > 0) p.cd[k] -= dt;
+  if (p.act) { p.actT -= dt; if (p.actT <= 0) { p.act = null; p.shotAim = false; } }
+  if (p.cls.mana) {
+    if (p.manaDelay > 0) p.manaDelay -= dt;
+    else p.mana = Math.min(p.maxMana, p.mana + MANA_REGEN * dt);
+  }
+  if (ctl) updateAim(w, p, dt);
+
+  // lança-chamas do dragônico: direção travada, anda devagar
+  if (p.flamer > 0) {
+    p.flamer = Math.max(0, p.flamer - dt); p.flameTk -= dt;
+    if (p.flameTk <= 0) { p.flameTk = 0.15; flameTick(w, p); if (Math.floor(p.flamer / 0.15) % 2) sfx('fire'); }
+  }
+  bodyStep(w, dt, p, ctl, p.remote && !hostAuth(p) ? 'remote' : 'sim');
+  if (ctl && p.hurtT <= 0) {
     if (p.dash <= 0 && p.flamer <= 0) {
       if (c.isDown('a')) skillA(w, p);
       if (c.isDown('b')) skillB(w, p);
@@ -786,12 +849,6 @@ function updatePlayer(w, dt, p, ctl) {
     }
     if (c.hit('special')) special(w, p);
   }
-
-  const wasGround = p.ground, fallV = p.vy;
-  moveBody(p, dt, lv);
-  if (p.diving && p.ground) { p.diving = false; explode(w, { x: p.x, y: p.y + p.h - 6, w: p.w, h: 6, dmg: 4, noFire: true, by: p, sk: 2 }); }
-  if (p.ground && !wasGround && fallV > 140) { p.landT = 0.1; burst(w, cxOf(p), p.y + p.h, '#ddd', 5, 35, 0.3, 0); }
-  p.lastVy = p.vy;
 
   // golpe corpo a corpo
   if (p.melee) {
@@ -840,7 +897,7 @@ function updatePlayer(w, dt, p, ctl) {
     w.state = 'win'; w.winT = 0.9; sfx('win'); burst(w, w.lv.goal.x, w.lv.goal.y - 16, '#ffd23f', 24, 120, 0.9);
   }
   if (w.lv.bossGate && !w.bossActive && cxOf(p) > w.lv.bossGate) {
-    w.bossActive = true; w.cine = 2.4; announce('REI GOLEM', 'Mire no núcleo brilhante: golpes críticos!', 2800); music('boss'); w.shake = 0.4; sfx('boom');
+    w.bossActive = true; w.cine = 2.4; announce('REI GOLEM', 'Mire no núcleo brilhante: golpes críticos!', 2800); music('boss'); feel(w, null, 0, 0.4); sfx('boom');
   }
 }
 // Ímã: moedas próximas voam até o herói. Devolve true quando a moeda encosta nele.
@@ -951,7 +1008,7 @@ const E_AI = {
           const opts = ['slam', 'rocks', 'charge'];
           let pick = opts[(Math.random() * 3) | 0];
           if (pick === e.last) pick = opts[(opts.indexOf(pick) + 1) % 3];
-          e.last = e.pick = pick; e.st = 'tele'; e.stT = pick === 'charge' ? 0.7 : 0.55; w.shake = Math.max(w.shake, 0.12);
+          e.last = e.pick = pick; e.st = 'tele'; e.stT = pick === 'charge' ? 0.7 : 0.55; feel(w, null, 0, 0.12);
         }
         break;
       case 'tele':
@@ -968,14 +1025,14 @@ const E_AI = {
       case 'slam':
         if (e.ground && e.stT <= 0) {
           for (const d of [-1, 1]) eshoot(w, { type: 'wave', w: 12, h: 9, x: ec + d * 14 - 6, y: e.y + e.h - 9, vx: d * (rage ? 170 : 140), life: 2.4, dmg: 1 });
-          w.shake = 0.4; sfx('boom'); burst(w, ec, e.y + e.h, '#bbb', 16, 90, 0.5);
+          feel(w, null, 0, 0.4); sfx('boom'); burst(w, ec, e.y + e.h, '#bbb', 16, 90, 0.5);
           e.st = 'idle'; e.stT = rage ? 0.8 : 1.3; e.vx = 0;
         }
         break;
       case 'charge':
         e.vx = e.dir * (rage ? 175 : 140);
         if (e.wall || e.stT <= 0) {
-          e.st = 'stun'; e.stT = 1.5; e.stun = 1.5; e.vx = 0; w.shake = 0.4; sfx('boom');
+          e.st = 'stun'; e.stT = 1.5; e.stun = 1.5; e.vx = 0; feel(w, null, 0, 0.4); sfx('boom');
           burst(w, ec + e.dir * 18, e.y + 20, '#bbb', 18, 100, 0.6);
           floatText(w, ec, e.y - 10, 'ATORDOADO', '#ffe94d');
         }
@@ -1045,8 +1102,11 @@ function updateEnemies(w, dt) {
       if (p.dead || e.dead) continue;
       if (e.atk && overlap(p, e.atk)) hurtPlayer(w, p, 1, cxOf(e), cyOf(e.atk));
       if (overlap(p, e)) {
-        if (e.stomp && p.vy > 60 && p.y + p.h - e.y < 11 && p.hurtT <= 0) { damageEnemy(w, e, 1, { by: p, noCrit: true }); p.vy = -240; if (DJUMP[p.cls.id]) p.jumps = 1; }
-        else if (!frozen(e)) hurtPlayer(w, p, 1, cxOf(e), cyOf(e));
+        if (p.stompT > 0) continue;   // acabou de quicar (o convidado ainda pode mandar a posição de antes do quique)
+        if (e.stomp && p.vy > 60 && p.y + p.h - e.y < 11 && p.hurtT <= 0) {
+          asOwner(p, () => damageEnemy(w, e, 1, { by: p, noCrit: true })); p.vy = -240; p.stompT = 0.2; if (DJUMP[p.cls.id]) p.jumps = 1;
+          if (p.remote) emit(['bo', p.id]);   // o convidado faz o quique na hora, no próprio aparelho
+        } else if (!frozen(e)) hurtPlayer(w, p, 1, cxOf(e), cyOf(e));
       }
     }
   }
@@ -1057,6 +1117,7 @@ function updateEnemies(w, dt) {
 function updateProj(w, dt) {
   const lv = w.lv;
   for (const q of w.proj) {
+    sndBy = q.by || null;   // sons do projétil: de quem atirou
     q.life -= dt;
     if (q.stuck) continue;
     q.vy += q.g * dt; q.x += q.vx * dt; q.y += q.vy * dt;
@@ -1084,6 +1145,7 @@ function updateProj(w, dt) {
       if (q.pierce > 0) q.pierce--; else { q.life = 0; break; }
     }
   }
+  sndBy = null;
   w.proj = w.proj.filter(q => q.life > 0);
 
   for (const q of w.eproj) {
@@ -1226,7 +1288,9 @@ function update(w, dt) {
   if (w.lifeT > 0) w.lifeT -= dt;
   if (w.cine > 0) w.cine -= dt;
   for (const p of w.players) {
-    if (!p.dead) { updatePlayer(w, dt, p, w.state === 'play'); continue; }
+    p.remote = Net.role === 'host' && p !== w.p;
+    if (p.remote && p.rp && !hostAuth(p)) applyRemoteBody(w, p);
+    if (!p.dead) { asOwner(p, () => updatePlayer(w, dt, p, w.state === 'play')); continue; }
     p.vy += GRAV * dt; p.y += p.vy * dt; p.anim += dt;
     if (p.out || w.state !== 'play') continue;
     p.deadT -= dt;
@@ -1813,7 +1877,11 @@ function drawHud(g, w) {
     for (let i = 0; i < q.maxHp; i++) { g.fillStyle = i < q.hp ? '#e63946' : '#3a2a40'; g.fillRect(x + 14 + i * 4, ty + 7, 3, 3); }
     g.globalAlpha = 1; ty += 15;
   }
-  if (Net.role === 'client') drawText(g, Net.ping + 'MS', W - 4 - textW(Net.ping + 'MS'), H - 8, Net.ping > 150 ? '#ff9aa5' : '#8a7ac0');
+  // ping (o anfitrião vê o pior entre os convidados) e se a ligação passa por relay (servidor distante)
+  if (Net.role && (Net.role === 'client' || Net.conns.length) && Net.ping) {
+    const t = Net.ping + 'MS' + (Net.link === 'relay' ? ' RELAY' : '');
+    drawText(g, t, W - 4 - textW(t), H - 8, Net.ping > 150 || Net.link === 'relay' ? '#ff9aa5' : Net.ping > 80 ? '#ffd27a' : '#8a7ac0');
+  }
   // barra do chefe (embaixo, no centro: não disputa espaço com os corações)
   if (w.boss && w.bossActive && !w.boss.dead) {
     const b = w.boss, bw = 140, bx = Math.round(W / 2 - bw / 2), by = H - 13, fr = Math.max(0, b.hp) / b.maxHp;

@@ -16,12 +16,16 @@ Abra `index.html` no navegador. Para testar no celular, o multiplayer ou o modo 
 - **Criar sala**: título → *Multiplayer* → *Criar sala*. Aparece um código de 5 letras e os botões *Convidar* / *Copiar link*.
 - **Entrar**: digite o código (ou abra o link do convite, que já preenche o código) → *Entrar*. Quem entra no meio da fase cai direto nela.
 - O **anfitrião** escolhe as fases; vidas e moedas são do time. Quem fica sem vidas assiste e volta quando o time ganha uma vida (moedas).
+- **Mini-chat** no canto superior direito: Enter (ou T) abre no PC, o botão 💬 no celular (com frases rápidas). Avisos do jogo aparecem ali: quem perdeu ou ganhou vida, quem usou o especial, quem entrou ou saiu.
+- Cada aparelho ouve só os sons do próprio herói (e os do mundo: chefe, 1UP...). Clarão e tremida de tela também aparecem só para quem causou.
 - A pausa no multiplayer é só um menu: o jogo continua para os outros. O anfitrião precisa deixar o jogo aberto (se ele minimizar/bloquear a tela, o mundo para para todos).
 
 **Como funciona**: conexão direta entre os aparelhos (WebRTC) com a biblioteca [PeerJS](https://peerjs.com), carregada só quando você abre o multiplayer.
 O servidor público gratuito do PeerJS apenas apresenta os aparelhos um ao outro; quando a rede (ex.: 4G com CGNAT) não permite a ligação direta, o PeerJS usa um relay TURN gratuito dele.
-O anfitrião roda a simulação inteira; os convidados mandam os comandos e recebem o estado do mundo 20x/s (~6 KB/s), suavizado na tela. Ver `js/net.js`.
-Como tudo passa pelo anfitrião, o convidado sente um pequeno atraso (o ping aparece no canto da tela); entre amigos no mesmo país costuma ficar abaixo de 100 ms.
+O anfitrião roda a simulação (inimigos, golpes, dano); os convidados recebem o estado do mundo 30x/s, suavizado na tela. Ver `js/net.js`.
+- **Sem atraso para andar**: cada convidado simula o próprio herói na hora (andar, pular, agachar, planar) e manda a posição ao anfitrião. Empurrões, rolamento, mergulho e morte continuam sendo decididos pelo anfitrião.
+- **Dois canais**: um confiável para eventos, botões e chat, e um rápido, sem reenvio, para as fotos do mundo e as posições. Assim um pacote perdido no Wi-Fi não segura os seguintes.
+- O ping aparece no canto inferior direito (no anfitrião, o pior entre os convidados). Se aparecer **RELAY**, a conexão direta falhou e os dados passam por um servidor na Europa/EUA, o que aumenta muito o ping. Costuma acontecer em redes de empresa/escola, 4G com CGNAT ou roteadores que bloqueiam conexão direta.
 
 ## Controles
 | Ação | Teclado / mouse | Controle (gamepad) | Celular |

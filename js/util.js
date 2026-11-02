@@ -432,7 +432,7 @@ function touchSync() {
 }
 function onTouch(e) {
   if (!document.body.classList.contains('playing') || !Input.enabled) return;
-  if (e.target.closest && e.target.closest('.screen')) return;
+  if (e.target.closest && e.target.closest('.screen, #chat')) return;
   e.preventDefault(); Snd.init();
   if (!Touch.btns.length || performance.now() - Touch.layoutT > 2000) { touchLayout(); Touch.layoutT = performance.now(); }
   for (const t of e.changedTouches) {

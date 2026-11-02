@@ -629,9 +629,76 @@ function resize() {
   if (s > 1) s = Math.floor(s * 2 * dpr) / (2 * dpr);   // múltiplos inteiros da grade de alta resolução
   canvas.style.width = Math.round(W * s) + 'px';
   canvas.style.height = Math.round(H * s) + 'px';
+  // o chat fica no canto superior direito da tela do jogo (abaixo das moedas)
+  const rc = canvas.getBoundingClientRect(), st = document.documentElement.style;
+  st.setProperty('--cv-top', rc.top + 'px'); st.setProperty('--cv-right', Math.max(0, iw - rc.right) + 'px'); st.setProperty('--cv-h', rc.height + 'px');
 }
 addEventListener('resize', resize);
 addEventListener('orientationchange', resize);
+
+// ---------- Mini-chat do multiplayer ----------
+// Canto superior direito: mensagens dos jogadores e avisos do jogo (vida perdida, especial...). Some sozinho depois de uns segundos.
+const QUICK_MSGS = ['Vem cá!', 'Me espera!', 'Socorro!', 'Boa!', 'Vamos!', 'Peguem as moedas!'];
+const Chat = {
+  open: false, shown: false,
+  add(m) {
+    if (!m || !m.text) return;
+    const el = document.createElement('div');
+    el.className = 'chat-line' + (m.sys ? ' sys' : '');
+    if (m.sys) el.textContent = m.text;
+    else {
+      const r = Net.roster.find(x => x.id === m.id), b = document.createElement('b');
+      b.textContent = (r ? r.ch.name : 'Jogador') + ': ';
+      b.style.color = (r && r.ch.accent) || '#ffd23f';
+      el.append(b, document.createTextNode(m.text));
+      if (m.id !== Net.pid) Snd.sfx('click');
+    }
+    const log = $('#chat-log');
+    log.appendChild(el);
+    while (log.children.length > 8) log.firstChild.remove();
+    setTimeout(() => el.classList.add('old'), m.sys ? 6000 : 9000);
+  },
+  clear() { $('#chat-log').innerHTML = ''; chatClose(false); },
+};
+function chatOpen() {
+  if (!Net.role || !Net.inLevel || Game.mode !== 'play' || Chat.open) return;
+  Chat.open = true; Input.enabled = false; Input.clear();
+  document.body.classList.add('chatting');
+  $('#chat-form').hidden = false;
+  const i = $('#chat-in'); i.value = ''; i.focus();
+}
+function chatClose(sendIt) {
+  if (!Chat.open) return;
+  const i = $('#chat-in');
+  if (sendIt) Net.chat(i.value);
+  Chat.open = false; $('#chat-form').hidden = true; i.blur();
+  document.body.classList.remove('chatting');
+  if (Game.mode === 'play') { Input.enabled = true; Input.clear(); }
+}
+// mostra o chat só durante uma fase do multiplayer
+function chatSync() {
+  const on = !!(Net.role && Net.inLevel && Game.world && document.body.classList.contains('playing'));
+  if (on === Chat.shown) return;
+  Chat.shown = on; $('#chat').hidden = !on;
+  if (!on) chatClose(false);
+}
+for (const q of QUICK_MSGS) {
+  const b = document.createElement('button');
+  b.type = 'button'; b.className = 'chip'; b.textContent = q;
+  b.addEventListener('pointerdown', e => e.preventDefault());   // não tira o foco do campo
+  b.addEventListener('click', () => { Net.chat(q); chatClose(false); });
+  $('#chat-quick').appendChild(b);
+}
+$('#chat-form').addEventListener('submit', e => { e.preventDefault(); chatClose(true); });
+$('#chat-in').addEventListener('blur', () => setTimeout(() => { if (Chat.open && document.activeElement !== $('#chat-in')) chatClose(false); }, 150));
+$('#chat-btn').addEventListener('pointerdown', e => e.preventDefault());
+$('#chat-btn').addEventListener('click', () => { Snd.init(); if (Chat.open) chatClose(true); else chatOpen(); });
+addEventListener('keydown', e => {
+  if (Chat.open) { if (e.key === 'Escape') { e.preventDefault(); chatClose(false); } return; }
+  if ((e.key === 'Enter' || e.code === 'KeyT') && !KEYMAP[e.code] && e.target.tagName !== 'INPUT' && Net.role && Net.inLevel && Game.mode === 'play') {
+    e.preventDefault(); chatOpen();
+  }
+});
 
 // ---------- Laço principal ----------
 let last = performance.now(), acc = 0;
@@ -639,7 +706,7 @@ function frame(now) {
   requestAnimationFrame(frame);
   const dt = Math.min(0.1, (now - last) / 1000);
   last = now; Game.t += dt;
-  pollPad(dt); touchSync();
+  pollPad(dt); touchSync(); chatSync();
   // no multiplayer a pausa é só um menu por cima: o mundo continua rodando para os outros
   const live = Game.world && (Game.mode === 'play' || (Game.mode === 'pause' && Net.role));
   if (live) {

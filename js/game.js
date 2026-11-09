@@ -265,6 +265,7 @@ function startLevel(idx, roster = [{ id: 0, ch: Game.save.char, b: myBuild() }],
     state: 'play', bossActive: false, boss: null, bossDrops: 0, flash: 0,
   };
   roster.forEach(r => addPlayer(w, r));
+  scaleEnemies(w);
   const p = w.p = w.players.find(q => q.id === me) || w.players[0];
   w.boss = w.enemies.find(e => e.boss) || null;
   w.cam.x = clamp(cxOf(p) - W / 2, 0, lv.w * T - W);
@@ -310,6 +311,19 @@ function nearestPlayer(w, e) {
   return best || w.p;
 }
 
+// Multiplayer: cada jogador a mais deixa os inimigos (e o chefe) mais resistentes, para manter a dificuldade
+const HP_PER_PLAYER = 0.5;                            // 2 jogadores: ×1,5 · 3: ×2 · 4: ×2,5
+const enemyHpK = n => 1 + HP_PER_PLAYER * Math.max(0, n - 1);
+// Recalcula a vida máxima de todos os inimigos para o número atual de heróis (alguém entrou ou saiu no meio da fase).
+// Quem já apanhou mantém a mesma fração de vida.
+function scaleEnemies(w) {
+  const k = enemyHpK(w.players.length);
+  for (const e of w.enemies) {
+    const max = Math.max(1, Math.round(ENEMIES[e.type].hp * k));
+    if (max === e.maxHp) continue;
+    e.hp = e.hp / e.maxHp * max; e.maxHp = max;
+  }
+}
 function makeEnemy(s, id) {
   const d = ENEMIES[s.t];
   return {
@@ -1323,7 +1337,10 @@ function updateVisuals(w, dt) {
   updateAmbient(w, dt);
   for (const s of w.secrets) if (s.open && s.fade > 0) s.fade = Math.max(0, s.fade - dt * 2.2);
   // subiu de nível durante a fase: aviso só neste aparelho (os pontos são gastos na tela de Evolução)
-  const me = w.p, lvl = xpPreview(progOf(me.cls.id), me.xpGot || 0).lvl;
+  // (o nível só é recalculado quando o XP da fase muda, não a cada quadro)
+  const me = w.p;
+  if (w.xpSeen !== me.xpGot) { w.xpSeen = me.xpGot; w.xpLvl = xpPreview(progOf(me.cls.id), me.xpGot || 0).lvl; }
+  const lvl = w.xpLvl;
   // vibração do controle: dano levado e especial
   if (w.lastHp !== undefined && me.hp < w.lastHp) padRumble(220, 0.75, 0.5);
   if (w.lastSp !== undefined && w.lastSp >= SPECIAL_MAX && me.sp < w.lastSp) padRumble(me.cls.id === 'dragonico' ? FLAMER_T * 1000 : 400, 0.6, 0.9);

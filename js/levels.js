@@ -56,7 +56,9 @@ function genLevel(def) {
   };
   const flat = n => { ground(x, x + n, gy); x += n; sinceCheck += n; };
   // caixa quebrável no chão (às vezes duas empilhadas)
-  const crate = (tx, g) => { tiles[g - 1][tx] = 4; if (R() < 0.3) tiles[g - 2][tx] = 4; };
+  // (o sorteio acontece sempre, para não mudar o resto da fase; só não põe a caixa em cima de um inimigo)
+  const spawnOn = (tx, g) => L.spawns.some(s => Math.floor(s.x / T) === tx && s.y === g * T);
+  const crate = (tx, g) => { const two = R() < 0.3; if (spawnOn(tx, g)) return; tiles[g - 1][tx] = 4; if (two) tiles[g - 2][tx] = 4; };
   let secrets = 0, ledges = 0, nests = 0, hills = 0;
   // Morro com túnel escondido: entra e sai quebrando paredes falsas; lá dentro há moedas e um baú
   const secret = () => {
@@ -187,7 +189,7 @@ function genLevel(def) {
   const surf = tx => { for (let y = 1; y < h; y++) { const t = tiles[y][tx]; if (t) return t === 1 ? y : -1; } return -1; };
   for (let tries = 0; crates < 8 && tries < 80; tries++) {
     const tx = rint(16, w - 22), g = surf(tx);
-    if (g < 3 || surf(tx - 1) !== g || surf(tx + 1) !== g || L.checks.some(c => Math.abs(c.x / T - tx) < 3) || clear.some(([a, b]) => tx >= a - 3 && tx <= b + 2)) continue;
+    if (g < 3 || spawnOn(tx, g) || surf(tx - 1) !== g || surf(tx + 1) !== g || L.checks.some(c => Math.abs(c.x / T - tx) < 3) || clear.some(([a, b]) => tx >= a - 3 && tx <= b + 2)) continue;
     tiles[g - 1][tx] = 4; crates++;
   }
   L.goal = { x: (w - 6) * T + 8, y: gy * T };

@@ -3,7 +3,7 @@
 Plataforma 2D em pixel art (personagens e inimigos em alta resolução, 2x o cenário), feita em HTML5 Canvas + JavaScript puro (sem build, sem dependências).
 Funciona no navegador do PC e do celular, e pode ser instalada como app (PWA).
 
-Feito do zero com vibe coding no **Claude Code**: a primeira versão jogável ficou pronta em 2 horas, e o jogo hoje tem cerca de 4.000 linhas de JavaScript.
+Feito do zero com vibe coding no **Claude Code**: a primeira versão jogável ficou pronta em 2 horas, e o jogo hoje tem cerca de 5.400 linhas de JavaScript.
 
 **▶ Jogar online:** https://vasconcellosgabriel.github.io/herois-de-pixel/
 
@@ -16,6 +16,7 @@ Abra `index.html` no navegador. Para testar no celular, o multiplayer ou o modo 
 - **Criar sala**: título → *Multiplayer* → *Criar sala*. Aparece um código de 5 letras e os botões *Convidar* / *Copiar link*.
 - **Entrar**: digite o código (ou abra o link do convite, que já preenche o código) → *Entrar*. Quem entra no meio da fase cai direto nela.
 - O **anfitrião** escolhe as fases; vidas e moedas são do time. Quem fica sem vidas assiste e volta quando o time ganha uma vida (moedas).
+- **Dificuldade em grupo**: cada jogador a mais deixa os inimigos e o chefe 50% mais resistentes (2 jogadores: ×1,5 de vida · 3: ×2 · 4: ×2,5). Se alguém entra ou sai no meio da fase, a vida deles se ajusta na hora.
 - **Mini-chat** no canto superior direito: Enter (ou T) abre no PC, o botão 💬 no celular (com frases rápidas). Avisos do jogo aparecem ali: quem perdeu ou ganhou vida, quem usou o especial, quem entrou ou saiu.
 - Cada aparelho ouve só os sons do próprio herói (e os do mundo: chefe, 1UP...). Clarão e tremida de tela também aparecem só para quem causou.
 - A pausa no multiplayer é só um menu: o jogo continua para os outros. O anfitrião precisa deixar o jogo aberto (se ele minimizar/bloquear a tela, o mundo para para todos).

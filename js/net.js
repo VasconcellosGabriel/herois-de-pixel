@@ -7,7 +7,7 @@
 // (sem reenvio e fora de ordem) para as fotos e posições: um pacote perdido no Wi-Fi não segura os seguintes.
 // O servidor público e gratuito do PeerJS só apresenta os aparelhos um ao outro; depois a conexão é direta
 // (ou passa por um "relay" TURN gratuito do PeerJS quando a rede não permite a ligação direta).
-const PROTO = 4, MAX_PLAYERS = 4, SNAP_EVERY = 2, FAST_ID = 100;
+const PROTO = 5, MAX_PLAYERS = 4, SNAP_EVERY = 2, FAST_ID = 100;
 const ID_PREFIX = 'heroisdepixel-v1-', CODE_CHARS = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789', CODE_LEN = 5;
 const PEERJS_URLS = ['https://cdnjs.cloudflare.com/ajax/libs/peerjs/1.5.4/peerjs.min.js', 'https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js'];
 
@@ -121,6 +121,7 @@ function syncPlayers(w) {
   w.roster = Net.roster;
   w.players = w.players.filter(p => Net.roster.some(r => r.id === p.id));
   for (const r of Net.roster) if (!playerById(w, r.id)) addPlayer(w, r);
+  scaleEnemies(w);                     // mais (ou menos) heróis: inimigos mais (ou menos) resistentes
 }
 
 // ---------- Anfitrião ----------
@@ -362,7 +363,10 @@ function applyOwn(w, p, a) {
   p.pred = true;
 }
 function applySnap(w, m) {
+  const was = w.state;
   WF.forEach((k, i) => { w[k] = m.w[i]; });
+  // game over: a fase recomeça com 3 vidas também no save do convidado (como no anfitrião)
+  if (w.state === 'over' && was !== 'over') { Game.save.lives = START_LIVES; persist(); }
   for (const a of m.P) {
     const p = playerById(w, a[0]);
     if (!p) continue;

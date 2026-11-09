@@ -4,10 +4,12 @@ const http = require('http'), fs = require('fs'), path = require('path'), os = r
 const root = __dirname, port = +process.argv[2] || 8080;
 const types = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.json': 'application/json', '.svg': 'image/svg+xml', '.png': 'image/png' };
 http.createServer((req, res) => {
-  let p = decodeURIComponent(req.url.split('?')[0]);
+  let p;
+  try { p = decodeURIComponent(req.url.split('?')[0]); }
+  catch (e) { res.writeHead(400); return res.end('400'); }      // URL malformada (ex.: "/%"): não derruba o servidor
   if (p.endsWith('/')) p += 'index.html';
   const f = path.join(root, p);
-  if (!f.startsWith(root)) { res.writeHead(403); return res.end(); }
+  if (f !== root && !f.startsWith(root + path.sep)) { res.writeHead(403); return res.end(); }   // não sai da pasta do jogo
   fs.readFile(f, (err, data) => {
     if (err) { res.writeHead(404); return res.end('404'); }
     res.writeHead(200, { 'Content-Type': types[path.extname(f)] || 'application/octet-stream', 'Cache-Control': 'no-store' });

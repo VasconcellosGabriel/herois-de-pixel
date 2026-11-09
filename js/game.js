@@ -1312,7 +1312,7 @@ function drawFire(g, w, cx, cy) {
 
 // ---------- Partículas de ambiente ----------
 function initAmbient(w) {
-  const n = { forest: 26, spores: 30, dust: 30, embers: 34, snow: 60, swamp: 30, sand: 40, sparkle: 30, autumn: 34, frost: 34 }[w.th.amb] || 20;
+  const n = { forest: 26, spores: 30, dust: 30, embers: 34, snow: 60, swamp: 30, sand: 40, sparkle: 30, autumn: 34, frost: 34, thaw: 36, ash: 46, fog: 14 }[w.th.amb] || 20;
   for (let i = 0; i < n; i++) w.amb.push(newAmb(w, true));
 }
 function newAmb(w, anywhere) {
@@ -1326,6 +1326,9 @@ function newAmb(w, anywhere) {
   else if (k === 'sand') { a.kind = 'sand'; a.vx = rnd(40, 80); a.vy = rnd(-3, 6); a.y = w.cam.y + rnd(0, H); if (!anywhere) a.x = w.cam.x - rnd(0, 10); }
   else if (k === 'sparkle') { a.kind = 'sparkle'; a.vx = rnd(-3, 3); a.vy = rnd(-8, -2); a.y = w.cam.y + rnd(0, H); }
   else if (k === 'autumn') { a.kind = 'leaf'; a.col = ['#e0602a', '#f0a030', '#c03a24', '#f4cc4a'][(Math.random() * 4) | 0]; a.vx = rnd(10, 24); a.vy = rnd(10, 22); }
+  else if (k === 'thaw') { if (Math.random() < 0.55) { a.kind = 'snow'; a.vx = rnd(-6, 2); a.vy = rnd(8, 18); a.sz = 1; if (!anywhere) a.y = w.cam.y - rnd(0, 16); } else { a.kind = 'bubble'; a.vx = rnd(-3, 3); a.vy = rnd(-12, -5); } }
+  else if (k === 'ash' && Math.random() < 0.7) { a.kind = 'ash'; a.vx = rnd(-8, 8); a.vy = rnd(8, 20); if (!anywhere) a.y = w.cam.y - rnd(0, 16); }
+  else if (k === 'fog') { a.kind = 'fog'; a.vx = rnd(4, 11); a.vy = rnd(-1, 1); a.y = w.cam.y + rnd(H * 0.35, H); a.sz = rnd(18, 40); if (!anywhere) a.x = w.cam.x - 18; }
   else if (k === 'frost') { a.kind = 'sparkle'; a.col = '#bfefff'; a.vx = rnd(-3, 3); a.vy = rnd(2, 8); a.y = w.cam.y + rnd(0, H); }
   else { a.kind = 'ember'; a.vx = rnd(-10, 10); a.vy = rnd(-45, -18); a.col = Math.random() < 0.5 ? '#ff8a2a' : '#ffd27a'; }
   return a;
@@ -1843,6 +1846,8 @@ function render(w) {
     else if (a.kind === 'dust') { g.globalAlpha = 0.25; g.fillStyle = '#e8e0ff'; g.fillRect(x, y, 1, 1); g.globalAlpha = 1; }
     else if (a.kind === 'snow') { g.globalAlpha = 0.85; g.fillStyle = '#ffffff'; g.fillRect(x, y, a.sz, a.sz); g.globalAlpha = 1; }
     else if (a.kind === 'bubble') { g.globalAlpha = 0.6; g.fillStyle = '#b8f070'; g.fillRect(x, y, 2, 1); g.fillRect(x, y + 2, 2, 1); g.fillRect(x - 1, y + 1, 1, 1); g.fillRect(x + 2, y + 1, 1, 1); g.globalAlpha = 1; }
+    else if (a.kind === 'ash') { g.globalAlpha = 0.7; g.fillStyle = Math.floor(a.ph * 3) % 2 ? '#b4aea8' : '#7e7874'; g.fillRect(x, y, 2, 1); g.globalAlpha = 1; }
+    else if (a.kind === 'fog') { g.globalAlpha = 0.07; g.fillStyle = '#d8d0f0'; g.fillRect(x - a.sz / 2, y, a.sz, 4); g.fillRect(x - a.sz / 3, y - 2, a.sz * 0.66, 8); g.globalAlpha = 1; }
     else if (a.kind === 'sand') { g.globalAlpha = 0.55; g.fillStyle = '#ffe0a0'; g.fillRect(x, y, 2, 1); g.globalAlpha = 1; }
     else if (a.kind === 'sparkle') { const b = (Math.sin(a.ph * 4) + 1) / 2; g.globalAlpha = 0.3 + b * 0.7; g.fillStyle = a.col || '#fff6c8'; g.fillRect(x, y, 1, 1); if (b > 0.8) { g.fillRect(x - 1, y, 3, 1); g.fillRect(x, y - 1, 1, 3); } g.globalAlpha = 1; }
     else { g.globalAlpha = 0.9; g.fillStyle = a.col; g.fillRect(x, y, 1 + (Math.floor(a.ph * 3) % 2), 1); g.globalAlpha = 1; }

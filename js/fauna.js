@@ -394,3 +394,9 @@ ON_KILL.bigslime = (w, e) => { for (const d of [-1, 1]) { const m = spawnEnemy(w
 
 // ---------- projéteis ----------
 EPROJ_DRAW.venom = (g, q, x, y) => { g.fillStyle = '#5ad02a'; g.fillRect(x + 1, y, 4, 6); g.fillRect(x, y + 1, 6, 4); g.fillStyle = '#c8ff8a'; g.fillRect(x + 1, y + 1, 2, 2); };
+
+// skins nas fases de transição (temas em js/worlds.js): mesmas cores do mundo de destino
+Object.assign(ENEMY_SKIN, { graveyard: { bat: 'blood', ghost: 'crimson' }, peak: { knight: 'gold', guard: 'gold', ghost: 'storm' }, ash: { knight: 'demon' }, thaw: { skeleton: 'frost' } });
+Object.assign(WOLF_SKIN, { thaw: 'snow', savanna: 'brown', ash: 'hell', graveyard: 'dark' });
+Object.assign(HAWK_SKIN, { savanna: 'sand', peak: 'gold' });
+SPIDER_PAL.graveyard = SPIDER_PAL.vampire;

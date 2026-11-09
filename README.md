@@ -67,11 +67,13 @@ No celular cada dedo é tratado à parte (dá para andar, pular e atacar ao mesm
 |---|---|---|
 | 1. Reino Verde | Floresta, Cavernas de Cristal, Castelo Sombrio | **Rei Golem**: salto, pedras e investida; o núcleo no peito é o ponto fraco (exposto quando ele bate na parede) |
 | 2. Picos Gelados | Bosque Outonal → Primeira Neve → Lago Congelado → Caverna de Gelo (no gelo o chão escorrega) | **Yeti Ancião**, caçador das neves: arremessa a lança (baixa: pule; alta: abaixe-se), bate o pé e faz cair uma bola de neve gigante que rola pela arena, e espalha estacas de gelo pelo chão. Depois do pisão ele ruge: a boca aberta é o ponto fraco |
-| 3. Pântano Gosmento | 3 fases de brejo | **Rei Gosma**: pulos em sequência com ondas de gosma, cuspe em arco e filhotes de slime (a coroa é o ponto fraco) |
-| 4. Deserto Escaldante | 3 fases de dunas e ruínas | **Escorpião Imperador**: investida (fica tonto ao bater na parede), rajada de ferrões e mergulho na areia |
-| 5. Montanha de Fogo | 3 fases de vulcão | **Dragão de Magma**: chuva de fogo, rasante e sopro rasteiro (agache!); o peito em brasa é o ponto fraco quando ele pousa |
-| 6. Castelo do Vampiro | 4 fases | **Conde Sanguinário**: some e reaparece ao seu lado, morcegos teleguiados, leque de orbes e investida da capa |
-| 7. Cidadela Celeste | 3 fases entre as nuvens | **Titã da Tempestade** (chefe final): raios marcados no chão, rajadas de vento, anel de orbes e soco no chão |
+| 3. Pântano Gosmento | Degelo do Brejo (a neve derretendo) → 2 fases de brejo | **Rei Gosma**: pulos em sequência com ondas de gosma, cuspe em arco e filhotes de slime (a coroa é o ponto fraco) |
+| 4. Deserto Escaldante | Savana Rachada → Oásis → Ruínas do Faraó | **Escorpião Imperador**: investida (fica tonto ao bater na parede), rajada de ferrões e mergulho na areia |
+| 5. Montanha de Fogo | Trilha de Cinzas (floresta queimada ao pé do vulcão) → 2 fases de vulcão | **Dragão de Magma**: chuva de fogo, rasante e sopro rasteiro (agache!); o peito em brasa é o ponto fraco quando ele pousa |
+| 6. Castelo do Vampiro | Cemitério do Conde (o castelo no alto da colina) → 3 fases dentro do castelo | **Conde Sanguinário**: some e reaparece ao seu lado, morcegos teleguiados, leque de orbes e investida da capa |
+| 7. Cidadela Celeste | Pico do Amanhecer (acima do mar de nuvens) → 2 fases na cidadela | **Titã da Tempestade** (chefe final): raios marcados no chão, rajadas de vento, anel de orbes e soco no chão |
+
+A primeira fase de cada mundo faz a ponte com o mundo anterior, e o cenário muda aos poucos até o tema novo.
 
 Cada chefe tem uma fase de **fúria** (abaixo de 50% da vida): fica mais rápido e ataca mais. Nos mundos avançados os inimigos comuns são mais resistentes.
 

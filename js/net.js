@@ -7,7 +7,7 @@
 // (sem reenvio e fora de ordem) para as fotos e posições: um pacote perdido no Wi-Fi não segura os seguintes.
 // O servidor público e gratuito do PeerJS só apresenta os aparelhos um ao outro; depois a conexão é direta
 // (ou passa por um "relay" TURN gratuito do PeerJS quando a rede não permite a ligação direta).
-const PROTO = 6, MAX_PLAYERS = 4, SNAP_EVERY = 2, FAST_ID = 100;
+const PROTO = 7, MAX_PLAYERS = 4, SNAP_EVERY = 2, FAST_ID = 100;
 const ID_PREFIX = 'heroisdepixel-v1-', CODE_CHARS = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789', CODE_LEN = 5;
 const PEERJS_URLS = ['https://cdnjs.cloudflare.com/ajax/libs/peerjs/1.5.4/peerjs.min.js', 'https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js'];
 

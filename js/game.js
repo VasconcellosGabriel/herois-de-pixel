@@ -70,7 +70,8 @@ const BOSS_INFO = {
 };
 const weakRect = e => { const b = e.boss && BOSS_INFO[e.type]; return b && b.core ? b.core(e) : null; };
 // Extensões (js/bestiary.js): imagem, deslocamento do desenho e transparência de cada tipo de inimigo; desenho dos projéteis
-const ENEMY_IMG = {}, ENEMY_YOFF = {}, ENEMY_ALPHA = {}, EPROJ_DRAW = {};
+// ENEMY_PRE: desenho antes do inimigo (fio da aranha) · ON_KILL: o que acontece quando ele morre (só no anfitrião)
+const ENEMY_IMG = {}, ENEMY_YOFF = {}, ENEMY_ALPHA = {}, EPROJ_DRAW = {}, ENEMY_PRE = {}, ON_KILL = {};
 // Cor de cada jogador no multiplayer local
 const LOCAL_COLS = ['#ffd23f', '#4aa3ff', '#ff4d6d', '#7bff9a'];
 
@@ -412,6 +413,7 @@ function killEnemy(w, e) {
   const es = { type: e.type, st: e.st, t: e.t, hurt: e.hurt, ground: e.ground, vx: e.vx, throwT: e.throwT, hp: e.hp, maxHp: e.maxHp };
   addFx(w, { type: 'corpse', es, x: r1(cxOf(e)), y: r1(e.y + e.h + 1 + enemyYOff(e)), flip: e.dir < 0, vy: e.boss ? 0 : -150, t: e.boss ? 2.6 : 0.5, max: e.boss ? 2.6 : 0.5, boss: !!e.boss });
   burst(w, cxOf(e), cyOf(e), e.boss ? '#ffb347' : '#fff', e.boss ? 40 : 10, e.boss ? 160 : 90, 0.7);
+  if (ON_KILL[e.type]) ON_KILL[e.type](w, e);
   w.coinsGot += e.coin; checkLifeUp(w, e.lastBy); sfx('coin');
   for (let i = 0; i < Math.min(e.coin, 6); i++) addFx(w, { type: 'coinpop', x: r1(cxOf(e)), y: r1(cyOf(e)), vx: r1(rnd(-40, 40)), vy: r1(rnd(-150, -90)), t: 0.7, max: 0.7 });
   floatText(w, cxOf(e), e.y - 8, '+' + e.coin, '#ffd23f');
@@ -1310,7 +1312,7 @@ function drawFire(g, w, cx, cy) {
 
 // ---------- Partículas de ambiente ----------
 function initAmbient(w) {
-  const n = { forest: 26, spores: 30, dust: 30, embers: 34, snow: 60, swamp: 30, sand: 40, sparkle: 30 }[w.th.amb] || 20;
+  const n = { forest: 26, spores: 30, dust: 30, embers: 34, snow: 60, swamp: 30, sand: 40, sparkle: 30, autumn: 34, frost: 34 }[w.th.amb] || 20;
   for (let i = 0; i < n; i++) w.amb.push(newAmb(w, true));
 }
 function newAmb(w, anywhere) {
@@ -1323,6 +1325,8 @@ function newAmb(w, anywhere) {
   else if (k === 'swamp') { a.kind = Math.random() < 0.6 ? 'firefly' : 'bubble'; a.vx = rnd(-4, 4); a.vy = a.kind === 'bubble' ? rnd(-14, -6) : rnd(-4, 4); if (a.kind === 'firefly') a.y = w.cam.y + rnd(50, 150); }
   else if (k === 'sand') { a.kind = 'sand'; a.vx = rnd(40, 80); a.vy = rnd(-3, 6); a.y = w.cam.y + rnd(0, H); if (!anywhere) a.x = w.cam.x - rnd(0, 10); }
   else if (k === 'sparkle') { a.kind = 'sparkle'; a.vx = rnd(-3, 3); a.vy = rnd(-8, -2); a.y = w.cam.y + rnd(0, H); }
+  else if (k === 'autumn') { a.kind = 'leaf'; a.col = ['#e0602a', '#f0a030', '#c03a24', '#f4cc4a'][(Math.random() * 4) | 0]; a.vx = rnd(10, 24); a.vy = rnd(10, 22); }
+  else if (k === 'frost') { a.kind = 'sparkle'; a.col = '#bfefff'; a.vx = rnd(-3, 3); a.vy = rnd(2, 8); a.y = w.cam.y + rnd(0, H); }
   else { a.kind = 'ember'; a.vx = rnd(-10, 10); a.vy = rnd(-45, -18); a.col = Math.random() < 0.5 ? '#ff8a2a' : '#ffd27a'; }
   return a;
 }
@@ -1557,7 +1561,9 @@ function drawPlayer(g, w, p, cx, cy, tag) {
 // nome sem acentos e curto, para a fonte de pixels
 const tagName = s => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase().slice(0, 8);
 
-function enemyImage(e, lv) {
+// skin do mundo (js/fauna.js): o mesmo inimigo recolorido conforme o tema da fase
+function enemyImage(e, lv) { const img = baseEnemyImage(e, lv), k = typeof skinOf === 'function' && skinOf(e, lv); return k ? skinned(img, k) : img; }
+function baseEnemyImage(e, lv) {
   switch (e.type) {
     case 'slime': {
       const th = lv.theme;
@@ -1671,6 +1677,7 @@ function render(w) {
     if (e.dead || !e.active) continue;
     const img = enemyImage(e, lv), yOff = enemyYOff(e);
     const shake = e.boss && e.st === 'tele' ? Math.round(rnd(-1, 1)) : 0, bob = e.type === 'bat' ? 0 : 0;
+    if (ENEMY_PRE[e.type]) ENEMY_PRE[e.type](g, e, cx, cy, w);
     if (!e.fly) drawShadow(g, w, cxOf(e), e.y + e.h, cx, cy, e.boss ? 34 : e.w + 4);
     else drawShadow(g, w, cxOf(e), e.y + e.h, cx, cy, 8);
     let spr = e.flash > 0 ? whiteOf(img) : img;
@@ -1831,13 +1838,13 @@ function render(w) {
   for (const a of w.amb) {
     const x = Math.round(a.x - cx), y = Math.round(a.y - cy);
     if (a.kind === 'firefly') { const b = (Math.sin(a.ph * 3) + 1) / 2; g.globalAlpha = 0.3 + b * 0.7; g.fillStyle = '#e8ff7a'; g.fillRect(x, y, 2, 2); g.globalCompositeOperation = 'lighter'; drawGlow(g, x + 1, y + 1, 8, '#d6ff5a', 0.5 * b); g.globalCompositeOperation = 'source-over'; g.globalAlpha = 1; }
-    else if (a.kind === 'leaf') { g.fillStyle = Math.floor(a.ph * 2) % 2 ? '#7ac070' : '#e0a040'; g.fillRect(x, y, 2, 1); g.fillRect(x + 1, y + 1, 1, 1); }
+    else if (a.kind === 'leaf') { g.fillStyle = a.col ? (Math.floor(a.ph * 2) % 2 ? a.col : shade(a.col, -0.25)) : Math.floor(a.ph * 2) % 2 ? '#7ac070' : '#e0a040'; g.fillRect(x, y, 2, 1); g.fillRect(x + 1, y + 1, 1, 1); }
     else if (a.kind === 'spore') { g.globalAlpha = 0.4 + (Math.sin(a.ph * 2) + 1) * 0.3; g.fillStyle = a.col; g.fillRect(x, y, 1, 1); g.globalAlpha = 1; }
     else if (a.kind === 'dust') { g.globalAlpha = 0.25; g.fillStyle = '#e8e0ff'; g.fillRect(x, y, 1, 1); g.globalAlpha = 1; }
     else if (a.kind === 'snow') { g.globalAlpha = 0.85; g.fillStyle = '#ffffff'; g.fillRect(x, y, a.sz, a.sz); g.globalAlpha = 1; }
     else if (a.kind === 'bubble') { g.globalAlpha = 0.6; g.fillStyle = '#b8f070'; g.fillRect(x, y, 2, 1); g.fillRect(x, y + 2, 2, 1); g.fillRect(x - 1, y + 1, 1, 1); g.fillRect(x + 2, y + 1, 1, 1); g.globalAlpha = 1; }
     else if (a.kind === 'sand') { g.globalAlpha = 0.55; g.fillStyle = '#ffe0a0'; g.fillRect(x, y, 2, 1); g.globalAlpha = 1; }
-    else if (a.kind === 'sparkle') { const b = (Math.sin(a.ph * 4) + 1) / 2; g.globalAlpha = 0.3 + b * 0.7; g.fillStyle = '#fff6c8'; g.fillRect(x, y, 1, 1); if (b > 0.8) { g.fillRect(x - 1, y, 3, 1); g.fillRect(x, y - 1, 1, 3); } g.globalAlpha = 1; }
+    else if (a.kind === 'sparkle') { const b = (Math.sin(a.ph * 4) + 1) / 2; g.globalAlpha = 0.3 + b * 0.7; g.fillStyle = a.col || '#fff6c8'; g.fillRect(x, y, 1, 1); if (b > 0.8) { g.fillRect(x - 1, y, 3, 1); g.fillRect(x, y - 1, 1, 3); } g.globalAlpha = 1; }
     else { g.globalAlpha = 0.9; g.fillStyle = a.col; g.fillRect(x, y, 1 + (Math.floor(a.ph * 3) % 2), 1); g.globalAlpha = 1; }
   }
   g.restore();

@@ -3,7 +3,7 @@
 Plataforma 2D em pixel art (personagens e inimigos em alta resolução, 2x o cenário), feita em HTML5 Canvas + JavaScript puro (sem build, sem dependências).
 Funciona no navegador do PC e do celular, e pode ser instalada como app (PWA).
 
-Feito do zero com vibe coding no **Claude Code**: a primeira versão jogável ficou pronta em 2 horas, e o jogo hoje tem cerca de 6.600 linhas de JavaScript: **30 fases em 7 mundos**, 7 chefes, multiplayer online e local.
+Feito do zero com vibe coding no **Claude Code**: a primeira versão jogável ficou pronta em 2 horas, e o jogo hoje tem cerca de 7.300 linhas de JavaScript: **30 fases em 7 mundos**, 7 chefes, multiplayer online e local.
 
 **▶ Jogar online:** https://vasconcellosgabriel.github.io/herois-de-pixel/
 
@@ -66,19 +66,25 @@ No celular cada dedo é tratado à parte (dá para andar, pular e atacar ao mesm
 | Mundo | Fases | Chefe |
 |---|---|---|
 | 1. Reino Verde | Floresta, Cavernas de Cristal, Castelo Sombrio | **Rei Golem**: salto, pedras e investida; o núcleo no peito é o ponto fraco (exposto quando ele bate na parede) |
-| 2. Picos Gelados (o chão escorrega) | 4 fases de neve e gelo | **Yeti Ancião**: salto com ondas de gelo, bolas de neve e rugido que derruba estalactites (a boca aberta é o ponto fraco) |
+| 2. Picos Gelados | Bosque Outonal → Primeira Neve → Lago Congelado → Caverna de Gelo (no gelo o chão escorrega) | **Yeti Ancião**, caçador das neves: arremessa a lança (baixa: pule; alta: abaixe-se), bate o pé e faz cair uma bola de neve gigante que rola pela arena, e espalha estacas de gelo pelo chão. Depois do pisão ele ruge: a boca aberta é o ponto fraco |
 | 3. Pântano Gosmento | 3 fases de brejo | **Rei Gosma**: pulos em sequência com ondas de gosma, cuspe em arco e filhotes de slime (a coroa é o ponto fraco) |
 | 4. Deserto Escaldante | 3 fases de dunas e ruínas | **Escorpião Imperador**: investida (fica tonto ao bater na parede), rajada de ferrões e mergulho na areia |
-| 5. Montanha de Fogo | 3 fases de vulcão | **Dragão de Magma**: chuva de fogo, rasante e sopro rasteiro (agache!); o peito em brasa é o ponto fraco |
+| 5. Montanha de Fogo | 3 fases de vulcão | **Dragão de Magma**: chuva de fogo, rasante e sopro rasteiro (agache!); o peito em brasa é o ponto fraco quando ele pousa |
 | 6. Castelo do Vampiro | 4 fases | **Conde Sanguinário**: some e reaparece ao seu lado, morcegos teleguiados, leque de orbes e investida da capa |
 | 7. Cidadela Celeste | 3 fases entre as nuvens | **Titã da Tempestade** (chefe final): raios marcados no chão, rajadas de vento, anel de orbes e soco no chão |
 
 Cada chefe tem uma fase de **fúria** (abaixo de 50% da vida): fica mais rápido e ataca mais. Nos mundos avançados os inimigos comuns são mais resistentes.
 
 ## Inimigos
-- **Reino Verde**: slime, **falcão raivoso** (circula no alto e mergulha em você), **planta carnívora**, morcego, esqueleto, **fantasma** (atravessa paredes), cavaleiro, **guarda da peste**
-- **Novos**: **sapo** (pula em você), **escorpião** (crava o ferrão de cima: agachar não adianta), **diabrete** (voa à distância e atira bolas de fogo)
-- Os slimes mudam de cor em cada mundo.
+Cada fase tem inimigos que combinam com o lugar (morcegos só em cavernas e castelos, demônios na forja etc.).
+- **Reino Verde**: slime, **falcão raivoso** (circula no alto e mergulha em você), **planta carnívora**, morcego, **aranha** (fica pendurada no fio e cai quando você passa embaixo), esqueleto, **fantasma** (atravessa paredes), cavaleiro, **guarda da peste**
+- **Picos Gelados**: **lobo** (corre atrás, agacha rosnando e dá o bote), falcão das neves, morcego e aranha de gelo, esqueleto congelado
+- **Pântano Gosmento**: **sapo venenoso** (pula e estica a língua), **slime gigante** (dentes, caveira dentro; ao morrer vira dois slimes), fogo-fátuo
+- **Deserto Escaldante**: **escorpião** (crava o ferrão de cima: agachar não adianta), **naja** (empina e dá o bote; de longe cospe veneno), **múmia** (agarra com os braços esticados), falcão do deserto
+- **Montanha de Fogo**: **diabrete** (voa à distância e atira bolas de fogo), **cão infernal**, **ferreiro demônio** (bate o martelo em brasa no chão e solta uma onda de choque), cavaleiro demoníaco
+- **Castelo do Vampiro**: morcego vampiro, lobo sombrio, fantasma carmesim, aranha, esqueleto, cavaleiro, guarda
+- **Cidadela Celeste**: águia dourada, cavaleiros e guardas dourados, espírito da tempestade
+- Os mesmos inimigos mudam de cor em cada mundo (skins): slimes, falcões, lobos, aranhas, morcegos, esqueletos, cavaleiros e fantasmas.
 
 ## Mecânicas
 - **Status**: as magias do Mago têm chance de **queimar** (Fogo), **congelar** (Gelo, o inimigo congelado leva +50% e quebra) ou **envenenar** (Veneno). O chefe não congela de vez: só fica lento.
@@ -114,6 +120,7 @@ No celular: abrir o link → menu do navegador → "Adicionar à tela inicial".
 - `js/levels.js`: **lista de fases** (`LEVELS`, `WORLDS`) e gerador de fases (túneis secretos, paredes falsas, baús, caixas)
 - `js/game.js`: física, combate, status, críticos, vidas, inimigos, chefe, renderização, HUD. Suporta vários heróis (`w.players`; `w.p` é o deste aparelho); cada herói lê o próprio controle (`p.inp`)
 - `js/bestiary.js`: falcão, sapo, escorpião, diabrete e os 6 chefes novos (sprites gerados sob demanda, IA, projéteis)
+- `js/fauna.js`: lobo, naja, slime gigante, múmia, ferreiro demônio, aranha e as skins de cada mundo (`ENEMY_SKIN`)
 - `js/net.js`: multiplayer online (salas, conexão P2P, "fotos" do mundo, eventos de efeitos)
 - `js/local.js`: multiplayer local (sala, aparelho de cada herói)
 - `js/ui.js`: menus, criador de personagem, tela de Evolução, botões de toque, laço principal
@@ -121,6 +128,6 @@ No celular: abrir o link → menu do navegador → "Adicionar à tela inicial".
 ## Adicionando conteúdo
 - **Nova fase**: adicione um objeto em `LEVELS` (`levels.js`): mundo, tema, tamanho, semente, inimigos, densidade, `hpK` (vida extra dos inimigos). Coloque-a antes do chefe do mundo.
 - **Novo tema visual**: em `worlds.js`, um item em `THEMES`. Para reaproveitar um estilo existente use `bgAs`/`decoAs`/`platAs`/`crateAs`; para um cenário próprio, preencha `BG_BUILD`, `DECO_BUILD` e `DECOR_PLACE`.
-- **Novo inimigo ou chefe**: em `bestiary.js`, `ENEMIES` + `E_AI` + `ENEMY_IMG` (e `ENEMY_YOFF` se o desenho precisar de ajuste). Chefe: `boss: true` e um item em `BOSS_INFO` (nome, dica, música, ponto fraco). Projéteis novos: `eshoot()` com `home`/`harmless`+`then`/`pass`/`big` e o desenho em `EPROJ_DRAW`. Lacaios: `spawnEnemy()`. Na IA, o alvo é `e.tgt` (jogador vivo mais próximo).
+- **Novo inimigo ou chefe**: em `bestiary.js` ou `fauna.js`, `ENEMIES` + `E_AI` + `ENEMY_IMG` (e `ENEMY_YOFF` se o desenho precisar de ajuste). Chefe: `boss: true` e um item em `BOSS_INFO` (nome, dica, música, ponto fraco). Projéteis novos: `eshoot()` com `home`/`harmless`+`then`/`pass`/`big` e o desenho em `EPROJ_DRAW`. Lacaios: `spawnEnemy()`; algo ao morrer: `ON_KILL`. Inimigo recolorido em um mundo: `ENEMY_SKIN[tema][tipo]`. Na IA, o alvo é `e.tgt` (jogador vivo mais próximo).
 - **Multiplayer**: na lógica do jogo use `sfx()`, `burst()`, `floatText()`, `addFx()` e `announce()` (eles repassam o efeito aos convidados). Campo novo que precisa aparecer na tela dos outros → listas `PF`/`EF`/`QF`/`RF`/`WF` em `net.js`. Ao mudar o protocolo, aumente `PROTO`.
 - **Nova classe**: `CLASSES`, `COST`, `CDMAX` + `skillA/B/C` (`game.js`), poses em `skeletonFor` e arma em `drawChar` (`sprites.js`), `POSE_LIST` (`ui.js`).

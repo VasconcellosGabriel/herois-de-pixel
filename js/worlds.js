@@ -200,3 +200,155 @@ DECOR_PLACE.sky = o => {
   else if (flat && tx - (last.orb || -99) > 18 && r > 0.95) { add({ spr: D.orb, x, y: y + 2, layer: 'back', sway: true, slow: true }); lights.push({ x, y: y - 20, r: 30, col: '#ffe27a', a: 0.5 }); last.orb = tx; }
   else if (r2 > 0.8) add({ spr: [D.cloud[(r * 2) | 0]], x: x + ((r * 6) | 0) - 3, y: y + 4, layer: 'front' });
 };
+
+// ---------- Transição do Reino Verde para os Picos Gelados ----------
+// Fase 2-1 bosque de outono → 2-2 primeira neve → 2-3 lago congelado (tema ice) → 2-4 e chefe na caverna de gelo
+Object.assign(THEMES, {
+  autumn: {
+    seed: 11, style: 'dirt', song: 'forest', amb: 'autumn', tint: ['#ffb070', 0.06], glow: null,
+    ground: ['#2a1810', '#47291a', '#68402a', '#8a5a38', '#b07c4c'], cap: ['#4a2010', '#8a3e16', '#c0662a', '#e09a3e', '#f6cc6a'],
+    edge: '#150b08', plat: '#b07a3e', sun: '#fff0c0', platAs: 'forest', crateAs: 'forest',
+    sky: [[0, '#5a8ad0'], [0.5, '#9cbce0'], [0.8, '#f0d0a8'], [1, '#ffe4c0']],
+  },
+  snow: {
+    seed: 12, style: 'dirt', song: 'ice', amb: 'snow', tint: ['#dce8ff', 0.06], glow: null,
+    ground: ['#22181a', '#3a2c2c', '#54423e', '#6e5a52', '#8e786a'], cap: ['#8aa0c0', '#bccce0', '#e2ecf6', '#f6fafe', '#ffffff'],
+    edge: '#120a0a', plat: '#9a7a52', sun: '#ffffff', platAs: 'forest', crateAs: 'forest',
+    sky: [[0, '#7a9cc8'], [0.55, '#aec6e2'], [0.85, '#d8e6f4'], [1, '#f0f6fc']],
+  },
+  icecave: {
+    seed: 13, style: 'rock', song: 'ice', amb: 'frost', tint: ['#2a5a9a', 0.12], glow: '#9fe8ff', ice: true,
+    ground: ['#0c1830', '#182c4e', '#284872', '#3e6698', '#6890c0'], cap: ['#4a7ab0', '#7aaad8', '#b0d8f6', '#e2f4ff', '#ffffff'],
+    edge: '#050a16', plat: '#7aaad8', sun: '#bfefff', platAs: 'castle', crateAs: 'castle',
+    gems: [['#8ad8ff', '#e8faff'], ['#b8e8ff', '#ffffff'], ['#6ab8f0', '#d8f2ff']],
+    sky: [[0, '#03081a'], [0.55, '#0a1834'], [1, '#183a66']],
+  },
+});
+Object.assign(SLIME_COL, { autumn: '#f0a030', snow: '#9ad8ff', icecave: '#7ad0ff' });
+
+const AUT_LEAF = [['#4a1408', '#7a2410', '#b03a18', '#d8602a', '#f0903a', '#ffc070'], ['#5a3008', '#8a5010', '#c07a18', '#e0a42a', '#f4cc4a', '#fff0a0'], ['#3a1010', '#6a1a1a', '#9a2a24', '#c84434', '#e8704a', '#ffa880']];
+const AUT_BARK = ['#20120a', '#3a2214', '#5a3a22', '#7a5030'];
+BG_BUILD.autumn = th => {
+  const b = bgBase(th), R = b.R;
+  b.disc(250, 44, 40, th.sun, 0.08); b.disc(250, 44, 26, th.sun, 0.16); b.disc(250, 44, 16, '#fffbe8', 1);
+  addClouds(b, 5);
+  // ao fundo, montanhas já com neve: o próximo destino
+  b.layers.push({ img: mountainLayer(R, 252, ['#6a84b4', '#8aa2cc', '#aec2e2', '#dce8f6'], 4, 90, 150, true, ['#e8eef8', 0.28]).toCanvas(), par: 0.08 });
+  b.layers.push({ img: mountainLayer(R, 284, ['#7a5a3a', '#9a7448', '#b88e5a', '#d4a870'], 5, 30, 60, false, ['#f0d8b8', 0.22]).toCanvas(), par: 0.2 });
+  const f1 = b.mk2(); f1.rect(0, 298, WW, WH - 298, '#8a4a1e');
+  wrap3(o => { for (let x = 10; x < WW; x += 26 + ((R() * 20) | 0)) { const c = AUT_LEAF[(R() * 3) | 0]; if (R() < 0.35) pineTree(f1, x + o, 306, 70 + ((R() * 40) | 0), 22, ['#12302a', '#1e4a3a', '#2e6a4e', '#468a62', '#6aaa7a']); else roundTree(f1, x + o, 306, 80 + ((R() * 40) | 0), c, (x * 7) | 0, AUT_BARK); } });
+  f1.tint(0, 0, WW, WH, '#f0dcc0', 0.24);
+  b.layers.push({ img: f1.toCanvas(), par: 0.32 });
+  const f2 = b.mk2(); f2.rect(0, 308, WW, WH - 308, '#6a3214');
+  wrap3(o => { for (let x = 14; x < WW; x += 64 + ((R() * 30) | 0)) roundTree(f2, x + o, 310, 110 + ((R() * 60) | 0), AUT_LEAF[(R() * 3) | 0], (x * 3) | 0, AUT_BARK); });
+  f2.tint(0, 0, WW, WH, '#e8c8a8', 0.16);
+  b.layers.push({ img: f2.toCanvas(), par: 0.5 });
+  return b.done();
+};
+BG_BUILD.snow = th => {
+  const b = bgBase(th), R = b.R;
+  b.disc(70, 40, 34, '#ffffff', 0.12); b.disc(70, 40, 15, '#fffef4', 0.9);
+  addClouds(b, 7, 60);
+  b.layers.push({ img: mountainLayer(R, 252, ['#7a94bc', '#98b0d4', '#bccfe6', '#e4eef8'], 4, 100, 160, true, ['#f0f6fc', 0.3]).toCanvas(), par: 0.08 });
+  const f1 = b.mk2(); f1.rect(0, 300, WW, WH - 300, '#dce8f4');
+  wrap3(o => { for (let x = 8; x < WW; x += 22 + ((R() * 20) | 0)) pineTree(f1, x + o, 306, 60 + ((R() * 50) | 0), 24, ['#1a3a40', '#2a5260', '#3e7080', '#e8f4fc', '#ffffff']); });
+  f1.tint(0, 0, WW, WH, '#e8f2ff', 0.3);
+  b.layers.push({ img: f1.toCanvas(), par: 0.3 });
+  // árvores de outono que ainda não perderam todas as folhas, polvilhadas de neve
+  const f2 = b.mk2(); f2.rect(0, 310, WW, WH - 310, '#eef4fa');
+  wrap3(o => { for (let x = 30; x < WW; x += 90 + ((R() * 50) | 0)) roundTree(f2, x + o, 312, 100 + ((R() * 50) | 0), AUT_LEAF[(R() * 3) | 0], (x * 5) | 0, AUT_BARK); });
+  for (let y = 1; y < 300; y++) for (let x = 0; x < WW; x++) if (f2.has(x, y) && !f2.has(x, y - 1) && pn(x, y, 3, 4096, 4) > 0.35) { f2.px(x, y, '#ffffff'); f2.px(x, y + 1, '#e8f0fa'); }
+  f2.tint(0, 0, WW, WH, '#dce8f8', 0.22);
+  b.layers.push({ img: f2.toCanvas(), par: 0.5 });
+  return b.done();
+};
+BG_BUILD.icecave = th => {
+  const b = bgBase(th), R = b.R;
+  const far = b.mk2(), C5 = ['#06102a', '#0c1c40', '#14305e', '#20487e', '#3a6aa8'];
+  for (let x = 0; x < WW; x++) { const h = 30 + Math.sin(x * 0.02) * 18 + Math.sin(x * 0.06 + 1) * 8; far.rect(x, 0, 1, Math.round(h), C5[1]); }
+  wrap3(o => { for (let x = 10; x < WW; x += 24 + ((R() * 30) | 0)) { const h = 30 + ((R() * 90) | 0); far.poly([[x + o - 7, 24], [x + o + 7, 24], [x + o, 24 + h]], C5[3], { hi: '#bfe8ff', lo: C5[1], depth: 2 }); } });
+  for (let x = 0; x < WW; x++) { const h = 226 + Math.sin(x * 0.015 + 2) * 22 + Math.sin(x * 0.05) * 10; far.rect(x, Math.round(h), 1, WH, C5[2]); }
+  b.layers.push({ img: far.toCanvas(), par: 0.12 });
+  const beams = b.mk2().toCanvas(), bg = beams.getContext('2d');
+  bg.save(); bg.scale(HR, HR);
+  for (let i = 0; i < 4; i++) { bg.globalAlpha = 0.07; bg.fillStyle = '#9fe8ff'; const x = 20 + i * 90; bg.beginPath(); bg.moveTo(x, 0); bg.lineTo(x + 12, 0); bg.lineTo(x + 60, BGH); bg.lineTo(x + 22, BGH); bg.closePath(); bg.fill(); }
+  bg.restore(); b.layers.push({ img: beams, par: 0.2 });
+  const mid = b.mk2();
+  mid.rect(0, 304, WW, WH, C5[2]);
+  wrap3(o => {
+    for (let x = 0; x < WW; x += 40 + ((R() * 40) | 0)) { const h = 40 + ((R() * 70) | 0), w = 16 + R() * 12; mid.poly([[x + o - w, 314], [x + o, 314 - h], [x + o + w, 314]], C5[3], { hi: '#9ad0f4', lo: C5[0], depth: 3 }); }
+    for (let x = 30; x < WW; x += 100 + ((R() * 70) | 0)) {
+      const h = 40 + ((R() * 44) | 0);
+      for (const [dx, hh, ww] of [[0, h, 9], [-12, h * 0.6, 7], [12, h * 0.7, 7]]) mid.poly([[x + o + dx - ww, 316], [x + o + dx - ww * 0.6, 316 - hh * 0.8], [x + o + dx, 316 - hh], [x + o + dx + ww * 0.6, 316 - hh * 0.8], [x + o + dx + ww, 316]], '#8ad8ff', { hi: '#ffffff', lo: '#2a6aa8', depth: 2 });
+    }
+  });
+  b.layers.push({ img: mid.toCanvas(), par: 0.38 });
+  return b.done();
+};
+
+DECO_BUILD.autumn = (D, sp, spN, R) => {
+  D.tree = [0, 1, 2].map(v => sp(150, 210, g => {
+    const x0 = 75;
+    g.poly([[x0 - 14, 208], [x0 - 7, 170], [x0 - 6, 100], [x0 + 6, 100], [x0 + 7, 170], [x0 + 14, 208]], AUT_BARK[2], { hi: AUT_BARK[3], lo: AUT_BARK[0], depth: 3 });
+    g.poly([[x0 - 6, 140], [x0 - 26, 124], [x0 - 26, 132], [x0 - 5, 152]], AUT_BARK[2], { hi: AUT_BARK[3], lo: AUT_BARK[0], depth: 2 });
+    const L = AUT_LEAF[v];
+    for (const [x, y, rx, ry] of [[75, 66, 54, 46], [36, 96, 36, 32], [114, 96, 36, 32], [75, 112, 42, 30], [70, 36, 38, 30], [106, 56, 28, 24], [44, 60, 28, 24]]) g.lit(x, y, rx, ry, L, 41 + v * 9 + x, { edge: 0.22, speckle: 0.03 });
+    for (let i = 0; i < 26; i++) { const x = 18 + ((R() * 114) | 0), y = 16 + ((R() * 110) | 0); if (g.has(x, y)) { g.px(x, y, L[5]); g.px(x + 1, y, L[4]); } }
+    g.tint(0, 0, 150, 210, '#f0d8c0', 0.12);
+  }));
+  D.bush = [0, 1].map(v => sp(76, 44, g => { for (const [x, y, rx, ry] of [[38, 30, 28, 12], [22, 26, 16, 12], [54, 26, 16, 12], [38, 20, 18, 12]]) g.lit(x, y, rx, ry, AUT_LEAF[v * 2], 11 + v + x, { edge: 0.2 }); for (let x = 0; x < 76; x++) for (let y = 40; y < 44; y++) g.clear(x, y); }));
+  D.pile = sp(40, 14, g => { for (let i = 0; i < 46; i++) { const x = 3 + ((R() * 34) | 0), y = 13 - ((R() * Math.max(1, 10 - Math.abs(x - 20) * 0.45)) | 0); g.rect(x, y, 2, 1, AUT_LEAF[(R() * 3) | 0][2 + ((R() * 4) | 0)]); } });
+  D.mush = sp(32, 28, g => { g.poly([[12, 14], [20, 14], [19, 27], [13, 27]], '#efe6cc', { hi: '#ffffff', lo: '#b8ad8a', depth: 1 }); g.lit(16, 12, 13, 9, ['#5a2a10', '#8a4a1a', '#b8702a', '#e0a050'], 21, { edge: 0.05 }); });
+  D.rock = sp(30, 20, g => { g.lit(15, 12, 13, 8, ['#3a3a4a', '#585a6e', '#80839a', '#b0b2c8'], 5, { edge: 0.25 }); g.rect(8, 5, 3, 1, '#e0602a'); g.rect(17, 4, 2, 1, '#f4cc4a'); for (let x = 0; x < 30; x++) for (let y = 17; y < 20; y++) g.clear(x, y); });
+  D.tuft = [0, 1].map(f => spN(26, 22, g => { for (let i = 0; i < 7; i++) { const x = 2 + i * 3, h = 7 + ((i * 7) % 9), sw = f ? (i % 2 ? 2 : 0) : (i % 2 ? 0 : 2); for (let y = 0; y < h; y++) { const t = y / h; g.px(x + Math.round(sw * t * t), 21 - y, ['#7a3a10', '#b0601e', '#e0983a', '#f4cc6a'][t > 0.8 ? 3 : t > 0.4 ? 2 : i % 2]); } } }));
+};
+DECOR_PLACE.autumn = o => {
+  const { D, add, x, y, r, r2, flat, tx, last } = o;
+  if (flat && tx - (last.big || -99) > 13 && r < 0.15) { add({ spr: [D.tree[(r2 * 3) | 0]], x, y: y + 2, layer: 'back' }); last.big = tx; }
+  else if (flat && tx - (last.bush || -99) > 5 && r < 0.4 && r2 < 0.35) { add({ spr: [D.bush[((r2 * 5) | 0) % 2]], x, y: y + 2, layer: 'back' }); last.bush = tx; }
+  if (r2 > 0.8) add({ spr: [D.pile], x: x + ((r * 6) | 0) - 3, y: y + 1, layer: 'mid' });
+  else if (r2 > 0.5 && r > 0.45) add({ spr: D.tuft, x: x + ((r * 6) | 0) - 3, y: y + 2, layer: 'front', sway: true });
+  else if (r > 0.93) add({ spr: [D.mush], x, y: y + 1, layer: 'mid' });
+  else if (r > 0.88) add({ spr: [D.rock], x, y: y + 1, layer: 'mid' });
+};
+DECO_BUILD.snow = (D, sp, spN) => {
+  D.pine = [0, 1].map(v => sp(48, 70 + v * 16, g => pineTree(g, 24, 69 + v * 16, 66 + v * 16, 30 + v * 4, ['#16343e', '#24505c', '#3a7080', '#e8f4fc', '#ffffff'])));
+  D.tree = [0, 1].map(v => sp(120, 160, g => {                                  // árvore de outono pegando a primeira neve
+    const x0 = 60;
+    g.poly([[x0 - 10, 158], [x0 - 5, 120], [x0 - 4, 70], [x0 + 4, 70], [x0 + 5, 120], [x0 + 10, 158]], AUT_BARK[2], { hi: AUT_BARK[3], lo: AUT_BARK[0], depth: 3 });
+    for (const [a, b, c, d] of [[x0 - 3, 90, x0 - 30, 60], [x0 + 3, 84, x0 + 32, 56], [x0, 72, x0 - 6, 30], [x0 + 2, 76, x0 + 18, 40]]) g.cap(a, b, c, d, 4, AUT_BARK[2], { hi: AUT_BARK[3], lo: AUT_BARK[0], depth: 1 });
+    for (const [x, y, rx, ry] of [[30, 58, 18, 13], [86, 54, 18, 13], [56, 34, 22, 15], [74, 40, 14, 11]]) g.lit(x, y, rx, ry, AUT_LEAF[v], 31 + v * 7 + x, { edge: 0.3, speckle: 0.03 });
+    for (let y = 1; y < 159; y++) for (let x = 0; x < 120; x++) if (g.has(x, y) && !g.has(x, y - 1) && pn(x, y, 3, 4096, 6) > 0.3) { g.px(x, y, '#ffffff'); if (g.has(x, y + 1)) g.px(x, y + 1, '#e2ecf6'); }
+  }));
+  D.rock = sp(30, 20, g => { g.lit(15, 12, 13, 8, ['#4a4a58', '#6a6c80', '#9a9cb0', '#c8cad8'], 5, { edge: 0.25 }); g.ell(14, 6, 9, 3, '#ffffff', { hi: '#ffffff', lo: '#c8d8ec', depth: 1 }); for (let x = 0; x < 30; x++) for (let y = 17; y < 20; y++) g.clear(x, y); });
+  D.bush = sp(60, 34, g => { for (const [x, y, rx, ry] of [[30, 24, 22, 9], [18, 20, 12, 9], [42, 20, 12, 9]]) g.lit(x, y, rx, ry, AUT_LEAF[2], 9 + x, { edge: 0.2 }); g.ell(30, 13, 20, 4, '#ffffff', { hi: '#ffffff', lo: '#c8d8ec', depth: 1 }); for (let x = 0; x < 60; x++) for (let y = 31; y < 34; y++) g.clear(x, y); });
+  D.drift = spN(36, 10, g => { g.ell(18, 9, 17, 6, '#f4f9ff', { hi: '#ffffff', lo: '#c8d8ec', depth: 1 }); for (let x = 0; x < 36; x++) g.clear(x, 9); });
+};
+DECOR_PLACE.snow = o => {
+  const { D, add, x, y, r, r2, flat, tx, last } = o;
+  if (flat && tx - (last.big || -99) > 10 && r < 0.16) { add({ spr: r2 < 0.5 ? [D.tree[r2 < 0.25 ? 0 : 1]] : [D.pine[(r2 * 2) | 0 & 1]], x, y: y + 2, layer: 'back' }); last.big = tx; }
+  else if (flat && r > 0.9) add({ spr: [D.bush], x, y: y + 2, layer: 'back' });
+  else if (r > 0.82) add({ spr: [D.rock], x, y: y + 1, layer: 'mid' });
+  else if (r2 > 0.75) add({ spr: [D.drift], x: x + ((r * 6) | 0) - 3, y: y + 2, layer: 'front' });
+};
+DECO_BUILD.icecave = (D, sp) => {
+  const shard = cs => sp(48, 56, g => { for (const [dx, h, w] of [[22, 50, 11], [6, 28, 8], [34, 34, 9], [27, 18, 7]]) { g.poly([[dx - w, 55], [dx - w + 2, 55 - h + 8], [dx, 55 - h], [dx + w - 2, 55 - h + 8], [dx + w, 55]], cs[0], { hi: cs[1], lo: cs[2], depth: 3 }); g.line(dx - 2, 55 - h + 6, dx - 2, 50, '#ffffff'); } });
+  D.crystal = [['#8ad8ff', '#e8faff', '#2a78b0'], ['#b8e8ff', '#ffffff', '#4a90c8'], ['#7ab0ff', '#e0ecff', '#2a50a8']].map(cs => ({ img: shard(cs), glow: cs[0] }));
+  D.stalag = [0, 1].map(v => sp(40, 52 + v * 16, g => { const h = 52 + v * 16; g.poly([[4, h - 1], [20, 1 + v * 2], [36, h - 1]], '#3e6698', { hi: '#bfe8ff', lo: '#14284a', depth: 3 }); g.line(20, 6, 14, h - 6, '#9ad0f4'); }));
+  D.rocks = sp(40, 22, g => { g.lit(11, 14, 10, 7, ['#14284a', '#284872', '#4a78a8', '#9ad0f4'], 88, { edge: 0.24 }); g.lit(27, 13, 12, 8, ['#14284a', '#284872', '#4a78a8', '#9ad0f4'], 89, { edge: 0.24 }); for (let x = 0; x < 40; x++) for (let y = 19; y < 22; y++) g.clear(x, y); });
+  // explorador que não teve sorte: esqueleto preso num bloco de gelo
+  D.frozen = sp(44, 52, g => {
+    g.poly([[2, 51], [4, 6], [12, 1], [38, 3], [42, 12], [41, 51]], '#8ad8ff', { hi: '#e8faff', lo: '#3a88c0', depth: 3 });
+    g.ell(22, 14, 6, 6, '#e8f4f8', { flat: true }); g.rect(19, 12, 2, 3, '#3a6a9a'); g.rect(23, 12, 2, 3, '#3a6a9a');
+    g.rect(21, 20, 2, 16, '#e8f4f8'); for (let k = 0; k < 3; k++) g.rect(16, 22 + k * 4, 12, 2, '#e8f4f8');
+    g.cap(16, 22, 10, 34, 2, '#e8f4f8', { flat: true }); g.cap(28, 22, 33, 30, 2, '#e8f4f8', { flat: true }); g.cap(20, 36, 18, 48, 2, '#e8f4f8', { flat: true }); g.cap(24, 36, 27, 48, 2, '#e8f4f8', { flat: true });
+    g.tint(0, 0, 44, 52, '#9fe0ff', 0.35); g.line(8, 8, 8, 40, '#ffffff'); g.line(9, 8, 9, 20, '#ffffff');
+  });
+};
+DECOR_PLACE.icecave = o => {
+  const { D, add, lights, x, y, r, r2, flat, tx, last } = o;
+  if (flat && r < 0.13) { const c = D.crystal[(r2 * 3) | 0]; add({ spr: [c.img], x, y: y + 2, layer: 'back' }); lights.push({ x, y: y - 14, r: 36, col: c.glow, a: 0.45 }); }
+  else if (flat && tx - (last.fz || -99) > 30 && r > 0.3 && r < 0.36) { add({ spr: [D.frozen], x, y: y + 2, layer: 'back' }); lights.push({ x, y: y - 20, r: 30, col: '#9fe8ff', a: 0.3 }); last.fz = tx; }
+  else if (r > 0.9) add({ spr: [D.stalag[(r2 * 2) | 0]], x, y: y + 2, layer: 'back' });
+  else if (r > 0.78) add({ spr: [D.rocks], x, y: y + 1, layer: 'mid' });
+};

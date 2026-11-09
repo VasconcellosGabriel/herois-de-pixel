@@ -262,6 +262,9 @@ const Snd = (() => {
     croak: () => { tone(160, 0.08, 'square', 0.2, -40); tone(150, 0.1, 'square', 0.2, -50, 0.1); },
     fade:  () => { tone(900, 0.25, 'sine', 0.2, -700); tone(600, 0.3, 'triangle', 0.15, 500, 0.05); },
     join:  () => [392, 523, 784].forEach((f, i) => tone(f, 0.1, 'square', 0.25, 0, i * 0.07)),
+    growl: () => { tone(95, 0.35, 'sawtooth', 0.3, 30); noise(0.2, 0.12); },
+    hiss:  () => { noise(0.3, 0.22); tone(2200, 0.12, 'sine', 0.06, -400); },
+    clang: () => { tone(1250, 0.2, 'square', 0.2, -500); tone(1870, 0.25, 'triangle', 0.18, -800); noise(0.1, 0.3); },
   };
   function stop() { if (timer) { clearInterval(timer); timer = null; } }
   function music(name) {

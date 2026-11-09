@@ -173,6 +173,13 @@ const SONGS = {
   cave:   { bpm: 100, root: 165, lead: [0, 3, 7, 3, 10, 7, 3, -1, 12, 10, 7, 3, 5, 3, -1, -1], bass: [0, -1, 0, -1, -2, -1, -4, -1] },
   castle: { bpm: 116, root: 147, lead: [0, 1, 5, 1, 7, 5, 1, -1, 8, 7, 5, 1, 3, 1, -1, -1], bass: [0, 0, -1, 0, -4, -4, -2, -1] },
   boss:   { bpm: 150, root: 131, lead: [0, 3, 0, 7, 0, 3, 10, 7, 0, 3, 0, 8, 7, 3, 1, 3], bass: [0, 0, -5, -5, -2, -2, -4, -4] },
+  ice:    { bpm: 104, root: 247, lead: [0, 7, 12, 7, 4, 7, 11, -1, 12, 11, 7, 4, 2, 4, -1, -1], bass: [0, -1, 4, -1, -3, -1, 2, -1] },
+  swamp:  { bpm: 92,  root: 147, lead: [0, -1, 3, 5, 6, -1, 5, 3, 0, -1, -2, 0, 3, -1, -1, -1], bass: [0, 0, -1, 0, -2, -2, -1, -2] },
+  desert: { bpm: 112, root: 196, lead: [0, 1, 4, 5, 7, 5, 4, 1, 0, -1, 1, 4, 1, 0, -1, -1], bass: [0, -1, 0, 7, -1, 0, 5, -1] },
+  volcano:{ bpm: 138, root: 139, lead: [0, 0, 3, 0, 6, 5, 3, -1, 0, 0, 3, 0, 7, 6, 5, 3], bass: [0, 0, 0, -1, -2, -2, -4, -1] },
+  vampire:{ bpm: 120, root: 165, lead: [0, 3, 7, 11, 12, 11, 7, 3, 1, 4, 8, 12, 13, 12, 8, -1], bass: [0, -1, -4, -1, -3, -1, -7, -1] },
+  sky:    { bpm: 126, root: 262, lead: [0, 4, 7, 11, 12, 7, 4, -1, 2, 5, 9, 12, 14, 12, 9, -1], bass: [0, -1, 5, -1, 7, -1, 5, -1] },
+  final:  { bpm: 160, root: 123, lead: [0, 3, 7, 10, 12, 10, 7, 3, 1, 5, 8, 12, 13, 12, 8, 5], bass: [0, 0, -2, -2, -4, -4, -5, -7] },
 };
 
 const Snd = (() => {
@@ -248,6 +255,13 @@ const Snd = (() => {
     chest: () => [523, 659, 784, 1047, 1319, 1568].forEach((f, i) => tone(f, 0.12, 'triangle', 0.28, 0, i * 0.07)),
     secret: () => { noise(0.3, 0.35); [392, 494, 587, 784].forEach((f, i) => tone(f, 0.16, 'square', 0.2, 0, 0.15 + i * 0.1)); },
     lvup: () => [523, 659, 784, 1047, 784, 1047, 1568].forEach((f, i) => tone(f, 0.12, 'square', 0.25, 0, i * 0.08)),
+    screech: () => { tone(1700, 0.22, 'sawtooth', 0.18, -900); noise(0.08, 0.12); },
+    roar:  () => { noise(0.6, 0.4); tone(110, 0.6, 'sawtooth', 0.4, -40); tone(165, 0.5, 'square', 0.18, -60, 0.05); },
+    thunder: () => { noise(0.5, 0.55); tone(70, 0.5, 'sawtooth', 0.45, -30); },
+    splat: () => { noise(0.12, 0.3); tone(220, 0.16, 'sine', 0.35, -150); },
+    croak: () => { tone(160, 0.08, 'square', 0.2, -40); tone(150, 0.1, 'square', 0.2, -50, 0.1); },
+    fade:  () => { tone(900, 0.25, 'sine', 0.2, -700); tone(600, 0.3, 'triangle', 0.15, 500, 0.05); },
+    join:  () => [392, 523, 784].forEach((f, i) => tone(f, 0.1, 'square', 0.25, 0, i * 0.07)),
   };
   function stop() { if (timer) { clearInterval(timer); timer = null; } }
   function music(name) {
@@ -288,11 +302,14 @@ const Snd = (() => {
 const Input = {
   enabled: false, kb: {}, touch: {}, pad: {}, pressed: {}, aim: null, aimMode: 'keys', mouseHeld: {}, capture: null,
   stick: null, padAim: null, padAng: 0, padOn: false, padCapture: null,
+  // multiplayer local: toques separados por aparelho (teclado+mouse, tela de toque; cada controle fica em Pads)
+  hitKb: {}, hitTouch: {}, kbAim: 'keys',
   isDown(k) { return !!(this.kb[k] || this.touch[k] || this.pad[k]); },
   hit(k) { return !!this.pressed[k]; },
-  end() { this.pressed = {}; },
+  end() { this.pressed = {}; this.hitKb = {}; this.hitTouch = {}; for (const i in Pads) Pads[i].hit = {}; },
   clear() {
-    this.kb = {}; this.touch = {}; this.pad = {}; this.pressed = {}; this.mouseHeld = {};
+    this.kb = {}; this.touch = {}; this.pad = {}; this.pressed = {}; this.mouseHeld = {}; this.hitKb = {}; this.hitTouch = {};
+    for (const i in Pads) { Pads[i].hit = {}; Pads[i].st = {}; }
     Touch.held = {}; Touch.taps = {}; endStick();
     $$('#touch [data-k]').forEach(b => b.classList.remove('on'));
   },
@@ -352,8 +369,8 @@ addEventListener('keydown', e => {
   if (!k || !Input.enabled || e.target.tagName === 'INPUT') return;
   e.preventDefault();
   Input.padOn = false;
-  if (k === 'aimup' || k === 'aimdown') Input.aimMode = 'keys';
-  if (!Input.kb[k] && !e.repeat) Input.pressed[k] = true;
+  if (k === 'aimup' || k === 'aimdown') { Input.aimMode = 'keys'; Input.kbAim = 'keys'; }
+  if (!Input.kb[k] && !e.repeat) { Input.pressed[k] = true; Input.hitKb[k] = true; }
   Input.kb[k] = true;
 });
 addEventListener('keyup', e => {
@@ -366,7 +383,7 @@ addEventListener('blur', () => Input.clear());
 function aimFrom(cx, cy) {
   const c = $('#game'), r = c.getBoundingClientRect();
   Input.aim = { x: (cx - r.left) / r.width * W, y: (cy - r.top) / r.height * H };
-  Input.aimMode = 'pointer';
+  Input.aimMode = 'pointer'; Input.kbAim = 'pointer';
 }
 // (no celular o "mouse" é emulado a partir do toque: ignorado, quem mira lá é o joystick)
 const realMouse = e => !e.sourceCapabilities || !e.sourceCapabilities.firesTouchEvents;
@@ -377,7 +394,7 @@ addEventListener('mousedown', e => {
   const act = Binds.mouse[e.button];
   if (!act) return;
   e.preventDefault();
-  if (!Input.kb[act]) Input.pressed[act] = true;
+  if (!Input.kb[act]) { Input.pressed[act] = true; Input.hitKb[act] = true; }
   Input.kb[act] = true; Input.mouseHeld[e.button] = act;
 });
 addEventListener('mouseup', e => { const act = Input.mouseHeld[e.button]; if (act) { Input.kb[act] = false; delete Input.mouseHeld[e.button]; } });
@@ -416,14 +433,14 @@ function endStick() {
   if (Input.aimMode === 'stick') Input.aimMode = 'auto';
   const el = typeof document !== 'undefined' && $('#stick'); if (el) el.classList.remove('on');
 }
-function touchTap(k) { Touch.taps[k] = performance.now() + 110; Input.pressed[k] = true; }
+function touchTap(k) { Touch.taps[k] = performance.now() + 110; Input.pressed[k] = true; Input.hitTouch[k] = true; }
 // junta dedos + toques rápidos no estado dos botões (chamado a cada evento e a cada quadro)
 function touchSync() {
   const now = performance.now(), ks = { ...Touch.held };
   // a direção do tiro solto vale por alguns quadros (o tempo de o disparo acontecer), depois volta à mira automática
   if (Touch.keepAim && now > Touch.keepAim && !Touch.stick) endStick();
   for (const k in Touch.taps) { if (Touch.taps[k] < now) delete Touch.taps[k]; else ks[k] = true; }
-  if (Input.enabled) for (const k in ks) if (!Input.touch[k] && !Touch.taps[k]) Input.pressed[k] = true;
+  if (Input.enabled) for (const k in ks) if (!Input.touch[k] && !Touch.taps[k]) { Input.pressed[k] = true; Input.hitTouch[k] = true; }
   let changed = false;
   for (const k in ks) if (!Input.touch[k]) changed = true;
   for (const k in Input.touch) if (Input.touch[k] && !ks[k]) changed = true;
@@ -502,7 +519,40 @@ function padRumble(ms, strong, weak) {
   }
 }
 const PadNav = { last: {}, rep: 0, prevBtn: [] };
+// Estado de cada controle conectado, pelo índice do navegador (multiplayer local: cada controle move um herói).
+// st = botões segurados · hit = acabou de apertar (até o próximo passo do jogo) · edge = menus · aim = analógico direito
+const Pads = {};
+function padStates(dt) {
+  const pads = navigator.getGamepads ? navigator.getGamepads() : [];
+  for (const i in Pads) Pads[i].connected = false;
+  for (const gp of pads) {
+    if (!gp || !gp.connected) continue;
+    const P = Pads[gp.index] || (Pads[gp.index] = { id: gp.index, st: {}, hit: {}, nav: {}, edge: {}, aim: null, ang: 0 });
+    P.connected = true; P.name = gp.id;
+    const btn = i => i >= 0 && gp.buttons[i] && (gp.buttons[i].pressed || gp.buttons[i].value > 0.5);
+    const st = {}, dz = PadCfg.dead, ax = gp.axes[0] || 0, ay = gp.axes[1] || 0;
+    for (const k in PadCfg.map) if (PadCfg.map[k].some(btn)) st[k] = true;
+    if (ax < -dz || btn(14)) st.left = true;
+    if (ax > dz || btn(15)) st.right = true;
+    if (ay > Math.max(0.6, dz)) st.down = true;
+    if (Input.enabled) for (const k in st) if (!P.st[k]) P.hit[k] = true;
+    P.st = Input.enabled ? st : {};
+    const nv = { ok: btn(0), back: btn(1), start: btn(9), left: ax < -0.6 || btn(14), right: ax > 0.6 || btn(15), up: ay < -0.6 || btn(12), down: ay > 0.6 || btn(13) };
+    P.edge = {}; for (const k in nv) P.edge[k] = nv[k] && !P.nav[k];
+    P.nav = nv;
+    const rx = gp.axes[2] || 0, ry = (gp.axes[3] || 0) * (PadCfg.invY ? -1 : 1);
+    if (Math.hypot(rx, ry) > dz) {
+      const tgt = Math.atan2(ry, rx);
+      if (!P.aim || PadCfg.sens >= 10) P.ang = tgt;
+      else { const d = ((tgt - P.ang + Math.PI * 3) % (Math.PI * 2)) - Math.PI, mx = (1.5 + PadCfg.sens * 1.7) * dt; P.ang += clamp(d, -mx, mx); }
+      P.aim = { x: Math.cos(P.ang), y: Math.sin(P.ang) };
+    }
+  }
+  // qualquer controle pode pausar
+  if (Input.enabled) for (const i in Pads) if (Pads[i].connected && Pads[i].hit.pause) Input.pressed.pause = true;
+}
 function pollPad(dt) {
+  padStates(dt);
   const pads = navigator.getGamepads ? navigator.getGamepads() : [];
   let gp = null;
   for (const p of pads) if (p && p.connected) { gp = p; break; }

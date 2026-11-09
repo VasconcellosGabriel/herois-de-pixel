@@ -3,7 +3,7 @@
 Plataforma 2D em pixel art (personagens e inimigos em alta resolução, 2x o cenário), feita em HTML5 Canvas + JavaScript puro (sem build, sem dependências).
 Funciona no navegador do PC e do celular, e pode ser instalada como app (PWA).
 
-Feito do zero com vibe coding no **Claude Code**: a primeira versão jogável ficou pronta em 2 horas, e o jogo hoje tem cerca de 5.400 linhas de JavaScript.
+Feito do zero com vibe coding no **Claude Code**: a primeira versão jogável ficou pronta em 2 horas, e o jogo hoje tem cerca de 6.600 linhas de JavaScript: **30 fases em 7 mundos**, 7 chefes, multiplayer online e local.
 
 **▶ Jogar online:** https://vasconcellosgabriel.github.io/herois-de-pixel/
 
@@ -12,12 +12,21 @@ Abra `index.html` no navegador. Para testar no celular, o multiplayer ou o modo 
 
     node servidor.js   # mostra o endereço para o PC e para o celular (mesma rede Wi-Fi)
 
-## Multiplayer cooperativo (até 4, grátis, sem servidor)
-- **Criar sala**: título → *Multiplayer* → *Criar sala*. Aparece um código de 5 letras e os botões *Convidar* / *Copiar link*.
+## Multiplayer local (até 4 na mesma tela)
+- Título → *Multiplayer local*. O jogador 1 é quem abriu a sala (teclado e mouse no PC, a tela de toque no celular, ou o controle que estava usando).
+- Os outros entram apertando **A** no próprio controle (ou **Enter**, para entrar pelo teclado). Cada um troca de herói com ◀ ▶ (o seu herói salvo ou um dos personagens prontos) e sai com **B**. O jogador 1 aperta **Start** (ou o botão) para escolher a fase.
+- **No celular** só funciona com controles pareados (Bluetooth): a tela de toque vale apenas para o jogador 1.
+- A câmera mostra o grupo todo e **ninguém sai da tela**: quem está na ponta e tenta se afastar fica segurado. Quem cai volta ao lado de um companheiro.
+- Vidas e moedas são do time; o XP de cada herói vai para a evolução da classe dele (mesmo save). A vida dos inimigos também aumenta com o número de jogadores.
+
+## Multiplayer online (até 4, grátis, sem servidor)
+- **Criar sala**: título → *Multiplayer online* → *Criar sala*. Aparece um código de 5 letras e os botões *Convidar* / *Copiar link*.
 - **Entrar**: digite o código (ou abra o link do convite, que já preenche o código) → *Entrar*. Quem entra no meio da fase cai direto nela.
 - O **anfitrião** escolhe as fases; vidas e moedas são do time. Quem fica sem vidas assiste e volta quando o time ganha uma vida (moedas).
 - **Dificuldade em grupo**: cada jogador a mais deixa os inimigos e o chefe 50% mais resistentes (2 jogadores: ×1,5 de vida · 3: ×2 · 4: ×2,5). Se alguém entra ou sai no meio da fase, a vida deles se ajusta na hora.
 - **Mini-chat** no canto superior direito: Enter (ou T) abre no PC, o botão 💬 no celular (com frases rápidas). Avisos do jogo aparecem ali: quem perdeu ou ganhou vida, quem usou o especial, quem entrou ou saiu.
+  O tamanho do chat (Pequeno / Normal / Grande / Enorme) muda no botão 💬 da pausa ou em *Controles → Tela*.
+- **Trocar de roupa** no meio da fase (pausa → 👕) aparece na hora para todos.
 - Cada aparelho ouve só os sons do próprio herói (e os do mundo: chefe, 1UP...). Clarão e tremida de tela também aparecem só para quem causou.
 - A pausa no multiplayer é só um menu: o jogo continua para os outros. O anfitrião precisa deixar o jogo aberto (se ele minimizar/bloquear a tela, o mundo para para todos).
 
@@ -43,7 +52,7 @@ O anfitrião roda a simulação (inimigos, golpes, dano); os convidados recebem 
 **Tela de Controles** (no título e na pausa), com três abas:
 - **Teclado**: tecla principal e alternativa de cada ação, botões do mouse e o esquema "WASD + mouse".
 - **Controle**: botões do gamepad configuráveis separadamente do teclado, **sensibilidade da mira**, zona morta dos analógicos, inverter a mira vertical e vibração. Nos menus, o controle navega com o direcional (A confirma, B volta).
-- **Câmera**: distância da câmera (Normal / Longe / Muito longe). Também troca pelo botão 📷 na pausa.
+- **Tela**: distância da câmera (Normal / Longe / Muito longe) e tamanho do mini-chat. Também trocam pelos botões 📷 e 💬 na pausa.
 No celular cada dedo é tratado à parte (dá para andar, pular e atacar ao mesmo tempo) e cada botão tem uma área de toque maior que o desenho.
 
 ## Classes
@@ -53,11 +62,23 @@ No celular cada dedo é tratado à parte (dá para andar, pular e atacar ao mesm
 - **Arqueiro** (4 ♥, foco em mobilidade): J flecha mirada (2 de dano; quanto mais longe o alvo, maior a chance de crítico e o crítico chega a ×3) · K tiro triplo (3 flechas que atravessam o primeiro alvo) · L rolamento invulnerável. Passivo: **pulo duplo** (cambalhota).
 - **Dragônico** (6 ♥): J garras (combo de 3, a última é mais forte) · K sopro de fogo (jato de chamas que queima) · L mergulho (despenca e explode ao pousar). Passivo: pulo duplo com batida de asas e **planar** segurando o pulo.
 
+## Mundos e chefes
+| Mundo | Fases | Chefe |
+|---|---|---|
+| 1. Reino Verde | Floresta, Cavernas de Cristal, Castelo Sombrio | **Rei Golem**: salto, pedras e investida; o núcleo no peito é o ponto fraco (exposto quando ele bate na parede) |
+| 2. Picos Gelados (o chão escorrega) | 4 fases de neve e gelo | **Yeti Ancião**: salto com ondas de gelo, bolas de neve e rugido que derruba estalactites (a boca aberta é o ponto fraco) |
+| 3. Pântano Gosmento | 3 fases de brejo | **Rei Gosma**: pulos em sequência com ondas de gosma, cuspe em arco e filhotes de slime (a coroa é o ponto fraco) |
+| 4. Deserto Escaldante | 3 fases de dunas e ruínas | **Escorpião Imperador**: investida (fica tonto ao bater na parede), rajada de ferrões e mergulho na areia |
+| 5. Montanha de Fogo | 3 fases de vulcão | **Dragão de Magma**: chuva de fogo, rasante e sopro rasteiro (agache!); o peito em brasa é o ponto fraco |
+| 6. Castelo do Vampiro | 4 fases | **Conde Sanguinário**: some e reaparece ao seu lado, morcegos teleguiados, leque de orbes e investida da capa |
+| 7. Cidadela Celeste | 3 fases entre as nuvens | **Titã da Tempestade** (chefe final): raios marcados no chão, rajadas de vento, anel de orbes e soco no chão |
+
+Cada chefe tem uma fase de **fúria** (abaixo de 50% da vida): fica mais rápido e ataca mais. Nos mundos avançados os inimigos comuns são mais resistentes.
+
 ## Inimigos
-- **Floresta**: slime, morcego, **planta carnívora** (fica parada e morde de surpresa)
-- **Cavernas**: slime, morcego, esqueleto, **fantasma** (atravessa paredes e dá o bote)
-- **Castelo**: esqueleto, cavaleiro, morcego, **guarda da peste** (lança de longo alcance)
-- **Chefe**: Rei Golem
+- **Reino Verde**: slime, **falcão raivoso** (circula no alto e mergulha em você), **planta carnívora**, morcego, esqueleto, **fantasma** (atravessa paredes), cavaleiro, **guarda da peste**
+- **Novos**: **sapo** (pula em você), **escorpião** (crava o ferrão de cima: agachar não adianta), **diabrete** (voa à distância e atira bolas de fogo)
+- Os slimes mudam de cor em cada mundo.
 
 ## Mecânicas
 - **Status**: as magias do Mago têm chance de **queimar** (Fogo), **congelar** (Gelo, o inimigo congelado leva +50% e quebra) ou **envenenar** (Veneno). O chefe não congela de vez: só fica lento.
@@ -70,33 +91,36 @@ No celular cada dedo é tratado à parte (dá para andar, pular e atacar ao mesm
 - **Áreas por classe**: **prateleiras altas** com baú que só quem tem pulo duplo alcança (Arqueiro, Dragônico) e **ninhos de caixas** no alto que se quebram atirando para cima (Mago, Arqueiro).
 - **Relevo**: montes em degraus e vales afundados (com moedas e baús) em todas as fases.
 - **XP e Evolução**: inimigos dão XP (para o time todo). Cada nível dá 1 ponto para Vida, Mana, Velocidade ou Pulo. No **Ferreiro**, as moedas compram mais dano e melhorias de cada habilidade. A evolução é guardada por classe; moedas e XP são guardados ao completar a fase.
-- **Chefe**: cada vez que você perde uma vida, o Rei Golem recupera 20% da vida.
+- **Chefes**: cada vez que você perde uma vida, o chefe recupera 20% da vida. Ao passar de 66% e 33%, caem corações de bônus.
 - **Impacto**: rastro em meia-lua nos golpes (cor da joia do herói), pausas curtas, números de dano, inimigos que "amassam" ao apanhar, moedas que saltam, partículas e tremida de tela.
-- **Ambiente**: partículas por fase (vaga-lumes, esporos, brasas), luzes de tochas e cristais, faixas de cinema na entrada do chefe.
+- **Ambiente**: partículas por mundo (vaga-lumes, esporos, neve, bolhas, areia, brasas, brilhos), luzes de tochas e cristais, faixas de cinema na entrada do chefe.
 
 ## Personalização
 Classe, altura, porte, pele, expressão, olhos, 8 cabelos + cor, 4 roupas + 2 cores, 8 chapéus + cor,
 3 capas + cor, 6 acessórios + cor (na aba Extras), cor da arma e da magia — mais personagens prontos e botão aleatório.
 Em cada cor, o quadrado vazio com "+" abre o seletor para escolher exatamente a cor do item.
-O personagem fica salvo no aparelho (localStorage).
+O personagem fica salvo no aparelho (localStorage). Dá para **trocar de roupa durante a campanha** pelo menu de pausa (👕): muda a aparência, mas não a classe.
 
 ## Para os amigos jogarem (grátis)
 Suba a pasta inteira em qualquer hospedagem estática: GitHub Pages, Netlify, Cloudflare Pages ou itch.io (zip).
 No celular: abrir o link → menu do navegador → "Adicionar à tela inicial".
 
 ## Estrutura
-- `js/util.js`: constantes, contorno automático dos sprites, fonte de pixels, áudio sintetizado, entrada (teclado, mouse, toque)
+- `js/util.js`: constantes, contorno automático dos sprites, fonte de pixels, áudio sintetizado, entrada (teclado, mouse, toque; cada controle separado em `Pads`)
 - `js/sprites.js`: motor de pixels com sombreamento automático (`PX`) e personagem desenhado por **esqueleto** (cinemática inversa) a 2x de resolução, poses/animações, ícones
-- `js/enemies.js`: sprites e animações dos inimigos e do chefe
+- `js/enemies.js`: sprites e animações dos inimigos do mundo 1 e do Rei Golem
 - `js/world.js`: tiles e cenário em alta resolução (terreno com ruído, bordas/cantos, árvores, cristais, tochas), fundos em camadas (parallax, nuvens), decoração, luzes
-- `js/levels.js`: **lista de fases** e gerador de fases (túneis secretos, paredes falsas, baús, caixas)
+- `js/worlds.js`: temas dos mundos 2 a 7 (cores, fundos, decoração)
+- `js/levels.js`: **lista de fases** (`LEVELS`, `WORLDS`) e gerador de fases (túneis secretos, paredes falsas, baús, caixas)
 - `js/game.js`: física, combate, status, críticos, vidas, inimigos, chefe, renderização, HUD. Suporta vários heróis (`w.players`; `w.p` é o deste aparelho); cada herói lê o próprio controle (`p.inp`)
-- `js/net.js`: multiplayer (salas, conexão P2P, "fotos" do mundo, eventos de efeitos)
+- `js/bestiary.js`: falcão, sapo, escorpião, diabrete e os 6 chefes novos (sprites gerados sob demanda, IA, projéteis)
+- `js/net.js`: multiplayer online (salas, conexão P2P, "fotos" do mundo, eventos de efeitos)
+- `js/local.js`: multiplayer local (sala, aparelho de cada herói)
 - `js/ui.js`: menus, criador de personagem, tela de Evolução, botões de toque, laço principal
 
 ## Adicionando conteúdo
-- **Nova fase**: adicione um objeto em `LEVELS` (`levels.js`): tema, tamanho, semente, inimigos, densidade. Coloque-a antes do chefe.
-- **Novo tema visual**: `THEMES` + ramos em `makeBg`, `decoSprites` e `buildDecor` (`world.js`).
-- **Novo inimigo**: `ENEMIES` + `E_AI` (`game.js`) + sprite em `enemies.js` + `enemyImage` (`game.js`). Na IA, o alvo é `e.tgt` (jogador vivo mais próximo).
+- **Nova fase**: adicione um objeto em `LEVELS` (`levels.js`): mundo, tema, tamanho, semente, inimigos, densidade, `hpK` (vida extra dos inimigos). Coloque-a antes do chefe do mundo.
+- **Novo tema visual**: em `worlds.js`, um item em `THEMES`. Para reaproveitar um estilo existente use `bgAs`/`decoAs`/`platAs`/`crateAs`; para um cenário próprio, preencha `BG_BUILD`, `DECO_BUILD` e `DECOR_PLACE`.
+- **Novo inimigo ou chefe**: em `bestiary.js`, `ENEMIES` + `E_AI` + `ENEMY_IMG` (e `ENEMY_YOFF` se o desenho precisar de ajuste). Chefe: `boss: true` e um item em `BOSS_INFO` (nome, dica, música, ponto fraco). Projéteis novos: `eshoot()` com `home`/`harmless`+`then`/`pass`/`big` e o desenho em `EPROJ_DRAW`. Lacaios: `spawnEnemy()`. Na IA, o alvo é `e.tgt` (jogador vivo mais próximo).
 - **Multiplayer**: na lógica do jogo use `sfx()`, `burst()`, `floatText()`, `addFx()` e `announce()` (eles repassam o efeito aos convidados). Campo novo que precisa aparecer na tela dos outros → listas `PF`/`EF`/`QF`/`RF`/`WF` em `net.js`. Ao mudar o protocolo, aumente `PROTO`.
 - **Nova classe**: `CLASSES`, `COST`, `CDMAX` + `skillA/B/C` (`game.js`), poses em `skeletonFor` e arma em `drawChar` (`sprites.js`), `POSE_LIST` (`ui.js`).

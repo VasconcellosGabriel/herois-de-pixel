@@ -63,6 +63,16 @@ const ENEMIES = {
   guard:    { w: 12, h: 24, hp: 5,  speed: 20, stomp: false, coin: 3, xp: 8 },
   golem:    { w: 34, h: 46, hp: 70, speed: 0,  stomp: false, coin: 20, xp: 60, boss: true },
 };
+// Chefes: nome (barra de vida e avisos), dica no começo da luta, música e ponto fraco (opcional: crítico garantido)
+const BOSS_INFO = {
+  golem: { name: 'REI GOLEM', title: 'o Rei Golem', tip: 'Mire no núcleo brilhante: golpes críticos!', song: 'boss',
+    core: e => ({ x: cxOf(e) - 8, y: e.y + 9 + (e.st === 'charge' ? 5 : 0), w: 16, h: 18 }), coreCol: e => e.st === 'stun' ? '#ffffff' : '#ff9d2e' },
+};
+const weakRect = e => { const b = e.boss && BOSS_INFO[e.type]; return b && b.core ? b.core(e) : null; };
+// Extensões (js/bestiary.js): imagem, deslocamento do desenho e transparência de cada tipo de inimigo; desenho dos projéteis
+const ENEMY_IMG = {}, ENEMY_YOFF = {}, ENEMY_ALPHA = {}, EPROJ_DRAW = {};
+// Cor de cada jogador no multiplayer local
+const LOCAL_COLS = ['#ffd23f', '#4aa3ff', '#ff4d6d', '#7bff9a'];
 
 // ---------- Progressão: XP/níveis (pontos de atributo) e melhorias compradas com moedas ----------
 // Guardada por classe (trocar de classe não mistura evoluções); as moedas são uma carteira só.
@@ -122,7 +132,6 @@ const overlap = (a, b) => a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h 
 const approach = (v, t, d) => v < t ? Math.min(t, v + d) : Math.max(t, v - d);
 const cxOf = e => e.x + e.w / 2, cyOf = e => e.y + e.h / 2;
 const rnd = (a, b) => a + Math.random() * (b - a);
-const coreRect = e => ({ x: cxOf(e) - 8, y: e.y + 9 + (e.st === 'charge' ? 5 : 0), w: 16, h: 18 });   // ponto fraco do chefe
 
 function tileAt(lv, tx, ty) {
   if (tx < 0 || tx >= lv.w) return 1;
@@ -263,6 +272,7 @@ function startLevel(idx, roster = [{ id: 0, ch: Game.save.char, b: myBuild() }],
     // as vidas extras (1UP) passam de uma fase para a outra
     lives: clamp(Game.save.lives || START_LIVES, START_LIVES, MAX_LIVES), nextLife: COINS_PER_LIFE, lifeT: 0, overT: 0,
     state: 'play', bossActive: false, boss: null, bossDrops: 0, flash: 0,
+    nextId: lv.spawns.length, local: roster.length > 1 && roster.every(r => r.dev),   // local: vários heróis no mesmo aparelho
   };
   roster.forEach(r => addPlayer(w, r));
   scaleEnemies(w);
@@ -274,7 +284,7 @@ function startLevel(idx, roster = [{ id: 0, ch: Game.save.char, b: myBuild() }],
   Game.mode = 'play'; Input.enabled = true; Input.clear();
   setupTouch(p);
   Snd.music(THEMES[def.theme].song);
-  banner(def.name, `Fase ${idx + 1}`);
+  banner(def.name, def.boss ? 'Chefe · Mundo ' + def.wn : `Mundo ${def.wn} · Fase ${def.ln}`);
   if (Net.role === 'host') Net.started(w);
 }
 // Cria o herói de um jogador no último checkpoint (os jogadores ficam lado a lado)
@@ -284,7 +294,7 @@ function addPlayer(w, r) {
   const maxHp = cls.hp + st.hp, maxMana = cls.mana ? cls.mana + st.mana * 15 : 0;
   const skUp = [up.a, up.b, up.c];
   const p = {
-    id: r.id, ch, cls, spr: buildPlayerSprites(ch), inp: makeCtl(),
+    id: r.id, ch, cls, spr: buildPlayerSprites(ch), inp: makeCtl(), dev: r.dev || null, chKey: JSON.stringify(ch),
     x: w.respawn.x - 5 + i * 10, y: w.respawn.y - 20, w: 10, h: 20, vx: 0, vy: 0, face: 1,
     ground: false, coyote: 0, jbuf: 0, hp: maxHp, maxHp, mana: maxMana, maxMana, manaDelay: 0,
     cd: { a: 0, b: 0, c: 0 }, act: null, actT: 0, actDur: 0, inv: 0, hurtT: 0, block: false, dash: 0, dashSpd: 0, dashKind: null, dashHit: null,
@@ -317,12 +327,21 @@ const enemyHpK = n => 1 + HP_PER_PLAYER * Math.max(0, n - 1);
 // Recalcula a vida máxima de todos os inimigos para o número atual de heróis (alguém entrou ou saiu no meio da fase).
 // Quem já apanhou mantém a mesma fração de vida.
 function scaleEnemies(w) {
-  const k = enemyHpK(w.players.length);
+  const k = enemyHpK(w.players.length), hk = (w.def && w.def.hpK) || 1;   // hpK: fases dos mundos mais avançados
   for (const e of w.enemies) {
-    const max = Math.max(1, Math.round(ENEMIES[e.type].hp * k));
+    const max = Math.max(1, Math.round(ENEMIES[e.type].hp * k * (e.boss ? 1 : hk)));
     if (max === e.maxHp) continue;
     e.hp = e.hp / e.maxHp * max; e.maxHp = max;
   }
+}
+// Inimigo que aparece no meio da luta (lacaios dos chefes): já nasce com a vida ajustada e não dá moedas
+function spawnEnemy(w, t, x, y) {
+  const e = makeEnemy({ t, x, y }, w.nextId++);
+  e.maxHp = e.hp = Math.max(1, Math.round(ENEMIES[t].hp * enemyHpK(w.players.length) * ((w.def && w.def.hpK) || 1)));
+  e.minion = true; e.coin = 0; e.xp = 1; e.cd = 0.6;
+  w.enemies.push(e); if (w.byId) w.byId.set(e.id, e);
+  emit(['sp', e.id, t, r1(x), r1(y)]);
+  return e;
 }
 function makeEnemy(s, id) {
   const d = ENEMIES[s.t];
@@ -356,13 +375,14 @@ function dotHit(w, e, d, col) {
 // ---------- Dano ----------
 // o: { by (jogador que atacou), dir, status, chance, kb, rect (área do golpe, p/ ponto fraco do chefe), back, noCrit, dot }
 function damageEnemy(w, e, dmg, o = {}) {
-  if (e.dead) return;
+  if (e.dead || e.invul) return;
   const p = o.by || w.p;
   if (o.by) e.lastBy = o.by;
   let crit = false, weak = false;
   if (!o.dot) {
     if (o.by) dmg *= o.by.dmgK * (o.sk !== undefined ? o.by.skK[o.sk] : 1);   // melhorias de dano
-    weak = !!(e.boss && o.rect && overlap(o.rect, coreRect(e)));
+    const wr = o.rect && weakRect(e);
+    weak = !!(wr && overlap(o.rect, wr));
     // far (0..1): flecha que viajou longe tem mais chance de crítico e crítico mais forte (até 3x)
     const far = o.far || 0;
     crit = weak || !!o.back || (!o.noCrit && Math.random() < p.cls.crit + far * 0.4);
@@ -405,7 +425,7 @@ function killEnemy(w, e) {
   }
   if (e.boss) {
     w.state = 'win'; w.winT = 2.8; w.eproj = []; asOwner(null, () => { feel(w, null, 0, 1.2); sfx('boom'); });
-    sysMsg((k ? k.ch.name : 'O time') + ' derrotou o Rei Golem!');
+    sysMsg((k ? k.ch.name : 'O time') + ' derrotou ' + ((BOSS_INFO[e.type] || {}).title || 'o chefe') + '!');
     for (let i = 0; i < 7; i++) setTimeout(() => { if (Game.world === w) asOwner(null, () => { burst(w, cxOf(e) + rnd(-18, 18), cyOf(e) + rnd(-20, 20), '#ffb347', 14, 110, 0.7); sfx('boom'); feel(w, null, 0, 0.5); }); }, i * 300);
   }
 }
@@ -454,6 +474,9 @@ function respawn(w, p, keepHp, noHeal) {
   p.flamer = 0; force(p);
   if (p.out) sysMsg(p.ch.name + ' voltou ao jogo!');
   p.x = w.respawn.x - p.w / 2; p.y = w.respawn.y - p.h; p.vx = p.vy = 0; p.inv = 1.8; p.dead = false; p.out = false; p.hurtT = 0;
+  // multiplayer local (tela compartilhada): volta ao lado de um companheiro vivo, não no checkpoint lá atrás
+  const mate = w.local && w.players.find(q => q !== p && !q.dead && !q.out && q.ground);
+  if (mate) { p.x = mate.x; p.y = mate.y + mate.h - p.h; }
   if (!keepHp) {
     p.hp = p.maxHp; p.mana = p.maxMana;
     // o chefe recupera um pouco de vida a cada vida perdida
@@ -671,7 +694,7 @@ function flameTick(w, p) {
   const rect = flameRect(w.lv, p);
   for (const e of w.enemies) if (!e.dead && e.active && overlap(rect, e))
     damageEnemy(w, e, 1.4, { by: p, dir: p.flameDir, status: 'burn', chance: 0.35, kb: 0.25, rect, quiet: true, special: true, noCrit: true });
-  for (const q of w.eproj) if (q.type !== 'wave' && overlap(rect, q)) { q.life = 0; burst(w, cxOf(q), cyOf(q), '#ffb347', 4, 50, 0.25); }
+  for (const q of w.eproj) if (q.type !== 'wave' && !q.big && !q.harmless && overlap(rect, q)) { q.life = 0; burst(w, cxOf(q), cyOf(q), '#ffb347', 4, 50, 0.25); }
   breakTilesIn(w, rect, 1, p);
 }
 
@@ -774,8 +797,9 @@ function bodyStep(w, dt, p, ctl, mode) {
     else {
       // melhoria do escudo: anda mais rápido defendendo · agachado anda devagar
       const maxV = RUN * p.spdK * (p.block ? 0.3 + 0.15 * p.skLvl[2] : p.flamer > 0 ? 0.45 : 1) * (p.crouch ? 0.45 : 1);
-      if (dir) { p.vx = approach(p.vx, dir * maxV, (p.ground ? 900 : 600) * dt); p.face = dir; }
-      else p.vx = approach(p.vx, 0, (p.ground ? 1100 : 250) * dt);
+      const ice = p.ground && w.th.ice;                     // gelo: demora para acelerar e para frear
+      if (dir) { p.vx = approach(p.vx, dir * maxV, (ice ? 330 : p.ground ? 900 : 600) * dt); p.face = dir; }
+      else p.vx = approach(p.vx, 0, (ice ? 170 : p.ground ? 1100 : 250) * dt);
       if (p.flamer > 0) p.face = p.flameDir;
     }
     p.vy = Math.min(MAXFALL, p.vy + GRAV * dt);
@@ -875,7 +899,7 @@ function updatePlayer(w, dt, p, ctl) {
         damageEnemy(w, e, p.melee.dmg, { by: p, dir: p.face, rect: m, sk: p.melee.sk });
       }
       if (!p.melee.tiles) { p.melee.tiles = true; breakTilesIn(w, m, p.melee.dmg * p.dmgK, p); }   // caixas e paredes falsas
-      for (const q of w.eproj) if (q.type !== 'wave' && overlap(m, q)) { q.life = 0; burst(w, q.x, q.y, '#fff', 4, 50, 0.2); sfx('block'); }
+      for (const q of w.eproj) if (q.type !== 'wave' && !q.big && !q.harmless && overlap(m, q)) { q.life = 0; burst(w, q.x, q.y, '#fff', 4, 50, 0.2); sfx('block'); }
       if (p.melee.t <= 0) p.melee = null;
     }
   }
@@ -911,7 +935,8 @@ function updatePlayer(w, dt, p, ctl) {
     w.state = 'win'; w.winT = 0.9; sfx('win'); burst(w, w.lv.goal.x, w.lv.goal.y - 16, '#ffd23f', 24, 120, 0.9);
   }
   if (w.lv.bossGate && !w.bossActive && cxOf(p) > w.lv.bossGate) {
-    w.bossActive = true; w.cine = 2.4; announce('REI GOLEM', 'Mire no núcleo brilhante: golpes críticos!', 2800); music('boss'); feel(w, null, 0, 0.4); sfx('boom');
+    const bi = (w.boss && BOSS_INFO[w.boss.type]) || BOSS_INFO.golem;
+    w.bossActive = true; w.cine = 2.4; announce(bi.ban || bi.name, bi.tip, 2800); music(bi.song || 'boss'); feel(w, null, 0, 0.4); sfx('boom');
   }
 }
 // Ímã: moedas próximas voam até o herói. Devolve true quando a moeda encosta nele.
@@ -1056,15 +1081,17 @@ const E_AI = {
         if (e.stT <= 0) { e.st = 'idle'; e.stT = 0.6; }
         break;
     }
-    // bônus de coração ao passar de 66% e 33% da vida
-    const frac = e.hp / e.maxHp;
-    if ((w.bossDrops === 0 && frac < 0.67) || (w.bossDrops === 1 && frac < 0.34)) {
-      w.bossDrops++;
-      w.picks.push({ t: 'heart', x: (w.bossDrops === 1 ? 8 : w.lv.w - 8) * T, y: w.lv.dropY, got: false });
-      emit(['pk', w.picks]);
-    }
   },
 };
+// bônus de coração ao passar de 66% e 33% da vida do chefe
+function bossDrops(w, e) {
+  const frac = e.hp / e.maxHp;
+  if ((w.bossDrops === 0 && frac < 0.67) || (w.bossDrops === 1 && frac < 0.34)) {
+    w.bossDrops++;
+    w.picks.push({ t: 'heart', x: (w.bossDrops === 1 ? 8 : w.lv.w - 8) * T, y: w.lv.dropY, got: false });
+    emit(['pk', w.picks]);
+  }
+}
 
 // Inimigo ativo = perto da tela de algum jogador (cada um com sua "câmera virtual")
 function nearAnyPlayer(w, e) {
@@ -1101,7 +1128,8 @@ function updateEnemies(w, dt) {
     const adt = e.boss && S.freeze > 0 ? dt * 0.6 : dt;      // chefe "gelado" age mais devagar
     if (still) { e.vx = 0; if (e.fly) e.vy = 0; }
     else E_AI[e.type](w, e, adt);
-    if (e.fly && e.ghost) { e.x += e.vx * dt; e.y += e.vy * dt; }
+    if (e.boss && !e.dead) bossDrops(w, e);
+    if (e.free || (e.fly && e.ghost)) { e.x += e.vx * dt; e.y += e.vy * dt; }
     else if (e.fly) {
       const nx = e.x + e.vx * dt, ny = e.y + e.vy * dt;
       if (!solidPx(lv, nx + e.w / 2, e.y + e.h / 2)) e.x = nx; else e.vx = -e.vx;
@@ -1113,7 +1141,7 @@ function updateEnemies(w, dt) {
     }
     if (w.state !== 'play') continue;
     for (const p of w.players) {
-      if (p.dead || e.dead) continue;
+      if (p.dead || e.dead || e.invul) continue;
       if (e.atk && overlap(p, e.atk)) hurtPlayer(w, p, 1, cxOf(e), cyOf(e.atk));
       if (overlap(p, e)) {
         if (p.stompT > 0) continue;   // acabou de quicar (o convidado ainda pode mandar a posição de antes do quique)
@@ -1162,12 +1190,23 @@ function updateProj(w, dt) {
   sndBy = null;
   w.proj = w.proj.filter(q => q.life > 0);
 
+  // home: teleguiado (graus/s) · harmless + then: aviso que vira outro golpe · pass: atravessa paredes · big: não some ao acertar
   for (const q of w.eproj) {
     q.life -= dt;
+    if (q.home && w.state === 'play') {
+      const p = nearestPlayer(w, q), cur = Math.atan2(q.vy, q.vx), sp = Math.hypot(q.vx, q.vy) || 60;
+      const d = ((Math.atan2(cyOf(p) - cyOf(q), cxOf(p) - cxOf(q)) - cur + Math.PI * 3) % (Math.PI * 2)) - Math.PI, mx = q.home * Math.PI / 180 * dt;
+      q.vx = Math.cos(cur + clamp(d, -mx, mx)) * sp; q.vy = Math.sin(cur + clamp(d, -mx, mx)) * sp;
+    }
     q.vy += q.g * dt; q.x += q.vx * dt; q.y += q.vy * dt; q.rot += dt * 10;
-    if (solidPx(lv, q.x + q.w / 2, q.y + q.h / 2)) { q.life = 0; if (q.type !== 'wave') burst(w, q.x, q.y, '#bbb', 4, 40, 0.3); continue; }
+    if (q.life <= 0) { if (q.then) q.then(w, q); continue; }
+    if (q.harmless) continue;
+    if (!q.pass && solidPx(lv, q.x + q.w / 2, q.y + q.h / 2)) { q.life = 0; if (q.then) q.then(w, q); else if (q.type !== 'wave') burst(w, q.x, q.y, q.col || '#bbb', 4, 40, 0.3); continue; }
     if (w.state !== 'play') continue;
-    for (const p of w.players) if (!p.dead && overlap(q, p)) { hurtPlayer(w, p, q.dmg, cxOf(q), cyOf(q)); q.life = 0; break; }
+    for (const p of w.players) if (!p.dead && overlap(q, p) && !(q.hitP && q.hitP.has(p))) {
+      hurtPlayer(w, p, q.dmg, cxOf(q), cyOf(q));
+      if (q.big) (q.hitP || (q.hitP = new Set())).add(p); else { q.life = 0; break; }
+    }
   }
   w.eproj = w.eproj.filter(q => q.life > 0);
 }
@@ -1271,7 +1310,7 @@ function drawFire(g, w, cx, cy) {
 
 // ---------- Partículas de ambiente ----------
 function initAmbient(w) {
-  const n = { forest: 26, spores: 30, dust: 30, embers: 34 }[w.th.amb] || 20;
+  const n = { forest: 26, spores: 30, dust: 30, embers: 34, snow: 60, swamp: 30, sand: 40, sparkle: 30 }[w.th.amb] || 20;
   for (let i = 0; i < n; i++) w.amb.push(newAmb(w, true));
 }
 function newAmb(w, anywhere) {
@@ -1280,6 +1319,10 @@ function newAmb(w, anywhere) {
   if (k === 'forest') { a.kind = Math.random() < 0.55 ? 'firefly' : 'leaf'; a.vx = a.kind === 'leaf' ? rnd(8, 20) : rnd(-6, 6); a.vy = a.kind === 'leaf' ? rnd(10, 22) : rnd(-4, 4); if (a.kind === 'firefly') a.y = w.cam.y + rnd(60, 150); }
   else if (k === 'spores') { a.kind = 'spore'; a.vx = rnd(-5, 5); a.vy = rnd(-14, -4); a.col = ['#7fd8ff', '#c8a8ff', '#ff9ad8'][(Math.random() * 3) | 0]; }
   else if (k === 'dust') { a.kind = 'dust'; a.vx = rnd(-4, 6); a.vy = rnd(-5, 3); a.y = w.cam.y + rnd(0, H); }
+  else if (k === 'snow') { a.kind = 'snow'; a.vx = rnd(-8, 4); a.vy = rnd(14, 30); a.sz = Math.random() < 0.3 ? 2 : 1; if (!anywhere) a.y = w.cam.y - rnd(0, 16); }
+  else if (k === 'swamp') { a.kind = Math.random() < 0.6 ? 'firefly' : 'bubble'; a.vx = rnd(-4, 4); a.vy = a.kind === 'bubble' ? rnd(-14, -6) : rnd(-4, 4); if (a.kind === 'firefly') a.y = w.cam.y + rnd(50, 150); }
+  else if (k === 'sand') { a.kind = 'sand'; a.vx = rnd(40, 80); a.vy = rnd(-3, 6); a.y = w.cam.y + rnd(0, H); if (!anywhere) a.x = w.cam.x - rnd(0, 10); }
+  else if (k === 'sparkle') { a.kind = 'sparkle'; a.vx = rnd(-3, 3); a.vy = rnd(-8, -2); a.y = w.cam.y + rnd(0, H); }
   else { a.kind = 'ember'; a.vx = rnd(-10, 10); a.vy = rnd(-45, -18); a.col = Math.random() < 0.5 ? '#ff8a2a' : '#ffd27a'; }
   return a;
 }
@@ -1301,6 +1344,7 @@ function update(w, dt) {
   if (w.flash > 0) w.flash -= dt;
   if (w.lifeT > 0) w.lifeT -= dt;
   if (w.cine > 0) w.cine -= dt;
+  const prevX = w.local ? new Map(w.players.map(q => [q, q.x])) : null;
   for (const p of w.players) {
     p.remote = Net.role === 'host' && p !== w.p;
     if (p.remote && p.rp && !hostAuth(p)) applyRemoteBody(w, p);
@@ -1310,6 +1354,7 @@ function update(w, dt) {
     p.deadT -= dt;
     if (p.deadT <= 0) { if (w.lives > 0) respawn(w, p, false); else p.out = true; }   // sem vidas: espera (ou é fim de jogo)
   }
+  if (prevX) leash(w, prevX);
   if (w.state === 'play') {
     if (w.lives > 0) for (const p of w.players) if (p.out) respawn(w, p, false, true);   // o time ganhou vida: volta quem esperava
     if (w.players.every(p => p.out)) { w.state = 'over'; w.overT = 3.2; sfx('over'); music(null); }
@@ -1351,10 +1396,31 @@ function updateVisuals(w, dt) {
     w.floats.push({ x: cxOf(me), y: me.y - 18, txt: 'NIVEL ' + lvl + '!', col: '#c8a8ff', big: true, t: 1.6, max: 1.6, vy: -30 });
   }
 
-  const lv = w.lv, p = camTarget(w);
-  const tx = clamp(cxOf(p) - W / 2 + p.face * 18, 0, lv.w * T - W);
+  const lv = w.lv, c = camPoint(w);
+  const tx = clamp(c.x - W / 2 + c.face * 18, 0, lv.w * T - W);
   w.cam.x += (tx - w.cam.x) * Math.min(1, dt * 7);
-  w.cam.y = clamp(p.y - 92, 0, lv.h * T - H);
+  w.cam.y = clamp(c.y - 92, 0, lv.h * T - H);
+}
+// Para onde a câmera olha: o seu herói; no multiplayer local, o meio do grupo (vivos)
+function camPoint(w) {
+  if (w.local) {
+    let L = w.players.filter(q => !q.dead && !q.out);
+    if (!L.length) L = w.players.filter(q => !q.out);
+    if (L.length) return { x: L.reduce((a, q) => a + cxOf(q), 0) / L.length, y: L.reduce((a, q) => a + q.y, 0) / L.length, face: 0 };
+  }
+  const p = camTarget(w);
+  return { x: cxOf(p), y: p.y, face: p.face };
+}
+// Multiplayer local: ninguém sai da tela (quem está na ponta e tenta se afastar é segurado)
+function leash(w, prev) {
+  const L = w.players.filter(q => !q.dead && !q.out);
+  if (L.length < 2) return;
+  const xs = L.map(cxOf), lo = Math.min(...xs), hi = Math.max(...xs);
+  if (hi - lo <= W - 36) return;
+  for (const q of L) {
+    const c = cxOf(q), px = prev.get(q);
+    if (px !== undefined && ((c === hi && q.x > px) || (c === lo && q.x < px))) { q.x = px; q.vx = 0; }
+  }
 }
 // A câmera segue o seu herói; se ele estiver fora (sem vidas), acompanha um companheiro vivo
 const camTarget = w => (w.p.out && w.players.find(q => !q.dead)) || w.p;
@@ -1470,7 +1536,7 @@ function playerImage(p) {
   return S.get(pose, f);
 }
 
-const enemyYOff = e => e.type === 'bat' ? 5 : e.type === 'ghost' ? 9 : 0;
+const enemyYOff = e => e.type === 'bat' ? 5 : e.type === 'ghost' ? 9 : ENEMY_YOFF[e.type] || 0;
 // Desenha um herói; tag = mostra o nome em cima (companheiros no multiplayer)
 function drawPlayer(g, w, p, cx, cy, tag) {
   if (p.out || (p.inv > 0 && !p.dead && Math.floor(w.t * 20) % 2)) return;
@@ -1484,8 +1550,8 @@ function drawPlayer(g, w, p, cx, cy, tag) {
   else drawSprite(g, img, cxOf(p), p.y + p.h + 2, p.face < 0, cx, cy);
   if (p.block) { g.globalAlpha = 0.18; g.fillStyle = '#9fd0ff'; g.fillRect(Math.round(cxOf(p) + p.face * 8 - 3 - cx), Math.round(p.y - 3 - cy), 6, 24); g.globalAlpha = 1; }
   if (tag && !p.dead) {
-    const t = tagName(p.ch.name);
-    g.globalAlpha = 0.85; drawTextO(g, t, Math.round(cxOf(p) - cx - textW(t) / 2), Math.round(p.y - 13 - cy), p.ch.accent || '#fff'); g.globalAlpha = 1;
+    const t = typeof tag === 'string' ? tag : tagName(p.ch.name), col = typeof tag === 'string' ? LOCAL_COLS[w.players.indexOf(p) % 4] : p.ch.accent || '#fff';
+    g.globalAlpha = 0.85; drawTextO(g, t, Math.round(cxOf(p) - cx - textW(t) / 2), Math.round(p.y - 13 - cy), col); g.globalAlpha = 1;
   }
 }
 // nome sem acentos e curto, para a fonte de pixels
@@ -1493,7 +1559,11 @@ const tagName = s => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').to
 
 function enemyImage(e, lv) {
   switch (e.type) {
-    case 'slime': return e.hurt > 0 ? ENEMY_SPR.slimeHurt[lv.theme] : ENEMY_SPR.slime[lv.theme][e.ground ? Math.floor(e.t * 5) & 3 : 1];
+    case 'slime': {
+      const th = lv.theme;
+      if (!ENEMY_SPR.slime[th]) { const col = SLIME_COL[th] || '#59c957'; ENEMY_SPR.slime[th] = [0, 1, 2, 3].map(f => slimeSprite(col, f)); ENEMY_SPR.slimeHurt[th] = slimeSprite(col, 3, true); }
+      return e.hurt > 0 ? ENEMY_SPR.slimeHurt[th] : ENEMY_SPR.slime[th][e.ground ? Math.floor(e.t * 5) & 3 : 1];
+    }
     case 'bat': return ENEMY_SPR.bat[Math.floor(e.t * 12) & 3];
     case 'skeleton': return e.throwT > 0 ? ENEMY_SPR.skeletonThrow : ENEMY_SPR.skeleton[Math.abs(e.vx) > 1 ? Math.floor(e.t * 8) & 3 : 0];
     case 'knight':
@@ -1507,6 +1577,7 @@ function enemyImage(e, lv) {
       const pose = e.st === 'tele' || e.st === 'slam' ? 'tele' : e.st === 'charge' ? 'charge' : e.st === 'stun' ? 'stun' : 'idle';
       return ENEMY_SPR.golem[pose][Math.floor(e.t * 1.8) & 1][e.hp < e.maxHp * 0.5 ? 1 : 0];
     }
+    default: return ENEMY_IMG[e.type](e, lv);
   }
 }
 
@@ -1604,6 +1675,8 @@ function render(w) {
     else drawShadow(g, w, cxOf(e), e.y + e.h, cx, cy, 8);
     let spr = e.flash > 0 ? whiteOf(img) : img;
     if (e.ghost) g.globalAlpha = 0.72 + Math.sin(e.t * 4) * 0.2;
+    if (ENEMY_ALPHA[e.type]) g.globalAlpha = ENEMY_ALPHA[e.type](e, w);
+    if (g.globalAlpha <= 0.01) { g.globalAlpha = 1; continue; }
     const sqk = e.sq > 0 ? e.sq / 0.14 : 0;
     drawSprite(g, spr, cxOf(e) + shake, e.y + e.h + 1 + yOff + bob, e.dir < 0, cx, cy, 1 + 0.16 * sqk, 1 - 0.14 * sqk);
     g.globalAlpha = 1;
@@ -1623,17 +1696,18 @@ function render(w) {
     const icons = []; if (S.burn > 0) icons.push('burn'); if (S.poison > 0) icons.push('poison'); if (S.freeze > 0) icons.push('freeze'); if (e.stun > 0 && !e.boss) icons.push('stun');
     icons.forEach((k, i) => { const ic = ICON.status[k]; g.drawImage(ic, Math.round(cxOf(e) - cx - icons.length * 3.5 + i * 7 - 0), Math.round(e.y - (e.boss ? 18 : 10) - cy + Math.sin(w.t * 6 + i) * 1)); });
     // ponto fraco do chefe
-    if (e.boss && w.bossActive) {
-      const r = coreRect(e), pulse = 0.5 + Math.sin(w.t * 8) * 0.5, big = e.st === 'stun';
-      g.globalCompositeOperation = 'lighter'; drawGlow(g, r.x + r.w / 2 - cx, r.y + r.h / 2 - cy, big ? 26 : 18, big ? '#ffffff' : '#ff9d2e', (big ? 0.7 : 0.35) + pulse * 0.2); g.globalAlpha = 1; g.globalCompositeOperation = 'source-over';
+    const wr = e.boss && w.bossActive && weakRect(e);
+    if (wr) {
+      const pulse = 0.5 + Math.sin(w.t * 8) * 0.5, col = BOSS_INFO[e.type].coreCol(e), big = col === '#ffffff';
+      g.globalCompositeOperation = 'lighter'; drawGlow(g, wr.x + wr.w / 2 - cx, wr.y + wr.h / 2 - cy, big ? 26 : 18, col, (big ? 0.7 : 0.35) + pulse * 0.2); g.globalAlpha = 1; g.globalCompositeOperation = 'source-over';
     }
   }
 
   // jogadores (o seu por cima dos companheiros)
-  for (const q of w.players) if (q !== p) drawPlayer(g, w, q, cx, cy, true);
-  drawPlayer(g, w, p, cx, cy, false);
+  if (w.local) w.players.forEach((q, i) => drawPlayer(g, w, q, cx, cy, 'P' + (i + 1)));
+  else { for (const q of w.players) if (q !== p) drawPlayer(g, w, q, cx, cy, true); drawPlayer(g, w, p, cx, cy, false); }
   drawDecor('front');
-  if (name !== 'forest' && !p.dead) { g.globalCompositeOperation = 'lighter'; drawGlow(g, cxOf(p) - cx, p.y + 10 - cy, 46, name === 'boss' ? '#ff7a4a' : name === 'castle' ? '#ffc88a' : '#9fb0ff', 0.2); g.globalAlpha = 1; g.globalCompositeOperation = 'source-over'; }
+  if (w.th.glow) { g.globalCompositeOperation = 'lighter'; for (const q of w.local ? w.players : [p]) if (!q.dead && !q.out) drawGlow(g, cxOf(q) - cx, q.y + 10 - cy, 46, w.th.glow, 0.2); g.globalAlpha = 1; g.globalCompositeOperation = 'source-over'; }
 
   // labaredas (lança-chamas e sopro) + brilho que ilumina o cenário
   drawFire(g, w, cx, cy);
@@ -1646,7 +1720,7 @@ function render(w) {
     g.globalAlpha = 1; g.globalCompositeOperation = 'source-over';
   }
   // arco do arqueiro: mira
-  if ((p.cls.id === 'arqueiro' || (p.cls.id === 'mago' && p.inp.am === 'pointer')) && w.state === 'play' && !p.dead && !(p.inp.am === 'auto' && !autoTarget(w, p, false))) {
+  for (const p of w.local ? w.players : [w.p]) if ((p.cls.id === 'arqueiro' || (p.cls.id === 'mago' && p.inp.am === 'pointer')) && w.state === 'play' && !p.dead && !p.out && !(p.inp.am === 'auto' && !autoTarget(w, p, false))) {
     const a = p.aimDeg * Math.PI / 180, f = p.aimFace, sx = cxOf(p), sy = p.y + 8;
     for (let d = 20; d <= 44; d += 6) { g.fillStyle = d === 44 ? '#fff' : 'rgba(255,255,255,.45)'; g.fillRect(Math.round(sx + Math.cos(a) * f * d - cx), Math.round(sy + Math.sin(a) * d - cy), 1, 1); }
     const rx = Math.round(sx + Math.cos(a) * f * 52 - cx), ry = Math.round(sy + Math.sin(a) * 52 - cy);
@@ -1703,7 +1777,8 @@ function render(w) {
       g.fillStyle = '#ece8d6'; if (Math.floor(q.rot) % 2) { g.fillRect(x, y + 2, 6, 2); g.fillRect(x, y + 1, 1, 4); g.fillRect(x + 5, y + 1, 1, 4); } else { g.fillRect(x + 2, y, 2, 6); g.fillRect(x + 1, y, 4, 1); g.fillRect(x + 1, y + 5, 4, 1); }
     } else if (q.type === 'rock') {
       g.fillStyle = '#7b8494'; g.fillRect(x, y + 1, 8, 6); g.fillRect(x + 1, y, 6, 8); g.fillStyle = '#a6afc0'; g.fillRect(x + 1, y + 1, 3, 2); g.fillStyle = '#4f5766'; g.fillRect(x + 1, y + 6, 6, 2);
-    } else {
+    } else if (EPROJ_DRAW[q.type]) EPROJ_DRAW[q.type](g, q, x, y, w);
+    else {
       g.fillStyle = '#ff9d2e'; g.fillRect(x, y + 2, 12, 7); g.fillRect(x + 2, y, 8, 9);
       g.fillStyle = '#ffe27a'; g.fillRect(x + 3, y + 4, 6, 3);
       g.globalCompositeOperation = 'lighter'; drawGlow(g, x + 6, y + 5, 12, '#ff8a2a', 0.4); g.globalAlpha = 1; g.globalCompositeOperation = 'source-over';
@@ -1759,6 +1834,10 @@ function render(w) {
     else if (a.kind === 'leaf') { g.fillStyle = Math.floor(a.ph * 2) % 2 ? '#7ac070' : '#e0a040'; g.fillRect(x, y, 2, 1); g.fillRect(x + 1, y + 1, 1, 1); }
     else if (a.kind === 'spore') { g.globalAlpha = 0.4 + (Math.sin(a.ph * 2) + 1) * 0.3; g.fillStyle = a.col; g.fillRect(x, y, 1, 1); g.globalAlpha = 1; }
     else if (a.kind === 'dust') { g.globalAlpha = 0.25; g.fillStyle = '#e8e0ff'; g.fillRect(x, y, 1, 1); g.globalAlpha = 1; }
+    else if (a.kind === 'snow') { g.globalAlpha = 0.85; g.fillStyle = '#ffffff'; g.fillRect(x, y, a.sz, a.sz); g.globalAlpha = 1; }
+    else if (a.kind === 'bubble') { g.globalAlpha = 0.6; g.fillStyle = '#b8f070'; g.fillRect(x, y, 2, 1); g.fillRect(x, y + 2, 2, 1); g.fillRect(x - 1, y + 1, 1, 1); g.fillRect(x + 2, y + 1, 1, 1); g.globalAlpha = 1; }
+    else if (a.kind === 'sand') { g.globalAlpha = 0.55; g.fillStyle = '#ffe0a0'; g.fillRect(x, y, 2, 1); g.globalAlpha = 1; }
+    else if (a.kind === 'sparkle') { const b = (Math.sin(a.ph * 4) + 1) / 2; g.globalAlpha = 0.3 + b * 0.7; g.fillStyle = '#fff6c8'; g.fillRect(x, y, 1, 1); if (b > 0.8) { g.fillRect(x - 1, y, 3, 1); g.fillRect(x, y - 1, 1, 3); } g.globalAlpha = 1; }
     else { g.globalAlpha = 0.9; g.fillStyle = a.col; g.fillRect(x, y, 1 + (Math.floor(a.ph * 3) % 2), 1); g.globalAlpha = 1; }
   }
   g.restore();
@@ -1825,7 +1904,7 @@ function drawPlate(g, x, y, w, h) {
   g.fillStyle = '#5a4a80'; g.fillRect(x, y, w, 1); g.fillStyle = '#241c36'; g.fillRect(x, y + h - 1, w, 1);
 }
 function drawHud(g, w) {
-  const p = w.p;
+  const p = w.p, usePad = w.local ? String(p.dev).startsWith('p') : Input.padOn;   // local: rótulos do aparelho do P1
   // rosto + vidas (estilo Sonic)
   drawPlate(g, 3, 3, 20, 20);
   g.fillStyle = '#1d1630'; g.fillRect(4, 4, 18, 18);
@@ -1838,6 +1917,7 @@ function drawHud(g, w) {
   g.fillStyle = '#3a2a5a'; g.fillRect(4, 25, 18, 2);
   g.fillStyle = '#b48aff'; g.fillRect(4, 25, Math.round(18 * xfr), 2);
   drawTextO(g, 'NV' + xv.lvl, 4, 30, '#d8c8ff');
+  if (w.local) drawTextO(g, 'P1', 24, 24, LOCAL_COLS[0]);
   // corações (mais apertados quando a vida máxima cresce)
   const hx = 45, hs = p.maxHp > 7 ? 7 : 9;
   for (let i = 0; i < p.maxHp; i++) g.drawImage(i < p.hp ? ICON.heart : ICON.heartEmpty, hx + i * hs, 3);
@@ -1861,11 +1941,11 @@ function drawHud(g, w) {
   g.fillStyle = 'rgba(255,255,255,.35)'; g.fillRect(hx, y, Math.round(bw * sfr), 1);
   if (full) {
     g.globalCompositeOperation = 'lighter'; drawGlow(g, hx + bw / 2, y + 2, 26, '#ffd23f', 0.25 + (blink ? 0.15 : 0)); g.globalAlpha = 1; g.globalCompositeOperation = 'source-over';
-    if (!document.body.classList.contains('touch')) drawTextO(g, (Input.padOn ? padName(PadCfg.map.special[0]) : keyLabel('special')) + '!', hx + bw + 4, y - 1, '#ffd23f');
+    if (!document.body.classList.contains('touch')) drawTextO(g, (usePad ? padName(PadCfg.map.special[0]) : keyLabel('special')) + '!', hx + bw + 4, y - 1, '#ffd23f');
   }
   // habilidades (no celular elas aparecem nos próprios botões da tela)
   if (!document.body.classList.contains('touch')) {
-    const keys = ['a', 'b', 'c'].map(k => Input.padOn ? padName(PadCfg.map[k][0]) : keyLabel(k)), sy = 37;
+    const keys = ['a', 'b', 'c'].map(k => usePad ? padName(PadCfg.map[k][0]) : keyLabel(k)), sy = 37;
     ['a', 'b', 'c'].forEach((k, i) => {
       const x = 4 + i * 17;
       drawPlate(g, x, sy, 14, 14);
@@ -1890,9 +1970,13 @@ function drawHud(g, w) {
     const x = W - 56;
     g.globalAlpha = q.dead ? 0.45 : 1;
     drawPlate(g, x, ty, 11, 11); g.drawImage(q.spr.face(), x, ty, 11, 11);
-    drawText(g, tagName(q.ch.name).slice(0, 6), x + 14, ty, q.ch.accent || '#fff');
+    const qi = w.players.indexOf(q);
+    drawText(g, w.local ? 'P' + (qi + 1) + ' ' + tagName(q.ch.name).slice(0, 4) : tagName(q.ch.name).slice(0, 6), x + 14, ty, w.local ? LOCAL_COLS[qi % 4] : q.ch.accent || '#fff');
     for (let i = 0; i < q.maxHp; i++) { g.fillStyle = i < q.hp ? '#e63946' : '#3a2a40'; g.fillRect(x + 14 + i * 4, ty + 7, 3, 3); }
-    g.globalAlpha = 1; ty += 15;
+    const qs = clamp((q.sp || 0) / SPECIAL_MAX, 0, 1);       // especial (e mana, de quem usa)
+    g.fillStyle = '#4a3a1a'; g.fillRect(x + 14, ty + 11, 28, 1); g.fillStyle = qs >= 1 ? '#fff2a0' : '#e0a020'; g.fillRect(x + 14, ty + 11, Math.round(28 * qs), 1);
+    if (q.cls.mana) { g.fillStyle = '#23306a'; g.fillRect(x + 14, ty + 13, 28, 1); g.fillStyle = '#4aa3ff'; g.fillRect(x + 14, ty + 13, Math.round(28 * q.mana / q.maxMana), 1); }
+    g.globalAlpha = 1; ty += 17;
   }
   // ping (o anfitrião vê o pior entre os convidados) e se a ligação passa por relay (servidor distante)
   if (Net.role && (Net.role === 'client' || Net.conns.length) && Net.ping) {
@@ -1902,7 +1986,7 @@ function drawHud(g, w) {
   // barra do chefe (embaixo, no centro: não disputa espaço com os corações)
   if (w.boss && w.bossActive && !w.boss.dead) {
     const b = w.boss, bw = 140, bx = Math.round(W / 2 - bw / 2), by = H - 13, fr = Math.max(0, b.hp) / b.maxHp;
-    drawTextO(g, 'REI GOLEM', bx, by - 8, '#ffd23f', 1);
+    drawTextO(g, (BOSS_INFO[b.type] || BOSS_INFO.golem).name, bx, by - 8, '#ffd23f', 1);
     g.fillStyle = '#0e0a14'; g.fillRect(bx - 2, by, bw + 4, 9);
     g.fillStyle = '#5a1f36'; g.fillRect(bx, by + 2, bw, 5);
     g.fillStyle = b.hp < b.maxHp * 0.5 ? '#ff5a3c' : '#e63946'; g.fillRect(bx, by + 2, Math.round(bw * fr), 5);
@@ -1957,7 +2041,8 @@ function drawShadow2(g, x, y, wd) { g.fillStyle = 'rgba(10,5,20,.3)'; g.fillRect
 // ---------- Fim de fase ----------
 function finishLevel(w) {
   const r = { idx: w.idx, coins: w.coinsGot, deaths: w.deaths, secs: Math.round(w.t), stars: w.deaths === 0 ? 3 : w.deaths <= 2 ? 2 : 1,
-    lives: w.lives, xp: Object.fromEntries(w.players.map(p => [p.id, p.xpGot])), sp: Object.fromEntries(w.players.map(p => [p.id, Math.round(p.sp)])) };
+    lives: w.lives, xp: Object.fromEntries(w.players.map(p => [p.id, p.xpGot])), sp: Object.fromEntries(w.players.map(p => [p.id, Math.round(p.sp)])),
+    local: w.local ? Object.fromEntries(w.players.map(p => [p.id, p.cls.id])) : null };
   if (Net.role === 'host') Net.finished(r);
   levelResult(r);
 }
@@ -1972,6 +2057,8 @@ function levelResult(r) {
   sv.lives = clamp(r.lives | 0, START_LIVES, MAX_LIVES);
   const me = Net.role === 'client' ? Net.pid : 0, xp = (r.xp && r.xp[me]) | 0;
   r.ups = addXp(progOf((sv.char || DEFAULT_CHAR).cls), xp); r.myXp = xp;
+  // multiplayer local: o XP dos outros heróis vai para a evolução da classe de cada um (mesmo aparelho, mesmo save)
+  if (r.local) for (const id in r.local) if (+id !== 0) addXp(progOf(r.local[id]), (r.xp[id] | 0));
   // a barra do especial também passa para a próxima fase (cada jogador guarda a sua)
   if (r.sp) {
     sv.sp = clamp(r.sp[me] | 0, 0, SPECIAL_MAX);

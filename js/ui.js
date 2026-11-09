@@ -89,26 +89,37 @@ function toggleSound() {
 }
 
 // ---------- Fluxo ----------
-function goTitle() { Net.toLobby(); Game.mode = 'menu'; Input.enabled = false; Snd.music('menu'); show('title'); }
+function goTitle() { Net.toLobby(); Local.on = false; Game.mode = 'menu'; Input.enabled = false; Snd.music('menu'); show('title'); }
 function goLevels() {
   Net.toLobby();
   Game.mode = 'menu'; Input.enabled = false;
   const list = $('#lv-list'); list.innerHTML = '';
+  let world = 0, next = null;
   LEVELS.forEach((lv, i) => {
+    if (lv.world !== world) {                       // título de cada mundo
+      world = lv.world;
+      const h = Object.assign(document.createElement('h3'), { className: 'lv-world', textContent: `Mundo ${world} · ${WORLDS[world]}` });
+      if (i + 1 > Game.save.unlocked) h.classList.add('off');
+      list.appendChild(h);
+    }
     const b = document.createElement('button'), best = Game.save.best[lv.id], locked = i + 1 > Game.save.unlocked;
-    b.className = 'lv'; b.disabled = locked;
+    b.className = 'lv' + (lv.boss ? ' boss' : ''); b.disabled = locked;
     const stars = best ? '★'.repeat(best.stars) + '<i>' + '★'.repeat(3 - best.stars) + '</i>' : '<i>★★★</i>';
-    b.innerHTML = `<span class="n">${lv.boss ? '☠' : i + 1}</span><span class="t">${lv.name}<br><small>${locked ? '🔒 Complete a fase anterior' : best ? 'Moedas: ' + best.coins : lv.boss ? 'Chefe final' : 'Nova!'}</small></span><span class="st">${stars}</span>`;
+    const sub = locked ? '🔒 Complete a fase anterior' : best ? 'Moedas: ' + best.coins : lv.boss ? (i === LEVELS.length - 1 ? 'Chefe final' : 'Chefe do mundo') : 'Nova!';
+    b.innerHTML = `<span class="n">${lv.boss ? '☠' : lv.wn + '-' + lv.ln}</span><span class="t">${lv.name}<br><small>${sub}</small></span><span class="st">${stars}</span>`;
     b.addEventListener('click', () => { Snd.init(); Snd.sfx('click'); beginLevel(i); });
+    if (!locked && !best && !next) next = b;
     list.appendChild(b);
   });
   show('levels');
+  if (next) next.scrollIntoView({ block: 'center' });      // rola até a próxima fase a jogar
 }
 function beginLevel(i) {
   if (Net.role === 'client') return;                 // no multiplayer quem escolhe a fase é o anfitrião
   if (!Game.save.char) { openCreator(); return; }
   hideScreens();
   if (Net.role === 'host') { Net.roster[0].ch = Game.save.char; Net.roster[0].b = myBuild(); startLevel(i, Net.roster, 0); }
+  else if (Local.on) startLevel(i, localRoster(), 0);
   else startLevel(i);
   goFullscreen();
 }
@@ -120,12 +131,12 @@ function goFullscreen() {
 }
 // r: { idx, coins, deaths, secs, stars }
 function showWin(r) {
-  const last = r.idx >= LEVELS.length - 1, guest = Net.role === 'client';
+  const last = r.idx >= LEVELS.length - 1, guest = Net.role === 'client', lvd = LEVELS[r.idx], bi = lvd.boss && BOSS_INFO[lvd.boss];
   $('#win-title').textContent = last ? '🏆 VITÓRIA! 🏆' : 'FASE COMPLETA!';
   $('#win-stars').innerHTML = '★'.repeat(r.stars) + '<i>' + '★'.repeat(3 - r.stars) + '</i>';
   const m = Math.floor(r.secs / 60), s = String(r.secs % 60).padStart(2, '0');
   const pr = progOf((Game.save.char || DEFAULT_CHAR).cls);
-  $('#win-stats').innerHTML = `Moedas: ${r.coins} <span class="gain">(carteira: ${Game.save.coins || 0})</span><br>XP: +${r.myXp || 0} <span class="gain">· Nível ${pr.lvl}${r.ups ? ' — SUBIU ' + r.ups + '!' : ''}</span><br>Vidas para a próxima fase: ${Game.save.lives}<br>Quedas: ${r.deaths} · Tempo: ${m}:${s}` + (last ? `<br><br>${Net.role ? 'Vocês derrotaram' : 'Você derrotou'} o Rei Golem!<br>Mais fases em breve...` : '');
+  $('#win-stats').innerHTML = `Moedas: ${r.coins} <span class="gain">(carteira: ${Game.save.coins || 0})</span><br>XP: +${r.myXp || 0} <span class="gain">· Nível ${pr.lvl}${r.ups ? ' — SUBIU ' + r.ups + '!' : ''}</span><br>Vidas para a próxima fase: ${Game.save.lives}<br>Quedas: ${r.deaths} · Tempo: ${m}:${s}` + (bi ? `<br><br>${Net.role || Local.on ? 'Vocês derrotaram' : 'Você derrotou'} ${bi.title}!` + (last ? '<br>Você salvou o reino! Parabéns!' : `<br>Próximo: Mundo ${lvd.world + 1} · ${WORLDS[lvd.world + 1]}`) : '');
   $('#b-win-up').textContent = pr.pts ? `⬆ Evolução (${pr.pts} ponto${pr.pts > 1 ? 's' : ''}!)` : '⬆ Evolução';
   $('#b-next').style.display = last || guest ? 'none' : '';
   $('#b-retry').style.display = $('#b-win-menu').style.display = guest ? 'none' : '';
@@ -138,9 +149,10 @@ function pauseGame() {
   $('#pause-mp').style.display = Net.role ? '' : 'none';
   $('#b-restart').style.display = Net.role === 'client' ? 'none' : '';
   $('#b-quit').textContent = Net.role === 'client' ? 'Sair da sala' : 'Sair para o menu';
+  $('#b-chatsz').style.display = Net.role ? '' : 'none';
   show('pause');
 }
-function resumeGame() { if (Game.mode !== 'pause') return; hideScreens(); Game.mode = 'play'; Input.enabled = true; Input.clear(); }
+function resumeGame() { if (Game.mode !== 'pause') return; Creator.wardrobe = false; hideScreens(); Game.mode = 'play'; Input.enabled = true; Input.clear(); }
 
 // ---------- Botões de toque ----------
 // Ícone da habilidade dentro do botão, custo de mana e a recarga escurecendo o botão
@@ -177,6 +189,7 @@ function updateTouchHud(w) {
 // ---------- Menus com o controle (gamepad) ----------
 function padMenu(m) {
   const scr = $('.screen.on');
+  if (scr && scr.id === 's-local') return;
   if (m.start && Game.mode === 'pause') { resumeGame(); return; }
   if (!scr || (!m.dir && !m.ok && !m.back && !m.h)) return;
   const items = $$('button, input, .custom', scr).filter(el => !el.disabled && el.offsetParent !== null && !el.closest('[hidden]'));
@@ -195,10 +208,29 @@ function padMenu(m) {
 Input.onPadMenu = padMenu;
 
 // ---------- Criador de personagem ----------
-const Creator = { ch: null, tab: 'classe', pose: 0, spr: null, t: 0, from: 'title' };
+const Creator = { ch: null, tab: 'classe', pose: 0, spr: null, t: 0, from: 'title', wardrobe: false };
 
+// Trocar de roupa no meio da campanha (menu de pausa): muda só a aparência; a classe e o elemento ficam
+function openWardrobe() {
+  const w = Game.world; if (!w) return;
+  Creator.from = 'pause'; Creator.wardrobe = true;
+  Creator.ch = { ...DEFAULT_CHAR, ...w.p.ch };
+  Creator.tab = 'roupa'; Creator.pose = 0;
+  $('#cr-name').value = Creator.ch.name;
+  renderTabs(); renderPanel(); renderPoses(); renderPresets(); rebuildPreview();
+  show('creator');                                  // o jogo continua pausado (no multiplayer, rodando)
+}
+function applyWardrobe() {
+  const w = Game.world, p = w && w.p, ch = { ...Creator.ch, cls: p.cls.id, elem: p.ch.elem };
+  // o herói salvo também muda (menos no multiplayer local, se o jogador 1 estiver com um personagem pronto)
+  if (!Local.on || (Local.slots[0] && Local.slots[0].pick < 0)) { Game.save.char = { ...ch }; persist(); Game.titleSpr = null; }
+  p.ch = ch; p.chKey = JSON.stringify(ch); p.spr = buildPlayerSprites(ch); setupTouch(p);
+  if (Net.role) Net.sendChar(ch);
+  Creator.wardrobe = false;
+  banner('Visual novo!', '', 1200); show('pause');
+}
 function openCreator(from = 'title') {
-  Game.mode = 'creator'; Input.enabled = false; Creator.from = from;
+  Game.mode = 'creator'; Input.enabled = false; Creator.from = from; Creator.wardrobe = false;
   const sv = Game.save.char || {};
   // heróis salvos antes da cor do acessório existir: começa com a cor que já aparecia
   const oldAcc = sv.acc === 5 ? sv.secondary : sv.acc === 3 ? sv.accent : sv.acc === 1 ? '#14101a' : sv.acc === 2 ? '#16121c' : undefined;
@@ -213,6 +245,7 @@ function rebuildPreview() { Creator.spr = buildPlayerSprites(Creator.ch); }
 function renderTabs() {
   const el = $('#cr-tabs'); el.innerHTML = '';
   TABS.forEach(t => {
+    if (Creator.wardrobe && t.id === 'classe') return;
     const b = document.createElement('button');
     b.className = 'tab' + (t.id === Creator.tab ? ' on' : ''); b.textContent = t.label;
     b.onclick = () => { Creator.tab = t.id; Snd.sfx('click'); renderTabs(); renderPanel(); };
@@ -235,7 +268,7 @@ function renderPresets() {
   PRESETS.forEach(p => {
     const b = document.createElement('button');
     b.className = 'chip'; b.textContent = p.name; b.title = 'Usar personagem pronto';
-    b.onclick = () => { Creator.ch = { ...p }; $('#cr-name').value = p.name; changed(true); };
+    b.onclick = () => { Creator.ch = Creator.wardrobe ? { ...p, cls: Creator.ch.cls, elem: Creator.ch.elem } : { ...p }; $('#cr-name').value = p.name; changed(true); };
     el.appendChild(b);
   });
 }
@@ -297,7 +330,7 @@ function randomChar() {
   const pick = a => a[(Math.random() * a.length) | 0], ri = n => (Math.random() * n) | 0;
   const c = Creator.ch;
   Object.assign(c, {
-    elem: ri(3), height: ri(3), build: ri(3), skin: pick(PAL.skin), face: ri(OPTS.faces.length), eyes: pick(PAL.eyes),
+    elem: Creator.wardrobe ? c.elem : ri(3), height: ri(3), build: ri(3), skin: pick(PAL.skin), face: ri(OPTS.faces.length), eyes: pick(PAL.eyes),
     hair: ri(OPTS.hairs.length), hairColor: pick(PAL.hair), outfit: ri(OPTS.outfits.length), primary: pick(PAL.cloth), secondary: pick(PAL.cloth),
     head: Math.random() < 0.5 ? 0 : 1 + ri(OPTS.heads.length - 1), headColor: pick(PAL.cloth), cape: ri(3), capeColor: pick(PAL.cloth),
     acc: Math.random() < 0.5 ? 0 : 1 + ri(OPTS.accs.length - 1), accColor: pick(PAL.cloth), weaponColor: pick(PAL.metal), accent: pick(PAL.accent),
@@ -323,6 +356,7 @@ function drawPreview(t) {
 }
 function saveCharacter() {
   Creator.ch.name = ($('#cr-name').value.trim() || 'Herói').slice(0, 14);
+  if (Creator.wardrobe) { applyWardrobe(); return; }
   Game.save.char = { ...Creator.ch }; persist();
   Game.titleSpr = null;
   if (Creator.from === 'mp') openMp(); else goLevels();
@@ -448,7 +482,7 @@ function openControls(from) {
 const CTL_HINT = {
   kb: 'Clique em uma tecla e pressione a nova. Esc cancela, Backspace limpa.',
   pad: 'Clique (ou aperte A) em um campo e depois aperte o botão do controle.',
-  game: 'Ajustes da câmera durante as fases.',
+  game: 'Ajustes da câmera e do mini-chat durante as fases.',
 };
 function ctlRow(label, cls) {
   const row = document.createElement('div'); row.className = 'ctl-row' + (cls ? ' ' + cls : '');
@@ -559,6 +593,20 @@ function renderCamOpts() {
     chips.appendChild(b);
   });
   row.appendChild(chips); box.appendChild(row);
+  const row2 = ctlRow('Tamanho do chat (online)', 'm'), chips2 = document.createElement('div'); chips2.className = 'chips';
+  CHAT_SIZES.forEach((v, i) => {
+    const b = document.createElement('button'); b.className = 'chip' + (Game.save.chatSize === i ? ' on' : ''); b.textContent = v.name;
+    b.onclick = () => { setChatSize(i); Snd.sfx('click'); renderControls('Chat: ' + v.name); };
+    chips2.appendChild(b);
+  });
+  row2.appendChild(chips2); box.appendChild(row2);
+}
+// Tamanho do mini-chat do multiplayer (letras, largura e botões)
+const CHAT_SIZES = [{ name: 'Pequeno', k: 0.8 }, { name: 'Normal', k: 1 }, { name: 'Grande', k: 1.3 }, { name: 'Enorme', k: 1.65 }];
+function setChatSize(i) {
+  Game.save.chatSize = clamp(i | 0, 0, CHAT_SIZES.length - 1); persist();
+  document.documentElement.style.setProperty('--chat-k', CHAT_SIZES[Game.save.chatSize].k);
+  $('#b-chatsz').textContent = '💬 Chat: ' + CHAT_SIZES[Game.save.chatSize].name;
 }
 function setCamera(i) {
   Game.save.view = clamp(i | 0, 0, VIEWS.length - 1); persist(); setView(Game.save.view);
@@ -567,7 +615,7 @@ function setCamera(i) {
 function resetControls() {
   if (ctlTab === 'kb') { setBinds(null); saveBinds(); }
   else if (ctlTab === 'pad') { const r = PadCfg.rumble; setPadCfg(null); PadCfg.rumble = r; savePad(); }
-  else setCamera(0);
+  else { setCamera(0); setChatSize(1); }
   Snd.sfx('click'); renderControls('Padrão restaurado.');
 }
 
@@ -601,22 +649,24 @@ click('#b-cam', () => setCamera(((Game.save.view | 0) + 1) % VIEWS.length));
 addEventListener('gamepadconnected', () => { if ($('#s-controls').classList.contains('on') && ctlTab === 'pad') renderControls(); });
 addEventListener('gamepaddisconnected', () => { if ($('#s-controls').classList.contains('on') && ctlTab === 'pad') renderControls(); });
 click('#b-sound2', toggleSound);
-click('#b-lv-back', () => { if (Net.role === 'host') openRoom(); else goTitle(); });
+click('#b-lv-back', () => { if (Net.role === 'host') openRoom(); else if (Local.on) openLocal(); else goTitle(); });
 click('#b-random', randomChar);
-click('#b-cr-back', () => { if (Creator.from === 'mp') openMp(); else goTitle(); });
+click('#b-cr-back', () => { if (Creator.wardrobe) { Creator.wardrobe = false; show('pause'); } else if (Creator.from === 'mp') openMp(); else goTitle(); });
+click('#b-wardrobe', openWardrobe);
+click('#b-chatsz', () => setChatSize(((Game.save.chatSize === undefined ? 1 : Game.save.chatSize) + 1) % CHAT_SIZES.length));
 click('#b-cr-done', saveCharacter);
 click('#b-next', () => beginLevel(Game.world.idx + 1));
 click('#b-retry', () => beginLevel(Game.world.idx));
 click('#b-win-menu', goLevels);
 click('#b-resume', resumeGame);
 click('#b-restart', () => { const i = Game.world.idx; beginLevel(i); });
-click('#b-quit', () => { if (Net.role === 'client') leaveRoom(); else if (Net.role === 'host') goLevels(); else goTitle(); });
+click('#b-quit', () => { if (Net.role === 'client') leaveRoom(); else if (Net.role === 'host' || Local.on) goLevels(); else goTitle(); });
 click('#b-fs', () => {
   try { if (document.fullscreenElement) document.exitFullscreen(); else document.documentElement.requestFullscreen(); } catch (e) {}
 });
 $('#cr-name').addEventListener('input', () => { Creator.ch.name = $('#cr-name').value; });
 addEventListener('keydown', e => {
-  if (KEYMAP[e.code] === 'pause' && Game.mode === 'pause' && !Input.capture) resumeGame();
+  if (KEYMAP[e.code] === 'pause' && Game.mode === 'pause' && !Input.capture && e.target.tagName !== 'INPUT') resumeGame();
 });
 addEventListener('touchstart', () => document.body.classList.add('touch'), { once: true, passive: true });
 document.addEventListener('visibilitychange', () => { if (document.hidden) pauseGame(); });
@@ -706,7 +756,7 @@ function frame(now) {
   requestAnimationFrame(frame);
   const dt = Math.min(0.1, (now - last) / 1000);
   last = now; Game.t += dt;
-  pollPad(dt); touchSync(); chatSync();
+  pollPad(dt); touchSync(); chatSync(); localTick();
   // no multiplayer a pausa é só um menu por cima: o mundo continua rodando para os outros
   const live = Game.world && (Game.mode === 'play' || (Game.mode === 'pause' && Net.role));
   if (live) {
@@ -717,7 +767,7 @@ function frame(now) {
       let n = 0;
       while (acc >= STEP && n++ < 6 && Game.world) {
         const w = Game.world;
-        readLocalCtl(w, w.p); update(w, STEP); Input.end(); acc -= STEP;
+        readCtls(w); update(w, STEP); Input.end(); acc -= STEP;
         if (Net.role === 'host' && Game.world) Net.hostTick(Game.world);
       }
     }
@@ -729,6 +779,7 @@ function frame(now) {
   } else {
     acc = 0; renderTitle(Game.t);
   }
+  if (Creator.wardrobe) drawPreview(Game.t);             // trocando de roupa na pausa
 }
 
 // ---------- Início ----------
@@ -738,6 +789,7 @@ function boot() {
   setBinds(Game.save.binds);
   setPadCfg(Game.save.pad);
   setCamera(Game.save.view | 0);
+  setChatSize(Game.save.chatSize === undefined ? 1 : Game.save.chatSize);
   Snd.setMuted(!!Game.save.mute);
   if ('ontouchstart' in window || matchMedia('(pointer: coarse)').matches) document.body.classList.add('touch');
   updateSoundLabels();

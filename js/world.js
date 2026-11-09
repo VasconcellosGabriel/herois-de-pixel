@@ -3,25 +3,25 @@
 const WW = BGW * HR, WH = BGH * HR, TT = T * HR;      // tamanho do mundo em pixels de alta resolução
 const THEMES = {
   forest: {
-    seed: 1, style: 'dirt', song: 'forest', amb: 'forest', tint: ['#ffe9a8', 0.05],
+    seed: 1, style: 'dirt', song: 'forest', amb: 'forest', tint: ['#ffe9a8', 0.05], glow: null,
     ground: ['#2a1810', '#47291a', '#68402a', '#8a5a38', '#b07c4c'], cap: ['#14472a', '#1f7336', '#32a043', '#5cc555', '#a2eb74'],
     edge: '#150b08', plat: '#b07a3e', sun: '#fff6b0',
     sky: [[0, '#3f9be0'], [0.5, '#7cc6f2'], [0.78, '#c4ebfc'], [1, '#f6fcff']],
   },
   cave: {
-    seed: 2, style: 'rock', song: 'cave', amb: 'spores', tint: ['#2a1f6a', 0.14],
+    seed: 2, style: 'rock', song: 'cave', amb: 'spores', tint: ['#2a1f6a', 0.14], glow: '#9fb0ff',
     ground: ['#100f2c', '#1d1d46', '#2c2e68', '#40448c', '#5c62b4'], cap: ['#2c2c78', '#4446a8', '#6a72dc', '#a0acff', '#e2e8ff'],
     edge: '#0a0a1e', plat: '#8b7bd8', sun: '#c8b8ff',
     sky: [[0, '#06051a'], [0.55, '#130e33'], [1, '#2c2266']],
   },
   castle: {
-    seed: 3, style: 'brick', song: 'castle', amb: 'dust', tint: ['#2a0f3a', 0.12],
+    seed: 3, style: 'brick', song: 'castle', amb: 'dust', tint: ['#2a0f3a', 0.12], glow: '#ffc88a', blood: true,
     ground: ['#1a1a2e', '#2c2c46', '#444464', '#62628a', '#8a8ab0'], cap: ['#3c3c5a', '#5c5c80', '#8484aa', '#b4b4d4', '#e8e8f8'],
     edge: '#0e0e1c', plat: '#8a7360', sun: '#fff1d0',
     sky: [[0, '#0e0924'], [0.5, '#2a1238'], [0.85, '#6a2a4c'], [1, '#a64e56']],
   },
   boss: {
-    seed: 4, style: 'lava', song: 'boss', amb: 'embers', tint: ['#5a0a0a', 0.14],
+    seed: 4, style: 'lava', song: 'boss', amb: 'embers', tint: ['#5a0a0a', 0.14], glow: '#ff7a4a', blood: true,
     ground: ['#0e060c', '#1c0e16', '#2e1a26', '#482a38', '#6a4054'], cap: ['#220f1a', '#46263a', '#7a4a5c', '#b87a80', '#ffb8a0'],
     edge: '#080308', plat: '#8a6a52', sun: '#ff6a4a',
     sky: [[0, '#12040a'], [0.5, '#3a0e1c'], [0.8, '#7a1e1e'], [1, '#c4502a']],
@@ -81,13 +81,14 @@ function terrain(g, th, variant) {
         const cx = 4 + ((R() * 24) | 0), cy = 6 + ((R() * 22) | 0), rx = 2 + ((R() * 3) | 0), ry = 1.5 + R() * 1.5;
         g.ell(cx, cy, rx, ry, '#8c8aa0', { hi: '#c8c6da', lo: '#4a4660', depth: 1 });
       }
-      for (let k = 0; k < 2; k++) {                       // raízes
+      for (let k = 0; k < (th.noRoots ? 0 : 2); k++) {    // raízes
         let x = (R() * 28) | 0, y = 5 + ((R() * 14) | 0);
         for (let j = 0; j < 9; j++) { px(x + j, y + (j >> 1), P[0]); px(x + j, y + (j >> 1) + 1, P[1]); }
       }
     } else if (th.style === 'rock') {
       for (let k = 0; k < 2; k++) if (R() < 0.7) {       // cristais embutidos
-        const cx = 4 + ((R() * 22) | 0), cy = 6 + ((R() * 18) | 0), col = [['#6a5cff', '#c8c0ff'], ['#ff6ad0', '#ffd0f4'], ['#3fd0ff', '#c8f6ff']][(R() * 3) | 0];
+        const gems = th.gems || [['#6a5cff', '#c8c0ff'], ['#ff6ad0', '#ffd0f4'], ['#3fd0ff', '#c8f6ff']];
+        const cx = 4 + ((R() * 22) | 0), cy = 6 + ((R() * 18) | 0), col = gems[(R() * gems.length) | 0];
         g.poly([[cx, cy - 6], [cx + 3, cy - 2], [cx + 3, cy + 4], [cx - 1, cy + 4], [cx - 3, cy - 1]], col[0], { hi: col[1], lo: toneLo(col[0], 0.4), depth: 1 });
       }
       for (let k = 0; k < 2; k++) { let x = (R() * 30) | 0, y = 0; for (let j = 0; j < 20; j++) { px(x, y + j, P[0]); if (R() < 0.4) x += R() < 0.5 ? 1 : -1; } }
@@ -157,8 +158,8 @@ function solidTile(name, mask, depth, variant) {
 function platTile(name) {
   const key = 'plat' + name;
   if (_tileCache[key]) return _tileCache[key];
-  const th = THEMES[name], g = new PX(32, 32);
-  if (name === 'forest') {
+  const th = THEMES[name], g = new PX(32, 32), kind = th.platAs || name;   // temas novos reaproveitam um dos estilos
+  if (kind === 'forest') {
     const W5 = ['#4a2a14', '#7a4a22', '#a8703a', '#cf9650', '#eebc78'];
     for (let i = 0; i < 3; i++) g.poly([[i * 11, 0], [i * 11 + 11, 0], [i * 11 + 11, 11], [i * 11, 11]], W5[2], { hi: W5[4], lo: W5[0], depth: 2 });
     for (let x = 0; x < 32; x++) for (let y = 2; y < 10; y++) if (pn(x * 0.4, y * 3, 2, 64, 7) > 0.66) g.px(x, y, W5[1]);
@@ -166,12 +167,12 @@ function platTile(name) {
     g.rect(0, 11, 32, 4, W5[0]); g.tint(0, 11, 32, 4, '#0a0418', 0.2);
     g.poly([[4, 15], [9, 15], [8, 28], [5, 28]], W5[1], { hi: W5[3], lo: W5[0], depth: 1 }); g.poly([[23, 15], [28, 15], [27, 28], [24, 28]], W5[1], { hi: W5[3], lo: W5[0], depth: 1 });
     g.rect(1, 17, 1, 8, '#3f9a3a'); g.rect(2, 21, 1, 6, '#2a7a2e'); g.rect(30, 17, 1, 9, '#3f9a3a');
-  } else if (name === 'cave') {
+  } else if (kind === 'cave') {
     const A = ['#1c1850', '#3a3290', '#6a5adc', '#a898ff', '#e6e0ff'];
     g.poly([[0, 2], [32, 2], [30, 12], [26, 16], [8, 16], [2, 12]], A[2], { hi: A[4], lo: A[0], depth: 3 });
     g.poly([[4, 4], [14, 4], [12, 9], [4, 9]], A[3], { flat: true }); g.rect(2, 3, 28, 1, A[4]);
     for (const [x, h, c] of [[6, 8, '#3fd0ff'], [16, 12, '#ff6ad0'], [24, 7, '#3fd0ff']]) g.poly([[x, 15], [x + 3, 15], [x + 2, 15 + h], [x + 1, 15 + h]], c, { hi: '#ffffff', lo: toneLo(c, 0.4), depth: 1 });
-  } else if (name === 'castle') {
+  } else if (kind === 'castle') {
     const S5 = th.ground;
     g.poly([[0, 0], [32, 0], [32, 12], [0, 12]], S5[3], { hi: S5[4], lo: S5[1], depth: 2 });
     g.rect(15, 2, 1, 9, S5[1]); g.rect(0, 11, 32, 1, S5[0]);
@@ -190,9 +191,10 @@ function platTile(name) {
 function crateTile(name, variant, dmg) {
   const key = 'crate' + name + variant + (dmg ? 'd' : '');
   if (_tileCache[key]) return _tileCache[key];
-  const g = new PX(32, 32), kind = name === 'boss' ? 'pot' : name === 'cave' ? (variant ? 'pot' : 'crate') : (variant ? 'barrel' : 'crate');
+  const tk = THEMES[name].crateAs || name;
+  const g = new PX(32, 32), kind = tk === 'boss' ? 'pot' : tk === 'cave' ? (variant ? 'pot' : 'crate') : (variant ? 'barrel' : 'crate');
   if (kind === 'crate') {
-    const W5 = name === 'cave' ? ['#2a2440', '#4a3e6a', '#6a5a92', '#9a88c4', '#c8b8f0'] : ['#4a2a14', '#7a4a22', '#a06a38', '#c88a52', '#e8b47a'];
+    const W5 = tk === 'cave' ? ['#2a2440', '#4a3e6a', '#6a5a92', '#9a88c4', '#c8b8f0'] : ['#4a2a14', '#7a4a22', '#a06a38', '#c88a52', '#e8b47a'];
     g.poly([[1, 1], [31, 1], [31, 31], [1, 31]], W5[2], { hi: W5[4], lo: W5[0], depth: 3 });
     g.rect(5, 5, 22, 22, W5[1]);
     for (let y = 6; y < 27; y += 5) g.rect(5, y, 22, 1, W5[0]);
@@ -203,7 +205,7 @@ function crateTile(name, variant, dmg) {
     for (const y of [6, 23]) { g.rect(2, y, 28, 3, '#6a6a80'); g.rect(2, y, 28, 1, '#b4b4cc'); }
     g.rect(15, 2, 1, 29, '#4a2a14'); g.rect(9, 2, 1, 29, '#6a4020');
   } else {
-    const P5 = name === 'boss' ? ['#3a1410', '#6a2a1c', '#9a4a2a', '#c87a4a', '#f0b080'] : ['#1a2a4a', '#2a4a7a', '#3a6aa8', '#6aa0d8', '#b0dcff'];
+    const P5 = tk === 'boss' ? ['#3a1410', '#6a2a1c', '#9a4a2a', '#c87a4a', '#f0b080'] : ['#1a2a4a', '#2a4a7a', '#3a6aa8', '#6aa0d8', '#b0dcff'];
     g.ell(16, 19, 13, 12, P5[2], { hi: P5[4], lo: P5[0], depth: 3 });
     g.poly([[10, 2], [22, 2], [21, 8], [11, 8]], P5[1], { hi: P5[3], lo: P5[0], depth: 1 });
     g.rect(5, 15, 22, 2, P5[3]); g.rect(7, 22, 18, 1, P5[1]);
@@ -250,7 +252,7 @@ function spikeTile(name) {
     const cx = 5 + i * 11;
     g.poly([[cx - 4, 27], [cx, 8], [cx + 4, 27]], '#c6ceda', { hi: '#ffffff', lo: '#6a7488', depth: 2 });
     g.line(cx, 11, cx, 25, '#ffffff');
-    if (name === 'boss' || name === 'castle') { g.px(cx - 1, 20, '#b5303a'); g.px(cx, 22, '#b5303a'); g.px(cx - 2, 24, '#8a1f2a'); }
+    if (THEMES[name].blood) { g.px(cx - 1, 20, '#b5303a'); g.px(cx, 22, '#b5303a'); g.px(cx - 2, 24, '#8a1f2a'); }
   }
   return (_tileCache[key] = outline(g.toCanvas(), '#14101c'));
 }
@@ -305,8 +307,10 @@ function roundTree(g, x, base, h, ramp, seed, trunk) {
   for (const [dx, dy, rx, ry] of [[0, 0.66, 1.2, 1], [-0.85, 0.5, 0.85, 0.8], [0.85, 0.5, 0.85, 0.8], [0, 0.9, 0.9, 0.75]]) g.lit(x + dx * r, base - h * dy, r * rx, r * ry, ramp, seed + ((dx * 7) | 0) + 3, { edge: 0.18 });
 }
 
-function makeBg(name) {
-  const th = THEMES[name], R = rng(th.seed * 31 + 5), layers = [], clouds = [];
+function makeBg(name0) {
+  const th = THEMES[name0], name = th.bgAs || name0;                 // name = estilo do fundo
+  if (BG_BUILD[name]) return BG_BUILD[name](th);
+  const R = rng(th.seed * 31 + 5), layers = [], clouds = [];
   const skyG = skyOf(th.sky);
   const skyC = skyG.toCanvas(), sg = skyC.getContext('2d');
   sg.save(); sg.scale(HR, HR);
@@ -431,6 +435,8 @@ function glowSprite(col, r) {
 }
 
 const ATLAS = {}, BG = {};
+// cenários dos temas novos (preenchidos em js/worlds.js): fundo, sprites de decoração e onde colocá-los
+const BG_BUILD = {}, DECO_BUILD = {}, DECOR_PLACE = {};
 function atlasOf(name) { return ATLAS[name] || (ATLAS[name] = { name }); }
 function bgOf(name) { return BG[name] || (BG[name] = makeBg(name)); }
 
@@ -438,12 +444,13 @@ function bgOf(name) { return BG[name] || (BG[name] = makeBg(name)); }
 const LEAF = ['#103c24', '#1b5e34', '#2a8444', '#46aa56', '#7ad272', '#b4ee92'];
 const BARK = ['#1c0f08', '#3a2214', '#5a3a22', '#7a5030', '#9a6a40'];
 const _deco = {};
-function decoSprites(name) {
-  if (_deco[name]) return _deco[name];
-  const R = rng(THEMES[name].seed * 53), D = {};
+function decoSprites(name0) {
+  if (_deco[name0]) return _deco[name0];
+  const name = THEMES[name0].decoAs || name0, R = rng(THEMES[name0].seed * 53), D = {};
   const sp = (w, h, fn) => { const g = new PX(w, h); fn(g); return outline(g.toCanvas(), '#0e0612'); };
   const spN = (w, h, fn) => { const g = new PX(w, h); fn(g); return g.toCanvas(); };      // sem contorno (folhas/grama)
-  if (name === 'forest') {
+  if (DECO_BUILD[name]) DECO_BUILD[name](D, sp, spN, R, THEMES[name0]);
+  else if (name === 'forest') {
     const blades = ['#1a5a2e', '#2f8f3a', '#52c04e', '#9be36e'];
     D.tuft = [0, 1, 2].map(v => [0, 1].map(f => spN(26, 22, g => {
       const n = 6 + v * 2;
@@ -522,15 +529,15 @@ function decoSprites(name) {
     D.bones = sp(40, 18, g => { g.poly([[4, 10], [20, 8], [20, 14], [4, 15]], '#d8d0b8', { hi: '#f4eed8', lo: '#8a8470', depth: 1 }); g.ell(26, 9, 8, 7, '#d8d0b8', { hi: '#f4eed8', lo: '#8a8470', depth: 2 }); g.rect(22, 6, 3, 4, '#1b1423'); g.rect(28, 6, 3, 4, '#1b1423'); });
     D.chain = sp(16, 60, g => { for (let i = 0; i < 10; i++) g.ell(8, 3 + i * 6, i % 2 ? 4 : 2.4, 3.4, i % 2 ? '#8a8a9c' : '#5a5a6c', { hi: '#c8c8d8', lo: '#2a2a38', depth: 1 }); });
   }
-  return (_deco[name] = D);
+  return (_deco[name0] = D);
 }
 
 // Monta a lista de decorações e luzes de uma fase
-function buildDecor(lv, name) {
-  const D = decoSprites(name), items = [], lights = [];
+function buildDecor(lv, name0) {
+  const D = decoSprites(name0), items = [], lights = [], name = THEMES[name0].decoAs || name0;
   const top = tx => { for (let y = 0; y < lv.h; y++) { const t = lv.tiles[y][tx]; if (t === 1 || t === 5) return y; if (t === 2 || t === 4) return -1; } return -1; };
   const add = o => items.push(o);
-  const seed = THEMES[name].seed;
+  const seed = THEMES[name0].seed, place = DECOR_PLACE[name];
   let lastTree = -99, lastBig = -99;
   for (let tx = 2; tx < lv.w - 1; tx++) {
     const ty = top(tx);
@@ -540,7 +547,8 @@ function buildDecor(lv, name) {
     if (nearSpike) continue;                              // nada de caixote escondendo espinhos
     const flat = tx > 0 && tx < lv.w - 1 && top(tx - 1) === ty && top(tx + 1) === ty;
     const r = hash2(tx, ty, seed), r2 = hash2(tx * 3, ty, seed + 9), x = tx * T + 8, y = ty * T + 2;
-    if (name === 'forest') {
+    if (place) { const o = { D, add, lights, tx, ty, x, y, r, r2, flat, last: place.last || (place.last = {}) }; place(o); }
+    else if (name === 'forest') {
       if (flat && tx - lastTree > 14 && r < 0.14) { add({ spr: [D.tree[(r2 * 2) | 0]], x, y: y + 2, layer: 'back' }); lastTree = tx; }
       else if (flat && tx - lastBig > 5 && r < 0.4 && r2 < 0.4) { add({ spr: [D.bush[((r2 * 5) | 0) % 2]], x, y: y + 2, layer: 'back' }); lastBig = tx; }
       if (r2 > 0.78) add({ spr: D.flower[(r * 4) | 0], x: x + ((r2 * 7) | 0) - 3, y: y + 1, layer: 'mid', sway: true });
@@ -564,6 +572,7 @@ function buildDecor(lv, name) {
       else if (r > 0.7 && r < 0.75) add({ spr: [D.bones], x, y: y + 1, layer: 'mid' });
     }
   }
+  if (place) place.last = null;
   for (let ty = 1; ty < lv.h; ty++) for (let tx = 0; tx < lv.w; tx++) {
     if (lv.tiles[ty][tx] !== 2 || lv.tiles[ty - 1][tx]) continue;
     const r = hash2(tx, ty, seed + 31);

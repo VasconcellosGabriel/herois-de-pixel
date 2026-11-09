@@ -42,6 +42,21 @@ h2 { font-size: clamp(12px, 2.6vw, 18px); margin: 0 0 10px; color: var(--acc); }
 .lv .t { flex: 1; line-height: 1.7; font-size: 10px; }
 .lv .t small { color: var(--mute); font-size: 8px; }
 .lv .st { color: var(--acc); font-size: 14px; letter-spacing: 2px; white-space: nowrap; }
+.lv .n { white-space: nowrap; font-size: 14px; min-width: 40px; width: auto; }
+.lv.boss { border-color: #a8424a; background: #3a2236; }
+.lv-world { margin: 10px 0 0; font-size: 11px; color: var(--acc); letter-spacing: 1px; border-bottom: 3px solid var(--line); padding-bottom: 6px; }
+.lv-world:first-child { margin-top: 0; }
+.lv-world.off { opacity: .45; }
+/* ---------- Multiplayer local ---------- */
+#lc-slots { display: grid; gap: 8px; min-width: min(560px, 88vw); }
+.lc-slot { display: flex; align-items: center; gap: 10px; padding: 8px 10px; background: var(--panel2); border: 3px solid var(--line); text-align: left; }
+.lc-slot > b { font-size: 14px; width: 30px; }
+.lc-slot.empty { opacity: .6; border-style: dashed; }
+.lc-face { width: 36px; height: 36px; image-rendering: pixelated; background: #1d1630; border: 2px solid #0e0a14; }
+.lc-info { flex: 1; display: flex; flex-direction: column; gap: 4px; font-size: 9px; line-height: 1.5; }
+.lc-info small { color: var(--mute); font-size: 8px; }
+.lc-wait { flex: 1; font-size: 8px; color: var(--mute); }
+.lc-slot .btn.small { padding: 6px 9px; }
 .lv .st i { color: #5b4f80; font-style: normal; }
 
 /* ---------- Criador ---------- */
@@ -173,23 +188,23 @@ body.touch.playing #touch { display: block; }
 }
 
 /* ---------- Mini-chat (multiplayer) ---------- */
-#chat { position: fixed; top: calc(var(--cv-top, 0px) + var(--cv-h, 100vh) * 0.14); right: calc(var(--cv-right, 0px) + 8px); width: min(300px, 42vw); z-index: 6; display: flex; flex-direction: column; align-items: flex-end; gap: 4px; pointer-events: none; }
+#chat { position: fixed; top: calc(var(--cv-top, 0px) + var(--cv-h, 100vh) * 0.14); right: calc(var(--cv-right, 0px) + 8px); width: min(calc(300px * var(--chat-k, 1)), calc(42vw * var(--chat-k, 1)), 70vw); z-index: 6; display: flex; flex-direction: column; align-items: flex-end; gap: 4px; pointer-events: none; }
 #chat[hidden] { display: none; }
 body.touch #chat { top: max(60px, calc(var(--cv-top, 0px) + var(--cv-h, 100vh) * 0.14)); }
 #chat-log { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; }
-.chat-line { font-size: 8px; line-height: 1.6; color: var(--ink); background: rgba(14, 10, 20, .74); border-right: 3px solid var(--panel2); padding: 3px 6px; text-shadow: 1px 1px 0 #000; word-break: break-word; transition: opacity .8s; }
+.chat-line { font-size: calc(8px * var(--chat-k, 1)); line-height: 1.6; color: var(--ink); background: rgba(14, 10, 20, .74); border-right: 3px solid var(--panel2); padding: calc(3px * var(--chat-k, 1)) calc(6px * var(--chat-k, 1)); text-shadow: 1px 1px 0 #000; word-break: break-word; transition: opacity .8s; }
 .chat-line b { font-weight: normal; }
 .chat-line.sys { color: var(--acc); border-right-color: var(--acc); }
 .chat-line.old { opacity: 0; }
 body.chatting .chat-line.old { opacity: .8; }
 #chat-form { pointer-events: auto; width: 100%; display: flex; flex-direction: column; gap: 5px; }
 #chat-form[hidden] { display: none; }
-#chat-in { font: inherit; font-size: 9px; padding: 7px 8px; background: #150f20; color: var(--ink); border: 3px solid var(--line); box-shadow: 0 0 0 2px var(--panel2); outline: none; }
+#chat-in { font: inherit; font-size: calc(9px * var(--chat-k, 1)); padding: 7px 8px; background: #150f20; color: var(--ink); border: 3px solid var(--line); box-shadow: 0 0 0 2px var(--panel2); outline: none; }
 #chat-quick { display: flex; flex-wrap: wrap; gap: 4px; justify-content: flex-end; }
-#chat-quick .chip { font-size: 7px; padding: 5px 6px; }
-#chat-btn { pointer-events: auto; font: inherit; font-size: 13px; width: 34px; height: 30px; padding: 0; background: rgba(42, 32, 64, .85); color: var(--ink); border: 3px solid var(--line); cursor: pointer; opacity: .8; }
+#chat-quick .chip { font-size: calc(7px * var(--chat-k, 1)); padding: calc(5px * var(--chat-k, 1)) calc(6px * var(--chat-k, 1)); }
+#chat-btn { pointer-events: auto; font: inherit; font-size: calc(13px * var(--chat-k, 1)); width: calc(34px * var(--chat-k, 1)); height: calc(30px * var(--chat-k, 1)); padding: 0; background: rgba(42, 32, 64, .85); color: var(--ink); border: 3px solid var(--line); cursor: pointer; opacity: .8; }
 #chat-btn:hover { opacity: 1; }
-body.touch #chat-btn { width: 44px; height: 40px; }
+body.touch #chat-btn { width: calc(44px * var(--chat-k, 1)); height: calc(40px * var(--chat-k, 1)); }
 
 /* ---------- Multiplayer ---------- */
 .mp-box { display: flex; flex-direction: column; align-items: center; gap: 10px; }

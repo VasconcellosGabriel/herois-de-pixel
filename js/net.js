@@ -7,7 +7,7 @@
 // (sem reenvio e fora de ordem) para as fotos e posições: um pacote perdido no Wi-Fi não segura os seguintes.
 // O servidor público e gratuito do PeerJS só apresenta os aparelhos um ao outro; depois a conexão é direta
 // (ou passa por um "relay" TURN gratuito do PeerJS quando a rede não permite a ligação direta).
-const PROTO = 5, MAX_PLAYERS = 4, SNAP_EVERY = 2, FAST_ID = 100;
+const PROTO = 6, MAX_PLAYERS = 4, SNAP_EVERY = 2, FAST_ID = 100;
 const ID_PREFIX = 'heroisdepixel-v1-', CODE_CHARS = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789', CODE_LEN = 5;
 const PEERJS_URLS = ['https://cdnjs.cloudflare.com/ajax/libs/peerjs/1.5.4/peerjs.min.js', 'https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js'];
 
@@ -120,7 +120,12 @@ function syncPlayers(w) {
   if (!w) return;
   w.roster = Net.roster;
   w.players = w.players.filter(p => Net.roster.some(r => r.id === p.id));
-  for (const r of Net.roster) if (!playerById(w, r.id)) addPlayer(w, r);
+  for (const r of Net.roster) {
+    const p = playerById(w, r.id);
+    if (!p) { addPlayer(w, r); continue; }
+    const key = JSON.stringify(r.ch);
+    if (p.chKey !== key) { p.chKey = key; p.ch = { ...r.ch, cls: p.cls.id, elem: p.ch.elem }; p.spr = buildPlayerSprites(p.ch); if (p === w.p) setupTouch(p); }
+  }
   scaleEnemies(w);                     // mais (ou menos) heróis: inimigos mais (ou menos) resistentes
 }
 
@@ -193,6 +198,9 @@ function hostMsg(conn, m) {
     conn.chatT = now;
     Chat.add({ id: conn.pid, text });
     for (const c of Net.conns) if (c !== conn) send(c, { t: 'chat', id: conn.pid, text });
+  } else if (m.t === 'char') {         // o convidado trocou de roupa durante a fase
+    const r = Net.roster.find(x => x.id === conn.pid);
+    if (r) { r.ch = { ...cleanChar(m.ch), cls: r.ch.cls, elem: r.ch.elem }; rosterChanged(); }
   } else if (m.t === 'build') {        // o convidado evoluiu o herói: vale a partir da próxima fase
     const r = Net.roster.find(x => x.id === conn.pid);
     if (r) { r.b = cleanBuild(m.b); rosterChanged(); }
@@ -220,6 +228,7 @@ function fullState(w) {
     coins: w.coins.flatMap((c, i) => c.got ? [i] : []), checks: w.checks.flatMap((c, i) => c.on ? [i] : []),
     picks: w.picks, alive: w.enemies.filter(e => !e.dead).map(e => e.id),
     broken: w.broken, chests: w.chests.flatMap((c, i) => c.open ? [i] : []),
+    minions: w.enemies.filter(e => e.minion && !e.dead).map(e => [e.id, e.type, r1(cxOf(e)), r1(e.y + e.h)]),
   };
 }
 const startMsg = w => ({ t: 'start', idx: w.idx, lv: Net.lvId, roster: Net.roster, full: fullState(w) });
@@ -304,6 +313,7 @@ function clientStart(m) {
   w.picks = f.picks;
   for (const [tx, ty] of f.broken || []) breakTile(w, tx, ty, null, true);
   for (const i of f.chests || []) if (w.chests[i]) w.chests[i].open = true;
+  for (const [id, t, x, y] of f.minions || []) if (ENEMIES[t]) w.enemies.push(makeEnemy({ t, x, y }, id));
   const alive = new Set(f.alive);
   w.enemies = w.enemies.filter(e => alive.has(e.id));
   if (w.boss && !alive.has(w.boss.id)) w.boss.dead = true;
@@ -327,6 +337,7 @@ function playEvent(w, ev) {
     case 'r': rise(w, ev[1], ev[2], ev[3], ev[4], ev[5], ev[6]); break;
     case 'bn': banner(ev[1], ev[2], ev[3]); break;
     case 'fx': { const f = ev[1]; if (f.pid !== undefined) f.p = playerById(w, f.pid); w.fx.push(f); break; }
+    case 'sp': if (ENEMIES[ev[2]] && !w.byId.has(ev[1])) { const e = makeEnemy({ t: ev[2], x: ev[3], y: ev[4] }, ev[1]); e.minion = true; w.enemies.push(e); w.byId.set(e.id, e); } break;
     case 'k': { const e = w.byId.get(ev[1]); if (e) { e.dead = true; w.byId.delete(ev[1]); w.enemies = w.enemies.filter(x => x !== e); } break; }
     case 'cg': if (w.coins[ev[1]]) w.coins[ev[1]].got = true; break;
     case 'ck': if (w.checks[ev[1]]) w.checks[ev[1]].on = true; break;
@@ -477,3 +488,8 @@ Net.chat = text => {
 };
 // O convidado mudou a evolução (tela de Evolução) ou o herói: avisa o anfitrião
 Net.sendBuild = () => { if (Net.role === 'client') send(Net.conn, { t: 'build', b: myBuild() }); };
+// Este jogador trocou de roupa no meio da fase
+Net.sendChar = ch => {
+  if (Net.role === 'client') send(Net.conn, { t: 'char', ch });
+  else if (Net.role === 'host' && Net.roster[0]) { Net.roster[0].ch = ch; rosterChanged(); }
+};

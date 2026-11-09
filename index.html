@@ -51,9 +51,10 @@
 <section id="s-title" class="screen">
   <div class="panel center">
     <h1>HERÓIS<br>DE PIXEL</h1>
-    <p class="sub">Crie seu herói. Enfrente o Rei Golem.</p>
+    <p class="sub">Crie seu herói. Atravesse 7 mundos e derrote os 7 chefes.</p>
     <button class="btn big" id="b-play">▶ Jogar</button>
-    <button class="btn" id="b-mp">👥 Multiplayer</button>
+    <button class="btn" id="b-mp">👥 Multiplayer online</button>
+    <button class="btn" id="b-local">🎮 Multiplayer local</button>
     <button class="btn" id="b-create">🎨 Meu personagem</button>
     <button class="btn" id="b-up">⬆ Evolução</button>
     <button class="btn" id="b-controls">⌨ Controles</button>
@@ -102,7 +103,7 @@
       <div class="ctl-tabs">
         <button class="ctl-tab" data-tab="kb">⌨ Teclado</button>
         <button class="ctl-tab" data-tab="pad">🎮 Controle</button>
-        <button class="ctl-tab" data-tab="game">📷 Câmera</button>
+        <button class="ctl-tab" data-tab="game">📷 Tela</button>
       </div>
       <div class="ctl-acts">
         <button class="ctl-sbtn" id="b-ctl-back">✔ Pronto</button>
@@ -129,7 +130,7 @@
         <p class="hint">Mesmo botão de novo = limpa o campo. Nos menus: direcional escolhe, A confirma, B volta.</p>
       </div>
       <div id="ctl-game" hidden>
-        <div class="ctl-head m"><span>CÂMERA</span><span></span></div>
+        <div class="ctl-head m"><span>CÂMERA E CHAT</span><span></span></div>
         <div id="ctl-game-list"></div>
         <p class="hint">Longe e Muito longe mostram mais da fase ao redor do herói (os desenhos ficam um pouco menores). Também dá para trocar no menu de pausa.</p>
       </div>
@@ -168,6 +169,19 @@
       <button class="btn big" id="b-mp-start">▶ Escolher fase</button>
       <button class="btn small" id="b-mp-leave">Sair da sala</button>
     </div>
+  </div>
+</section>
+
+<!-- Multiplayer local (mesma tela) -->
+<section id="s-local" class="screen">
+  <div class="panel center">
+    <h2>Multiplayer local</h2>
+    <p class="sub">Até 4 jogadores na mesma tela. Cada um com seu controle.</p>
+    <div id="lc-slots"></div>
+    <p class="mp-msg" id="lc-msg"></p>
+    <p class="hint">Controle: A entra · ◀ ▶ troca de herói · B sai · Start (jogador 1) escolhe a fase.<br>Teclado: Enter entra/começa · ← → troca de herói · Esc sai.</p>
+    <button class="btn big" id="b-lc-start">▶ Escolher fase</button>
+    <button class="btn small" id="b-lc-back">← Voltar</button>
   </div>
 </section>
 
@@ -215,9 +229,11 @@
     <p class="hint" id="pause-mp">Multiplayer: o jogo continua rodando para os outros!</p>
     <button class="btn big" id="b-resume">▶ Continuar</button>
     <button class="btn" id="b-restart">↺ Reiniciar fase</button>
+    <button class="btn small" id="b-wardrobe">👕 Trocar roupa</button>
     <button class="btn small" id="b-controls2">⌨ Controles</button>
     <button class="btn small" id="b-cam">📷 Câmera: Normal</button>
     <button class="btn small" id="b-fs">⛶ Tela cheia</button>
+    <button class="btn small" id="b-chatsz">💬 Chat: Normal</button>
     <button class="btn small" id="b-sound2">🔊 Som: ligado</button>
     <button class="btn small" id="b-quit">Sair para o menu</button>
   </div>
@@ -227,9 +243,12 @@
 <script src="js/sprites.js"></script>
 <script src="js/enemies.js"></script>
 <script src="js/world.js"></script>
+<script src="js/worlds.js"></script>
 <script src="js/levels.js"></script>
 <script src="js/game.js"></script>
+<script src="js/bestiary.js"></script>
 <script src="js/net.js"></script>
+<script src="js/local.js"></script>
 <script src="js/ui.js"></script>
 </body>
 </html>

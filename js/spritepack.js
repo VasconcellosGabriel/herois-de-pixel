@@ -62,20 +62,23 @@ function packNeed(files) {
 
 // ---------- Montagem ----------
 const KEY_OF_CH = { accColor: ACC_OF, armor: ARMOR_OF, vest: VEST_OF, cheek: CHEEK_OF };
-const _lut = new WeakMap();
+const _lut = new Map();
 // tabela brilho-da-cor-chave -> cor final, por canal (o inverso do toneLo/toneHi usados no desenho)
+// (guardada pelas cores, não pelo objeto: o criador de personagem muda as cores no mesmo objeto)
 function packLut(ch) {
-  let L = _lut.get(ch);
+  const cols = KEY_CH.map(([k]) => KEY_OF_CH[k] ? KEY_OF_CH[k](ch) : ch[k] || DEF_COLORS[k]), key = cols.join();
+  let L = _lut.get(key);
   if (L) return L;
-  L = KEY_CH.map(([k]) => {
-    const u = KEY_OF_CH[k] ? KEY_OF_CH[k](ch) : ch[k] || DEF_COLORS[k], t = new Uint8Array(256 * 3);
+  if (_lut.size > 64) _lut.clear();
+  L = cols.map(u => {
+    const t = new Uint8Array(256 * 3);
     for (let v = 0; v < 256; v++) {
       const V = v / 255, hex = V <= KEY_BASE ? toneLo(u, 1 - V / KEY_BASE) : toneHi(u, (V - KEY_BASE) / ((1 - KEY_BASE) * KEY_HI));
       const c = hexToRgb(hex); t[v * 3] = c[0]; t[v * 3 + 1] = c[1]; t[v * 3 + 2] = c[2];
     }
     return t;
   });
-  _lut.set(ch, L);
+  _lut.set(key, L);
   return L;
 }
 const DEF_COLORS = { skin: '#f1c27d', hairColor: '#5a3825', primary: '#3b6fd6', secondary: '#8a5a2b', accent: '#ffd23f', weaponColor: '#dfe6f0', headColor: '#9aa5b1', capeColor: '#c0392b', eyes: '#2b6cb0' };

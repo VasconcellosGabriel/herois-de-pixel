@@ -795,6 +795,7 @@ function boot() {
   Snd.setMuted(!!Game.save.mute);
   if ('ontouchstart' in window || matchMedia('(pointer: coarse)').matches) document.body.classList.add('touch');
   updateSoundLabels();
+  $('#ver').textContent = 'versão ' + VERSAO;
   resize();
   goTitle();
   if (new URLSearchParams(location.search).get('sala')) openMp();   // abriu um link de convite

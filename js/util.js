@@ -32,6 +32,8 @@ function rgbToHex(r, g, b) {
 // Modo cor-chave (exportação das folhas PNG recoloríveis, ver js/spritepack.js): os tons de uma cor-chave
 // mudam só o brilho, para o jogo saber depois qual cor do personagem pintar ali
 let KEYMODE = false;
+// Versão do jogo (aparece no menu inicial). Ao publicar, suba junto com o CACHE do sw.js.
+const VERSAO = 13;
 // amt < 0 escurece, amt > 0 clareia (-1..1)
 function shade(hex, amt) {
   if (KEYMODE) { const k = keyOf(hex); if (k) return keyHex(k.h, amt < 0 ? k.v * (1 + amt) : k.v + (1 - k.v) * amt); }

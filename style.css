@@ -22,6 +22,7 @@ h1 { font-size: clamp(22px, 6vw, 40px); line-height: 1.25; margin: 0; color: var
 h2 { font-size: clamp(12px, 2.6vw, 18px); margin: 0 0 10px; color: var(--acc); }
 .sub, .hint { color: var(--mute); line-height: 1.6; margin: 0; }
 .hint { font-size: 8px; max-width: 360px; }
+.ver { color: var(--mute); font-size: 7px; margin: 0; opacity: .7; }
 
 .btn { font: inherit; font-size: 11px; color: var(--ink); background: #5b3fd1; border: 3px solid var(--line); border-bottom-width: 6px; padding: 10px 16px; cursor: pointer; min-width: 190px; border-radius: 0; }
 .btn:hover { background: #7054ee; }

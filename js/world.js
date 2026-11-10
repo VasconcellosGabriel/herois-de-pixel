@@ -116,6 +116,14 @@ function capTop(g, th, variant, leftEmpty, rightEmpty) {
       for (let y = hs[x]; y < hs[x] + len; y++) { g.px(x, y, C5[y - hs[x] < len - 2 ? 1 : 0]); g.px(x + 1, y, C5[0]); }
     }
     if (th.style === 'rock') for (let k = 0; k < 4; k++) { const x = (R() * 30) | 0; g.px(x, 1, '#ffffff'); g.px(x + 1, 1, '#ffffff'); g.px(x, 0, '#ffffff'); }
+    if (th.goo) {                                          // gosma: escorre da borda e brilha
+      for (let k = 0; k < 5; k++) {
+        const x = 1 + ((R() * 29) | 0), len = 4 + ((R() * 9) | 0);
+        for (let y = hs[x] - 1; y < hs[x] + len; y++) { g.px(x, y, C5[2]); g.px(x + 1, y, C5[1]); }
+        g.px(x, hs[x] + len, C5[4]); g.px(x + 1, hs[x] + len, C5[3]); g.px(x, hs[x] + len + 1, C5[3]);
+      }
+      for (let k = 0; k < 3; k++) { const x = 2 + ((R() * 27) | 0), y = 2 + ((R() * 3) | 0); g.px(x, y, '#ffffff'); g.px(x + 1, y, C5[4]); }
+    }
     g.tint(0, 9, 32, 5, '#0c0618', 0.22);                  // oclusão sob a cobertura
   } else {
     const hgt = 9;
@@ -422,6 +430,17 @@ function vignette() {
   gr.addColorStop(0, 'rgba(8,4,16,0)'); gr.addColorStop(1, 'rgba(8,4,16,0.5)');
   g.fillStyle = gr; g.fillRect(0, 0, W, H);
   return (_vig = c);
+}
+// vinheta já com a tinta do tema por cima (uma imagem só por quadro)
+let _vt = null;
+function vignetteTint(tint) {
+  const key = W + 'x' + H + tint[0] + tint[1];
+  if (_vt && _vt.key === key) return _vt;
+  const c = mk(W, H), g = c.getContext('2d');
+  g.drawImage(vignette(), 0, 0);
+  g.globalAlpha = tint[1]; g.fillStyle = tint[0]; g.fillRect(0, 0, W, H); g.globalAlpha = 1;
+  c.key = key;
+  return (_vt = c);
 }
 // brilho suave (luzes de tochas, cristais)
 const _glow = {};

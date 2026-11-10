@@ -14,8 +14,8 @@ Object.assign(ENEMIES, {
   titan:     { w: 40, h: 50, hp: 160, speed: 0,  stomp: false, coin: 50, xp: 160, boss: true, fly: true, free: true },
 });
 Object.assign(BOSS_INFO, {
-  yeti: { name: 'YETI ANCIAO', ban: 'Yeti Ancião', title: 'o Yeti Ancião', tip: 'Pule a lança baixa, abaixe-se da alta. Quando ele rugir, acerte a boca!',
-    core: e => e.st === 'roar' ? { x: cxOf(e) - 6 + e.dir * 2, y: e.y - 2, w: 14, h: 14 } : null, coreCol: () => '#9fe8ff' },
+  yeti: { name: 'YETI ANCIAO', ban: 'Yeti Ancião', title: 'o Yeti Ancião', tip: 'Pule a lança baixa, abaixe-se da alta. Quando ele rugir ou cravar a lança, acerte a boca!',
+    core: e => e.st === 'roar' || e.st === 'stuck' ? { x: cxOf(e) - 6 + e.dir * 2, y: e.y - 2, w: 14, h: 14 } : null, coreCol: () => '#9fe8ff' },
   slimeking: { name: 'REI GOSMA', ban: 'Rei Gosma', title: 'o Rei Gosma', tip: 'A coroa é o ponto fraco. Cuidado com os filhotes!',
     core: e => ({ x: cxOf(e) - 8, y: e.y + e.h - 46, w: 14, h: 12 }), coreCol: () => '#ffe27a' },
   scorpking: { name: 'ESCORPIAO IMPERADOR', ban: 'Escorpião Imperador', title: 'o Escorpião Imperador', tip: 'Faça-o bater na parede e ataque a cabeça!',
@@ -138,63 +138,66 @@ function impSprite(f, thr) {
 }
 
 // ---------- sprites dos chefes ----------
-// Yeti Ancião: caçador das neves. Lança de osso com ponta de gelo, colar de presas, tanga de pele e pintura de guerra.
-// pose: idle (2) | aim (lança armada) | throw (braço à frente) | stomp (perna erguida) | roar (boca aberta) | toss (joga estacas de gelo)
+// Yeti Ancião: o yeti peludo de sempre, agora com uma lança de osso com ponta de gelo.
+// pose: idle (2) | walk (2) | tele (agacha) | leap | roar | aim (lança armada) | throw | ball (bola de neve no alto) | wind (recua a lança) | lunge (estocada) | stuck (lança cravada)
 function yetiSprite(pose, f, rage) {
-  const g = new PX(150, 124), cx = 75, feet = 122;
-  const F = rage ? ['#6a7898', '#a0b0cc', '#d0dcee', '#ffffff'] : ['#7a8aa8', '#b4c4dc', '#e2eaf6', '#ffffff'];
-  const skin = rage ? '#7a5aa8' : '#4a6aa8', skinL = rage ? '#b89ae0' : '#8aaee0', skinD = rage ? '#3e2470' : '#22407a';
-  const C = sh(0, F[3], F[0], 3), paint = rage ? '#ff3a3a' : '#d84a2a';
-  const b = pose === 'idle' ? f * 2 : 0, crouch = pose === 'toss' ? 6 : pose === 'stomp' ? -3 : 0;
-  const ty = 38 + b + crouch;
+  const g = new PX(150, 124), cx = 70, feet = 122;
+  const F = rage ? ['#7a8aa8', '#a8b8d4', '#d4e0f0', '#ffffff'] : ['#8a9ab8', '#b8c8e0', '#e4ecf8', '#ffffff'];
+  const skin = rage ? '#8a5ab8' : '#5a7ab8', skinL = rage ? '#c09ae0' : '#9ab8e0', skinD = rage ? '#4a2a7a' : '#2a4a8a';
+  const C = sh(0, F[2], F[0], 3);
   const spear = (x0, y0, x1, y1) => {
-    g.cap(x0, y0, x1, y1, 4, '#c8b48a', sh(0, '#f0e0b8', '#7a6440', 1));                   // haste de osso
+    g.cap(x0, y0, x1, y1, 4, '#c8b48a', sh(0, '#f0e0b8', '#7a6440', 1));
     const a = Math.atan2(y1 - y0, x1 - x0), c = Math.cos(a), s = Math.sin(a);
     g.poly([[x1 - s * 4, y1 + c * 4], [x1 + c * 16, y1 + s * 16], [x1 + s * 4, y1 - c * 4]], '#9fe0ff', sh(0, '#ffffff', '#3a88c0', 1));
-    g.cap(x1 - c * 3, y1 - s * 3, x1 - c * 7, y1 - s * 7, 5, '#6a4a2a', { flat: true });      // amarração
+    g.cap(x1 - c * 3, y1 - s * 3, x1 - c * 7, y1 - s * 7, 5, '#6a4a2a', { flat: true });
     for (const k of [-1, 1]) g.poly([[x1 - c * 7, y1 - s * 7], [x1 - c * 12 + s * k * 6, y1 - s * 12 - c * k * 6], [x1 - c * 14 + s * k * 2, y1 - s * 14 - c * k * 2]], k > 0 ? '#e04a3a' : '#ffffff', { flat: true });
   };
-  if (pose === 'idle') spear(cx + 36, feet - 2, cx + 36, ty - 30);
-  if (pose === 'aim') spear(cx - 46, ty - 6, cx + 22, ty - 22);
+  const walk = pose === 'walk' ? (f ? 1 : -1) : 0;
+  const b = pose === 'idle' ? f * 2 : pose === 'walk' ? 1 - f : 0;
+  const cr = pose === 'tele' ? 6 : pose === 'leap' ? -4 : pose === 'lunge' ? 10 : pose === 'wind' ? 6 : pose === 'stuck' ? 4 : 0;
+  const lean = pose === 'lunge' ? 8 : pose === 'wind' ? -5 : pose === 'stuck' ? 6 : 0;
+  const ty = 40 + cr + b, bx = cx + lean;
+  // lança atrás do corpo (cravada no chão ou segurada de pé)
+  if (pose === 'roar' || pose === 'tele') spear(cx + 40, feet, cx + 44, ty - 34);
+  if (pose === 'ball') spear(cx - 40, feet, cx - 44, ty - 30);
+  if (pose === 'idle' || pose === 'walk') spear(cx + 36, feet - 4 + b, cx + 36, ty - 32);
+  if (pose === 'aim') spear(cx - 46, ty - 4, cx + 20, ty - 22);
+  if (pose === 'leap') spear(cx - 30, ty + 30, cx + 38, ty - 10);
   // pernas
   for (const s of [-1, 1]) {
-    if (pose === 'stomp' && s > 0) {
-      g.cap(cx + 10, ty + 48, cx + 24, ty + 36, 20, F[1], C); g.cap(cx + 24, ty + 36, cx + 26, ty + 58, 18, F[1], C);
-      g.ell(cx + 28, ty + 62, 13, 5, skin, sh(0, skinL, skinD));
-      continue;
-    }
-    g.poly([[cx + s * 10 - 11, 84 + crouch], [cx + s * 10 + 11, 84 + crouch], [cx + s * 12 + 12, feet - 4], [cx + s * 12 - 12, feet - 4]], F[1], C);
-    g.ell(cx + s * 13, feet - 4, 13, 4.5, skin, sh(0, skinL, skinD));
-    for (let k = 0; k < 3; k++) g.rect(cx + s * 13 + 4 + k * 3, feet - 6, 2, 3, '#e8e0d0');                 // garras
+    const st = pose === 'lunge' ? s * 6 : walk * s * 4;
+    g.poly([[cx + s * 10 - 11, 88 + cr], [cx + s * 10 + 11, 88 + cr], [cx + s * 12 + 12 + st, feet - 4], [cx + s * 12 - 12 + st, feet - 4]], F[1], C);
+    g.ell(cx + s * 13 + st, feet - 4, 13, 4.5, skin, sh(0, skinL, skinD));
   }
-  // tronco, tanga de pele e colar de presas
-  g.ell(cx, ty + 26, 31, 30, F[1], sh(0, F[3], F[0], 4));
-  g.ell(cx + 4, ty + 30, 16, 18, F[2], { flat: true });
-  g.poly([[cx - 27, ty + 44], [cx + 27, ty + 44], [cx + 24, ty + 62], [cx + 10, ty + 56], [cx - 2, ty + 64], [cx - 14, ty + 56], [cx - 26, ty + 62]], '#8a5a30', sh(0, '#b88450', '#4a2a14', 2));
-  for (let i = 0; i < 4; i++) g.rect(cx - 20 + i * 12, ty + 48, 6, 2, '#5a3418');
-  g.rect(cx - 28, ty + 42, 56, 4, '#4a2e18'); g.ell(cx + 2, ty + 44, 4, 3, '#c8a050', sh(0, '#ffe8a0', '#7a5a20', 1));
-  for (let i = 0; i < 7; i++) { const a = Math.PI * (0.2 + i * 0.1), x = cx + 2 + Math.cos(a) * 18, y = ty + 2 + Math.sin(a) * 10; g.poly([[x - 2, y], [x, y + 6], [x + 2, y]], '#fff8e8', sh(0, '#ffffff', '#a89878', 1)); }
-  g.line(cx - 15, ty + 4, cx + 19, ty + 4, '#5a3418');
-  // braços
-  const arm = (x0, y0, x1, y1) => { g.cap(x0, y0, x1, y1, 17, F[1], sh(0, F[2], F[0], 3)); g.ell(x1, y1 + 4, 9, 8, skin, sh(0, skinL, skinD)); };
-  if (pose === 'idle') { arm(cx - 26, ty + 14, cx - 32, ty + 48 + b); arm(cx + 26, ty + 14, cx + 34, ty + 36); }
-  else if (pose === 'aim') { arm(cx - 26, ty + 14, cx - 34, ty + 30); arm(cx + 24, ty + 12, cx - 4, ty - 12); }
-  else if (pose === 'throw') { arm(cx - 26, ty + 14, cx - 38, ty + 24); arm(cx + 26, ty + 12, cx + 54, ty + 10); }
-  else if (pose === 'stomp' || pose === 'roar') { arm(cx - 26, ty + 14, cx - 44, ty - 10); arm(cx + 26, ty + 14, cx + 44, ty - 10); }
-  else { arm(cx - 26, ty + 14, cx - 30, ty + 44); arm(cx + 26, ty + 14, cx + 50, ty + 36); for (const d of [-4, 3]) g.poly([[cx + 52 + d, ty + 30], [cx + 55 + d, ty + 20], [cx + 58 + d, ty + 30]], '#bfeaff', sh(0, '#ffffff', '#5aa0d0', 1)); }
-  // cabeça: chifres, rosto azul, pintura de guerra
-  const hy = ty - 10 - (pose === 'roar' ? 2 : 0);
-  g.ell(cx, hy, 21, 18, F[1], sh(0, F[3], F[0], 3));
-  for (const s of [-1, 1]) g.poly([[cx + s * 12, hy - 10], [cx + s * 28, hy - 28], [cx + s * 22, hy - 30], [cx + s * 6, hy - 16]], '#e8dcc0', sh(0, '#ffffff', '#9a8a6a', 2));
-  for (const s of [-1, 1]) for (let k = 0; k < 3; k++) g.rect(cx + s * (14 + k * 4) - 1, hy - 14 - k * 4, 2, 2, '#9a8a6a');              // anéis nos chifres
-  g.ell(cx + 4, hy + 4, 13, 11, skin, sh(0, skinL, skinD));
-  for (const x of [cx - 6, cx + 14]) { g.rect(x, hy + 3, 4, 1, paint); g.rect(x, hy + 6, 4, 1, paint); }
+  // tronco peludo
+  g.ell(bx, ty + 26, 31, 30, F[1], sh(0, F[3], F[0], 4));
+  g.ell(bx + 4, ty + 32, 16, 18, F[2], { flat: true });
+  for (let i = 0; i < 6; i++) g.poly([[cx - 30 + i * 12, ty + 52], [cx - 26 + i * 12, ty + 60], [cx - 22 + i * 12, ty + 52]], F[1], { flat: true });
+  const arm = (x0, y0, x1, y1) => { g.cap(x0, y0, x1, y1, 17, F[1], C); g.ell(x1, y1 + 4, 9, 8, skin, sh(0, skinL, skinD)); };
+  const L = bx - 26, R = bx + 26;
+  if (pose === 'tele' || pose === 'roar') { arm(L, ty + 14, bx - 42, ty - 12); arm(R, ty + 14, bx + 42, ty - 12); }
+  else if (pose === 'leap') { arm(L, ty + 14, bx - 34, ty + 26); arm(R, ty + 14, bx + 30, ty - 4); }
+  else if (pose === 'aim') { arm(L, ty + 14, bx - 34, ty + 30); arm(R, ty + 12, bx - 4, ty - 12); }
+  else if (pose === 'throw') { arm(L, ty + 14, bx - 38, ty + 24); arm(R, ty + 12, bx + 52, ty + 10); }
+  else if (pose === 'ball') {
+    arm(L, ty + 14, bx - 34, ty + 44); arm(R, ty + 12, bx + 38, ty - 14);
+    g.ell(bx + 42, ty - 24, 12, 11, '#ffffff', sh(0, '#ffffff', '#9ac0e8', 3)); g.rect(bx + 36, ty - 30, 4, 2, '#ffffff');
+  } else if (pose === 'wind') { spear(cx - 58, ty + 46, cx + 4, ty + 48); arm(L, ty + 14, bx - 26, ty + 44); arm(R, ty + 14, bx + 4, ty + 44); }
+  else if (pose === 'lunge') { spear(cx - 12, ty + 46, cx + 58, ty + 48); arm(L, ty + 14, bx + 20, ty + 40); arm(R, ty + 14, bx + 34, ty + 42); }
+  else if (pose === 'stuck') { spear(cx - 4, ty + 34, cx + 52, feet - 2); arm(L, ty + 14, bx + 22, ty + 38); arm(R, ty + 14, bx + 30, ty + 42); }
+  else { arm(L, ty + 14, bx - 32, ty + 48 + b); arm(R, ty + 14, bx + 34, ty + 36); }
+  // cabeça: chifres, rosto azul
+  const hy = ty - 10 - (pose === 'roar' ? 2 : 0), hx = bx + (pose === 'lunge' ? 4 : 0);
+  g.ell(hx, hy, 21, 18, F[1], sh(0, F[3], F[0], 3));
+  for (const s of [-1, 1]) g.poly([[hx + s * 12, hy - 10], [hx + s * 28, hy - 28], [hx + s * 22, hy - 30], [hx + s * 6, hy - 16]], '#e8dcc0', sh(0, '#ffffff', '#9a8a6a', 2));
+  g.ell(hx + 4, hy + 4, 13, 11, skin, sh(0, skinL, skinD));
   const ec = rage ? '#ff3a3a' : '#ffec4a';
-  g.rect(cx - 3, hy - 1, 5, 3, ec); g.rect(cx + 7, hy - 1, 5, 3, ec);
-  g.line(cx - 6, hy - 5, cx + 2, hy - 2, '#1b1423'); g.line(cx - 6, hy - 4, cx + 2, hy - 1, '#1b1423'); g.line(cx + 15, hy - 5, cx + 7, hy - 2, '#1b1423'); g.line(cx + 15, hy - 4, cx + 7, hy - 1, '#1b1423');
-  if (pose === 'roar' || pose === 'stomp') { g.ell(cx + 4, hy + 9, 8, 6, '#3a0a1a', { flat: true }); g.ell(cx + 4, hy + 12, 4, 2, '#d0405a', { flat: true }); for (const dx of [-3, 9]) g.poly([[cx + dx, hy + 3], [cx + dx + 2, hy + 8], [cx + dx + 4, hy + 3]], '#ffffff', { flat: true }); }
-  else { g.rect(cx - 2, hy + 8, 12, 2, '#1b2a4a'); g.px(cx - 1, hy + 7, '#fff'); g.px(cx + 8, hy + 7, '#fff'); }
-  if (pose === 'idle') { g.ell(cx + 34, ty + 38, 9, 8, skin, sh(0, skinL, skinD)); }          // mão por cima da lança
+  g.rect(hx - 3, hy - 1, 5, 3, ec); g.rect(hx + 7, hy - 1, 5, 3, ec);
+  g.line(hx - 6, hy - 5, hx + 2, hy - 2, '#1b1423'); g.line(hx - 6, hy - 4, hx + 2, hy - 1, '#1b1423'); g.line(hx + 15, hy - 5, hx + 7, hy - 2, '#1b1423'); g.line(hx + 15, hy - 4, hx + 7, hy - 1, '#1b1423');
+  if (pose === 'roar' || pose === 'stuck') { g.ell(hx + 4, hy + 9, 8, 6, '#3a0a1a', { flat: true }); g.ell(hx + 4, hy + 12, 4, 2, '#d0405a', { flat: true }); for (const dx of [-3, 9]) g.poly([[hx + dx, hy + 3], [hx + dx + 2, hy + 8], [hx + dx + 4, hy + 3]], '#ffffff', { flat: true }); }
+  else if (pose === 'lunge' || pose === 'wind') { g.rect(hx - 2, hy + 7, 12, 4, '#1b2a4a'); g.rect(hx - 1, hy + 7, 10, 1, '#ffffff'); }
+  else { g.rect(hx - 2, hy + 8, 12, 2, '#1b2a4a'); g.px(hx - 1, hy + 7, '#fff'); g.px(hx + 8, hy + 7, '#fff'); }
+  if (pose === 'idle' || pose === 'walk') g.ell(cx + 34, ty + 38, 9, 8, skin, sh(0, skinL, skinD));          // mão por cima da lança
   return outline(g.toCanvas(), INK);
 }
 function slimekingSprite(pose, f, rage) {     // idle | squash | jump | spit
@@ -348,8 +351,9 @@ ENEMY_IMG.scorpion = e => { const m = e.st === 'wind' ? 'wind' : e.st === 'sting
 ENEMY_IMG.imp = e => { const t = e.throwT > 0, f = fr(e, 12, 4); return spr2('imp' + f + t, () => impSprite(f, t)); };
 const rageOf = e => e.hp < e.maxHp * 0.5;
 ENEMY_IMG.yeti = e => {
-  const p = e.st === 'aim' ? 'aim' : e.st === 'throw' ? 'throw' : e.st === 'tele' || e.st === 'stomp' ? 'stomp' : e.st === 'roar' ? 'roar' : e.st === 'toss' ? (e.throwT > 0 ? 'toss' : 'aim') : 'idle';
-  const f = p === 'idle' ? fr(e, 2, 2) : 0, r = rageOf(e);
+  const st = e.st, p = st === 'leap' && !e.ground ? 'leap' : st === 'ball' && e.throwT > 0 ? 'throw' : st === 'idle' && e.throwT > 0 ? 'throw'
+    : ['aim', 'throw', 'tele', 'roar', 'ball', 'wind', 'lunge', 'stuck', 'walk'].includes(st) ? st : st === 'leap' ? 'tele' : 'idle';
+  const f = p === 'idle' ? fr(e, 2, 2) : p === 'walk' ? fr(e, 5, 2) : 0, r = rageOf(e);
   return spr2('yeti' + p + f + r, () => yetiSprite(p, f, r));
 };
 ENEMY_IMG.slimeking = e => {
@@ -431,21 +435,27 @@ Object.assign(E_AI, {
   },
 
   // ---------- chefes ----------
-  // Yeti Ancião (caçador das neves): arremessa a lança (baixa = pule, alta = abaixe-se), bate o pé e faz cair uma bola de neve
-  // gigante que rola pela arena (ele fica rugindo: boca aberta = ponto fraco) e espalha estacas de gelo pelo chão
+  // Yeti Ancião: anda e pula pela arena (ao cair, estalactites grandes despencam do teto), arremessa a lança
+  // (baixa = pule, alta = abaixe-se), joga uma bola de neve que rola e vai crescendo e investe com a lança.
+  // Ponto fraco (boca): quando ruge depois do pulo ou quando a lança fica cravada no fim da investida.
   yeti(w, e, dt) {
     const A = arenaOf(w), p = e.tgt, pc = cxOf(p), ec = cxOf(e), rage = rageOf(e);
-    e.stT -= dt;
+    e.stT -= dt; e.atk = null;
     switch (e.st) {
-      case 'idle':
-        e.vx = 0; e.dir = pc > ec ? 1 : -1;
+      case 'idle': case 'walk': {
+        e.dir = pc > ec ? 1 : -1;
+        const far = Math.abs(pc - ec) > 110;
+        e.st = far ? 'walk' : 'idle'; e.vx = far ? e.dir * (rage ? 62 : 48) : 0;
         if (e.stT <= 0) {
-          pickAtk(e, ['spear', 'stomp', 'traps']);
+          e.vx = 0;
+          pickAtk(e, ['leap', 'spear', 'ball', 'lunge']);
           if (e.pick === 'spear') { e.st = 'aim'; e.stT = 0.75; e.spears = rage ? 2 : 1; sfx('growl'); }
-          else if (e.pick === 'stomp') { e.st = 'tele'; e.stT = 0.6; feel(w, null, 0, 0.1); }
-          else { e.st = 'toss'; e.stT = 0.35; e.shots = rage ? 5 : 3; e.shotT = 0.35; }
+          else if (e.pick === 'leap') { e.st = 'tele'; e.stT = 0.55; e.leaps = rage ? 2 : 1; feel(w, null, 0, 0.1); }
+          else if (e.pick === 'ball') { e.st = 'ball'; e.stT = 0.7; e.balls = rage ? 2 : 1; }
+          else { e.st = 'wind'; e.stT = 0.6; e.lunges = rage ? 2 : 1; sfx('growl'); }
         }
         break;
+      }
       case 'aim':
         e.vx = 0; e.dir = pc > ec ? 1 : -1; if (e.stT > 0) break;
         {
@@ -456,45 +466,54 @@ Object.assign(E_AI, {
         break;
       case 'throw':
         e.vx = 0; if (e.stT > 0) break;
-        if (--e.spears > 0) { e.st = 'aim'; e.stT = 0.45; } else { e.st = 'idle'; e.stT = rage ? 0.7 : 1.1; }
+        if (--e.spears > 0) { e.st = 'aim'; e.stT = 0.45; } else { e.st = 'idle'; e.stT = rage ? 0.8 : 1.2; }
         break;
-      case 'tele': e.vx = 0; if (e.stT <= 0) { e.st = 'stomp'; e.stT = 0.3; e.vy = -150; sfx('dash'); } break;
-      case 'stomp':
-        e.vx = 0;
+      // pulo: cai perto do jogador; o tremor derruba estalactites grandes (a sombra no chão avisa onde)
+      case 'tele': e.vx = 0; e.dir = pc > ec ? 1 : -1; if (e.stT <= 0) { e.vy = -430; e.vx = clamp((pc - ec) / 0.95, -220, 220); e.st = 'leap'; e.stT = 0.25; sfx('dash'); } break;
+      case 'leap':
         if (e.ground && e.stT <= 0) {
-          feel(w, null, 0, 0.6); sfx('boom'); burst(w, ec + e.dir * 12, e.y + e.h, '#ffffff', 22, 110, 0.6);
-          const xs = [pc]; if (rage) xs.push(pc + (pc > A.mid ? -96 : 96));
+          e.vx = 0; feel(w, null, 0, 0.6); sfx('boom'); burst(w, ec, e.y + e.h, '#ffffff', 22, 110, 0.6);
+          const n = rage ? 4 : 3, xs = [pc];
+          for (let i = 1; i < n; i++) xs.push(pc + (i % 2 ? 1 : -1) * Math.ceil(i / 2) * rnd(52, 70));
           xs.forEach((x, i) => {
-            const tx = clamp(x, A.x0 + 16, A.x1 - 16), dir = tx >= ec ? 1 : -1, y0 = A.top - 40, d = A.gy - 22 - y0, T0 = 0.5;
-            eshoot(w, { type: 'snowmark', x: tx - 11, y: A.gy - 4, w: 22, h: 4, life: 0.8 + i * 0.35, harmless: true, pass: true,
-              then: (w2, q) => eshoot(w2, { type: 'bigsnow', x: q.x, y: y0, w: 22, h: 22, vy: (d - 0.5 * 900 * T0 * T0) / T0, g: 900, life: T0, pass: true, big: true,
-                then: (w3, b) => {
-                  feel(w3, null, 0, 0.3); sfx('boom'); burst(w3, b.x + 11, A.gy, '#ffffff', 12, 90, 0.5);
-                  const dist = dir > 0 ? A.x1 - (b.x + 22) : b.x - A.x0;
-                  eshoot(w3, { type: 'bigsnow', x: b.x, y: A.gy - 22, w: 22, h: 22, vx: dir * 125, life: Math.max(0.1, dist / 125), pass: true, big: true,
-                    then: (w4, c) => { burst(w4, c.x + 11, c.y + 11, '#ffffff', 18, 110, 0.6); sfx('shatter'); } });
-                } }) });
+            const tx = clamp(x, A.x0 + 10, A.x1 - 10);
+            if (Math.abs(tx - ec) < 22) return;                                     // não cai na cabeça dele
+            eshoot(w, { type: 'bigicicle', x: tx - 6, y: A.top, w: 12, h: 26, life: 0.75 + i * 0.18, harmless: true, pass: true,
+              then: (w2, q) => eshoot(w2, { type: 'bigicicle', x: q.x, y: q.y, w: 12, h: 26, vy: 60, g: 620, life: 3, dmg: 1, big: true,
+                then: (w3, c) => { burst(w3, c.x + 6, c.y + 22, '#cfefff', 10, 80, 0.45); sfx('shatter'); } }) });
+            eshoot(w, { type: 'icemark', x: tx - 8, y: A.gy - 3, w: 16, h: 3, life: 0.75 + i * 0.18 + 0.35, harmless: true, pass: true });
           });
-          if (rage) for (let i = 0; i < 3; i++) {
-            const tx = clamp(rnd(A.x0 + 20, A.x1 - 20), A.x0 + 8, A.x1 - 8);
-            eshoot(w, { type: 'icicle', x: tx - 3, y: A.top, w: 6, h: 12, life: 0.7 + i * 0.15, harmless: true, pass: true,
-              then: (w2, q) => eshoot(w2, { type: 'icicle', x: q.x, y: q.y, w: 6, h: 12, vy: 40, g: 560, life: 2, col: '#cfefff' }) });
-          }
-          e.st = 'roar'; e.stT = 1.6; sfx('roar');
+          if (--e.leaps > 0) { e.st = 'tele'; e.stT = 0.45; }
+          else { e.st = 'roar'; e.stT = rage ? 1.3 : 1.6; sfx('roar'); }
         }
         break;
       case 'roar': e.vx = 0; if (e.stT <= 0) { e.st = 'idle'; e.stT = 0.6; } break;
-      case 'toss':
-        e.vx = 0; e.shotT -= dt;
-        if (e.shotT <= 0 && e.shots > 0) {
-          e.shots--; e.shotT = 0.24; e.throwT = 0.2;
-          const tx = clamp(pc + rnd(-80, 80), A.x0 + 10, A.x1 - 10);
-          lob(w, ec + e.dir * 18, e.y + 14, tx, A.gy - 3, 0.7, 420, { type: 'icespike', w: 6, h: 6,
-            then: (w2, q) => eshoot(w2, { type: 'spikes', x: q.x - 3, y: A.gy - 8, w: 12, h: 8, life: rage ? 5 : 4, big: true, pass: true }) });
-          sfx('ice');
+      // bola de neve: começa pequena e vai crescendo enquanto rola até o jogador
+      case 'ball':
+        e.vx = 0; e.dir = pc > ec ? 1 : -1; if (e.stT > 0) break;
+        {
+          const sx = ec + e.dir * 26, dist = e.dir > 0 ? A.x1 - sx : sx - A.x0, sp = rage ? 150 : 125, life = Math.max(0.2, dist / sp);
+          eshoot(w, { type: 'bigsnow', x: sx - 5, y: A.gy - 10, w: 10, h: 10, vx: e.dir * sp, grow: Math.max(rage ? 30 : 24, 26 / life), gmax: rage ? 38 : 34, life, pass: true, big: true,
+            then: (w2, c) => { burst(w2, c.x + c.w / 2, c.y + c.h / 2, '#ffffff', 20, 120, 0.6); sfx('shatter'); feel(w2, null, 0, 0.2); } });
+          e.throwT = 0.3; sfx('spear'); burst(w, sx, A.gy - 4, '#ffffff', 8, 60, 0.4);
+          if (--e.balls > 0) { e.st = 'ball'; e.stT = 0.9; } else { e.st = 'idle'; e.stT = rage ? 0.9 : 1.3; }
         }
-        if (e.shots <= 0 && e.shotT <= 0) { e.st = 'idle'; e.stT = rage ? 0.7 : 1.1; }
         break;
+      // investida com a lança: recua, avança correndo com a lança baixa (pule por cima!) e, se bater na parede, a lança fica cravada
+      case 'wind': e.vx = 0; e.dir = pc > ec ? 1 : -1; if (e.stT <= 0) { e.st = 'lunge'; e.stT = 0.85; sfx('dash'); } break;
+      case 'lunge': {
+        e.vx = e.dir * (rage ? 300 : 260);
+        e.atk = { x: e.dir > 0 ? e.x + e.w : e.x - 32, y: e.y + e.h - 18, w: 32, h: 8 };
+        if (Math.random() < 0.5) burst(w, ec - e.dir * 10, e.y + e.h, '#ffffff', 2, 40, 0.3);
+        const wall = e.dir > 0 ? e.x + e.w >= A.x1 - 4 : e.x <= A.x0 + 4;
+        if (wall) { e.vx = 0; e.st = 'stuck'; e.stT = rage ? 1.1 : 1.5; feel(w, null, 0, 0.4); sfx('boom'); burst(w, ec + e.dir * 30, e.y + e.h - 4, '#cfefff', 14, 90, 0.5); }
+        else if (e.stT <= 0) {
+          e.vx = 0;
+          if (--e.lunges > 0) { e.st = 'wind'; e.stT = 0.4; } else { e.st = 'idle'; e.stT = rage ? 0.8 : 1.1; }
+        }
+        break;
+      }
+      case 'stuck': e.vx = 0; if (e.stT <= 0) { e.st = 'idle'; e.stT = 0.5; sfx('growl'); } break;
     }
   },
   // Rei Gosma: pulos em sequência (ondas de gosma ao cair), cuspe em arco e filhotes de slime
@@ -704,12 +723,21 @@ Object.assign(EPROJ_DRAW, {
     for (let i = 0; i < 7; i++) { const hh = Math.max(1, 5 - Math.round(i * 0.7)), px = d > 0 ? x + L - 7 + i : x + 6 - i; g.fillStyle = i < 2 ? '#3a88c0' : '#bfefff'; g.fillRect(px, y + 3 - (hh >> 1), 1, hh); }
     const fx = d > 0 ? x : x + L - 4; g.fillStyle = '#e04a3a'; g.fillRect(fx, y, 4, 2); g.fillStyle = '#ffffff'; g.fillRect(fx, y + 4, 4, 1);
   },
-  bigsnow(g, q, x, y) {                                                     // bola de neve gigante (22x22), gira ao rolar
-    const r = 11, cx = x + 11, cy = y + 11;
+  bigsnow(g, q, x, y) {                                                     // bola de neve (cresce ao rolar), gira
+    const D = q.w || 22, r = Math.max(3, Math.round(D / 2)), cx = x + r, cy = y + r, b = Math.max(1, Math.round(r * 0.45));
     g.fillStyle = '#3a5a7a'; for (let j = -r - 1; j <= r + 1; j++) { const hw = Math.floor(Math.sqrt(Math.max(0, (r + 1) * (r + 1) - j * j))); g.fillRect(cx - hw, cy + j, hw * 2, 1); }
-    for (let j = -r; j <= r; j++) { const hw = Math.floor(Math.sqrt(r * r - j * j)); g.fillStyle = j > 5 ? '#a8c8e8' : j < -5 ? '#ffffff' : '#e4f0fc'; g.fillRect(cx - hw, cy + j, hw * 2, 1); }
-    g.fillStyle = '#b4cce4'; for (let k = 0; k < 4; k++) { const a = q.rot * 1.1 * (q.vx < 0 ? -1 : 1) + k * 1.57; g.fillRect(Math.round(cx + Math.cos(a) * 6) - 1, Math.round(cy + Math.sin(a) * 6) - 1, 3, 2); }
-    g.fillStyle = '#ffffff'; g.fillRect(cx - 6, cy - 7, 4, 2);
+    for (let j = -r; j <= r; j++) { const hw = Math.floor(Math.sqrt(r * r - j * j)); g.fillStyle = j > b ? '#a8c8e8' : j < -b ? '#ffffff' : '#e4f0fc'; g.fillRect(cx - hw, cy + j, hw * 2, 1); }
+    g.fillStyle = '#b4cce4'; for (let k = 0; k < 4; k++) { const a = q.rot * 1.1 * (q.vx < 0 ? -1 : 1) + k * 1.57; g.fillRect(Math.round(cx + Math.cos(a) * r * 0.55) - 1, Math.round(cy + Math.sin(a) * r * 0.55) - 1, 3, 2); }
+    g.fillStyle = '#ffffff'; g.fillRect(cx - Math.round(r * 0.55), cy - Math.round(r * 0.65), Math.max(2, r >> 2), 2);
+  },
+  bigicicle(g, q, x, y) {                                                   // estalactite grande (12x26)
+    if (q.g === 0 && q.vy === 0) x += Math.floor(q.rot * 4) % 2;
+    for (let i = 0; i < 26; i++) { const wd = Math.max(1, Math.round(12 * (1 - i / 27))); g.fillStyle = i < 3 ? '#ffffff' : i % 4 === 0 ? '#e8faff' : (i & 1) ? '#9fd8f4' : '#bfe8ff'; g.fillRect(x + ((12 - wd) >> 1), y + i, wd, 1); }
+    g.fillStyle = '#ffffff'; g.fillRect(x + 3, y + 3, 1, 12); g.fillStyle = '#5aa0d0'; g.fillRect(x + 8, y + 4, 1, 9);
+  },
+  icemark(g, q, x, y) {                                                     // sombra de onde a estalactite vai cair
+    const k = clamp(q.rot / 8, 0, 1), hw = Math.round(3 + k * 5);
+    g.globalAlpha = 0.25 + k * 0.45; g.fillStyle = '#1a2a4a'; g.fillRect(x + 8 - hw, y + 1, hw * 2, 2); g.globalAlpha = 1;
   },
   snowmark(g, q, x, y) {                                                    // sombra de onde a bola vai cair
     const k = clamp(q.rot / 8, 0, 1), hw = Math.round(4 + k * 8);

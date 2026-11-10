@@ -761,17 +761,19 @@ function frame(now) {
   const live = Game.world && (Game.mode === 'play' || (Game.mode === 'pause' && Net.role));
   if (live) {
     if (Game.mode === 'play' && Input.hit('pause')) { Input.end(); pauseGame(); return; }
+    let n = 1;
     if (Net.role === 'client') { Net.clientFrame(Game.world, dt); Input.end(); }
     else {
-      acc += dt;
-      let n = 0;
-      while (acc >= STEP && n++ < 6 && Game.world) {
-        const w = Game.world;
+      acc += dt; n = 0;
+      while (acc >= STEP && n < 4 && Game.world) {
+        const w = Game.world; n++;
         readCtls(w); update(w, STEP); Input.end(); acc -= STEP;
         if (Net.role === 'host' && Game.world) Net.hostTick(Game.world);
       }
+      if (n >= 4) acc = Math.min(acc, STEP);           // aparelho lento: não acumula atraso (evita a "espiral" de quadros)
     }
-    if (Game.world) { render(Game.world); updateTouchHud(Game.world); }
+    // telas de 90/120/144 Hz: só redesenha quando o jogo andou (o mundo roda a 60 passos por segundo)
+    if (Game.world && n > 0) { render(Game.world); updateTouchHud(Game.world); }
   } else if (Game.mode === 'pause' && Game.world) {
     acc = 0; render(Game.world);
   } else if (Game.mode === 'creator') {

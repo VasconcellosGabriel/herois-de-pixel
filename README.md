@@ -56,7 +56,7 @@ O anfitrião roda a simulação (inimigos, golpes, dano); os convidados recebem 
 No celular cada dedo é tratado à parte (dá para andar, pular e atacar ao mesmo tempo) e cada botão tem uma área de toque maior que o desenho.
 
 ## Classes
-- **Guerreiro** (6 ♥): J espada (curto alcance, rebate projéteis) · K lança arremessável (atravessa inimigos) · L escudo (segure: defende pela frente e pelas costas; só passa o que vem de cima ou de baixo)
+- **Guerreiro** (6 ♥): J espada (combo de 3: corte, corte de volta e estocada com avanço; alcance maior, rebate projéteis) · K lança arremessável (atravessa inimigos) · L escudo (segure: defende pela frente e pelas costas; só passa o que vem de cima ou de baixo)
 - **Mago** (4 ♥, mana): J magia elemental (10 mana; dano 3 fogo / 2 gelo / 2 veneno) · K raio (40 mana, 10 de dano, atordoa) · L cura (35 mana, +2 ♥ e +1 ♥ nos aliados por perto).
   A mana recarrega devagar (4,5/s) e só depois de ~1 s sem gastar.
 - **Arqueiro** (4 ♥, foco em mobilidade): J flecha mirada (2 de dano; quanto mais longe o alvo, maior a chance de crítico e o crítico chega a ×3) · K tiro triplo (3 flechas que atravessam o primeiro alvo) · L rolamento invulnerável. Passivo: **pulo duplo** (cambalhota).
@@ -66,8 +66,8 @@ No celular cada dedo é tratado à parte (dá para andar, pular e atacar ao mesm
 | Mundo | Fases | Chefe |
 |---|---|---|
 | 1. Reino Verde | Floresta, Cavernas de Cristal, Castelo Sombrio | **Rei Golem**: salto, pedras e investida; o núcleo no peito é o ponto fraco (exposto quando ele bate na parede) |
-| 2. Picos Gelados | Bosque Outonal → Primeira Neve → Lago Congelado → Caverna de Gelo (no gelo o chão escorrega) | **Yeti Ancião**, caçador das neves: arremessa a lança (baixa: pule; alta: abaixe-se), bate o pé e faz cair uma bola de neve gigante que rola pela arena, e espalha estacas de gelo pelo chão. Depois do pisão ele ruge: a boca aberta é o ponto fraco |
-| 3. Pântano Gosmento | Degelo do Brejo (a neve derretendo) → 2 fases de brejo | **Rei Gosma**: pulos em sequência com ondas de gosma, cuspe em arco e filhotes de slime (a coroa é o ponto fraco) |
+| 2. Picos Gelados | Bosque Outonal → Primeira Neve → Lago Congelado → Caverna de Gelo (no gelo o chão escorrega) | **Yeti Ancião**: anda e pula pela arena (ao cair, estalactites grandes despencam do teto), arremessa a lança (baixa: pule; alta: abaixe-se), joga uma bola de neve que começa pequena e vai crescendo enquanto rola e investe com a lança baixa (pule por cima!). Quando ruge ou fica com a lança cravada na parede, a boca aberta é o ponto fraco |
+| 3. Pântano Gosmento | Degelo do Brejo (a neve derretendo) → Lodo das Rãs → Floresta de Gosma (vira um pântano alagado no meio da fase; nos lagos, heróis e inimigos ficam mais lentos) | **Rei Gosma**: pulos em sequência com ondas de gosma, cuspe em arco e filhotes de slime (a coroa é o ponto fraco) |
 | 4. Deserto Escaldante | Savana Rachada → Oásis → Ruínas do Faraó | **Escorpião Imperador**: investida (fica tonto ao bater na parede), rajada de ferrões e mergulho na areia |
 | 5. Montanha de Fogo | Trilha de Cinzas (floresta queimada ao pé do vulcão) → 2 fases de vulcão | **Dragão de Magma**: chuva de fogo, rasante e sopro rasteiro (agache!); o peito em brasa é o ponto fraco quando ele pousa |
 | 6. Castelo do Vampiro | Cemitério do Conde (o castelo no alto da colina) → 3 fases dentro do castelo | **Conde Sanguinário**: some e reaparece ao seu lado, morcegos teleguiados, leque de orbes e investida da capa |
@@ -83,7 +83,7 @@ Cada fase tem inimigos que combinam com o lugar (morcegos só em cavernas e cast
 - **Picos Gelados**: **lobo** (corre atrás, agacha rosnando e dá o bote), falcão das neves, morcego e aranha de gelo, esqueleto congelado
 - **Pântano Gosmento**: **sapo venenoso** (pula e estica a língua), **slime gigante** (dentes, caveira dentro; ao morrer vira dois slimes), fogo-fátuo
 - **Deserto Escaldante**: **escorpião** (crava o ferrão de cima: agachar não adianta), **naja** (empina e dá o bote; de longe cospe veneno), **múmia** (agarra com os braços esticados), falcão do deserto
-- **Montanha de Fogo**: **diabrete** (voa à distância e atira bolas de fogo), **cão infernal**, **ferreiro demônio** (bate o martelo em brasa no chão e solta uma onda de choque), cavaleiro demoníaco
+- **Montanha de Fogo**: **diabrete** (voa à distância e atira bolas de fogo), **cão infernal**, **ferreiro demônio** (fornalha acesa no peito e chaminé nas costas: bate o martelo em brasa no chão soltando uma onda de choque e, de longe, arremessa um lingote quente com a tenaz), cavaleiro demoníaco
 - **Castelo do Vampiro**: morcego vampiro, lobo sombrio, fantasma carmesim, aranha, esqueleto, cavaleiro, guarda
 - **Cidadela Celeste**: águia dourada, cavaleiros e guardas dourados, espírito da tempestade
 - Os mesmos inimigos mudam de cor em cada mundo (skins): slimes, falcões, lobos, aranhas, morcegos, esqueletos, cavaleiros e fantasmas.

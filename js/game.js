@@ -19,7 +19,7 @@ const CLASSES = {
     id: 'guerreiro', name: 'Guerreiro', icon: '⚔️', hp: 6, mana: 0, crit: 0.1,
     desc: 'Resistente e versátil. Luta de perto ou de longe.',
     skills: [
-      { key: 'J', name: 'Espada', desc: 'Golpe de curto alcance. Também rebate projéteis.', icon: '⚔️' },
+      { key: 'J', name: 'Espada', desc: 'Combo de 3 golpes: corte, corte de volta e estocada com avanço. Também rebate projéteis.', icon: '⚔️' },
       { key: 'K', name: 'Lança', desc: 'Arremessa a lança: médio/longo alcance, atravessa inimigos.', icon: '🔱' },
       { key: 'L', name: 'Escudo', desc: 'Segure para bloquear dano pela frente e pelas costas (só passa o que vem de cima ou de baixo).', icon: '🛡️' },
     ],
@@ -153,10 +153,19 @@ function groundBelow(lv, x, y, max = 8) {
   return null;
 }
 
+// Lagos do pântano: quem está com os pés na água anda bem mais devagar (heróis e inimigos)
+const WATER_SLOW = 0.5;
+function waterAt(lv, b) {
+  if (!lv.water) return null;
+  const x = b.x + b.w / 2, f = b.y + b.h;
+  for (const q of lv.water) if (x > q.x && x < q.x + q.w && f > q.y - 7 && f < q.y + 3) return q;
+  return null;
+}
 function moveBody(b, dt, lv) {
   const prevBottom = b.y + b.h;
   const rng4 = () => ({ x0: Math.floor(b.x / T), x1: Math.floor((b.x + b.w - 0.001) / T), y0: Math.floor(b.y / T), y1: Math.floor((b.y + b.h - 0.001) / T) });
-  b.x += b.vx * dt; b.wall = 0;
+  b.inWater = !!waterAt(lv, b);
+  b.x += b.vx * dt * (b.inWater ? WATER_SLOW : 1); b.wall = 0;
   let r = rng4();
   for (let ty = r.y0; ty <= r.y1; ty++) for (let tx = r.x0; tx <= r.x1; tx++) {
     if (isSolid(tileAt(lv, tx, ty))) {
@@ -249,10 +258,30 @@ function readLocalCtl(w, p, c = p.inp) {
   } else c.am = Input.aimMode === 'auto' ? 'auto' : 'keys';
   return c;
 }
-function computeDepth(lv) {
+// hide: túneis secretos ainda fechados contam como terra maciça (sem bordas nem grama por dentro do morro)
+// Fase com dois cenários (3-3: floresta de gosma -> pântano alagado): cada trecho usa a decoração do próprio tema
+const themeAt = (lv, tx) => lv.theme2 && tx >= lv.split ? lv.theme2 : lv.theme;
+function levelDecor(lv) {
+  const a = buildDecor(lv, lv.theme);
+  if (!lv.theme2) return a;
+  const b = buildDecor(lv, lv.theme2), X = lv.split * T, wet = x => lv.water && lv.water.some(q => x > q.x - 6 && x < q.x + q.w + 6);
+  const keep = (d, two) => (two ? d.x >= X : d.x < X) && !(d.layer !== 'front' && wet(d.x));   // dentro do lago só os juncos
+  return { items: a.items.filter(d => keep(d, false)).concat(b.items.filter(d => keep(d, true))), lights: a.lights.filter(l => l.x < X).concat(b.lights.filter(l => l.x >= X && !wet(l.x))) };
+}
+// 0 = só o primeiro cenário, 1 = só o segundo (mistura perto da divisa, pela posição da câmera)
+function themeMix(w) {
+  if (!w.bg2) return 0;
+  return clamp((w.cam.x + W / 2 - (w.lv.split * T - 140)) / 280, 0, 1);
+}
+function computeDepth(lv, hide) {
   const d = Array.from({ length: lv.h }, () => new Uint8Array(lv.w));
-  for (let tx = 0; tx < lv.w; tx++) { let run = 0; for (let ty = 0; ty < lv.h; ty++) { if (isTerrain(lv.tiles[ty][tx])) { d[ty][tx] = Math.min(3, run); run++; } else run = 0; } }
+  for (let tx = 0; tx < lv.w; tx++) { let run = 0; for (let ty = 0; ty < lv.h; ty++) { if (isTerrain(lv.tiles[ty][tx]) || (hide && hide[ty * lv.w + tx])) { d[ty][tx] = Math.min(3, run); run++; } else run = 0; } }
   return d;
+}
+function secretHide(lv, secrets) {
+  const m = new Uint8Array(lv.w * lv.h);
+  for (const s of secrets) if (!s.open) for (let ty = s.y0; ty <= s.y1; ty++) for (let tx = s.x0; tx <= s.x1; tx++) m[ty * lv.w + tx] = 1;
+  return m;
 }
 
 // ---------- Início de fase ----------
@@ -262,7 +291,7 @@ function startLevel(idx, roster = [{ id: 0, ch: Game.save.char, b: myBuild() }],
   const def = LEVELS[idx], lv = genLevel(def);
   const anyMana = roster.some(r => (CLASSES[r.ch.cls] || CLASSES.guerreiro).mana > 0);
   const w = Game.world = {
-    idx, def, lv, roster, players: [], p: null, th: THEMES[def.theme], bg: bgOf(def.theme), depth: computeDepth(lv), decor: buildDecor(lv, def.theme),
+    idx, def, lv, roster, players: [], p: null, th: THEMES[def.theme], bg: bgOf(def.theme), bg2: lv.theme2 ? bgOf(lv.theme2) : null, depth: null, decor: levelDecor(lv),
     enemies: lv.spawns.map(makeEnemy), proj: [], eproj: [], parts: [], fx: [], floats: [], amb: [],
     coins: lv.coins.map(c => ({ ...c, got: false })),
     picks: lv.picks.map(c => ({ ...c, t: c.t === 'mana' && !anyMana ? 'heart' : c.t, got: false })),
@@ -275,6 +304,7 @@ function startLevel(idx, roster = [{ id: 0, ch: Game.save.char, b: myBuild() }],
     state: 'play', bossActive: false, boss: null, bossDrops: 0, flash: 0,
     nextId: lv.spawns.length, local: roster.length > 1 && roster.every(r => r.dev),   // local: vários heróis no mesmo aparelho
   };
+  w.hide = secretHide(lv, w.secrets); w.depth = computeDepth(lv, w.hide);
   roster.forEach(r => addPlayer(w, r));
   scaleEnemies(w);
   const p = w.p = w.players.find(q => q.id === me) || w.players[0];
@@ -550,8 +580,14 @@ function skillA(w, p) {
   if (p.cd.a > 0 || p.block) return;
   const f = p.face, id = p.cls.id;
   if (id === 'guerreiro') {
-    setCd(p, 'a', 0.34); act(p, 'atk', 0.28); p.melee = { wait: 0.06, t: 0.14, hit: new Set(), dmg: 2, sk: 0 }; sfx('slash');
-    addFx(w, { type: 'slash', t: 0.2, max: 0.2, p, face: f, kind: 'sword' });
+    // combo de 3: corte, corte de volta (de baixo para cima) e estocada com avanço (mais longe e mais forte)
+    p.combo = p.comboT > 0 ? (p.combo + 1) % 3 : 0; p.comboT = 0.6; p.atkIdx = p.combo;
+    const fin = p.combo === 2;
+    setCd(p, 'a', fin ? 0.42 : 0.3); act(p, 'atk', fin ? 0.3 : 0.26);
+    p.melee = { wait: 0.05, t: 0.14, hit: new Set(), dmg: fin ? 3 : 2, reach: fin ? 46 : 36, up: fin ? 4 : 12, sk: 0, kb: fin ? 1.4 : 1 };
+    if (fin && p.ground) p.vx = f * 150;
+    sfx('slash');
+    addFx(w, { type: 'slash', t: 0.2, max: 0.2, p, face: f, kind: 'sword', idx: p.combo });
   } else if (id === 'mago') {
     const eli = p.ch.elem || 0, el = ELEMENTS[eli];
     if (p.mana < p.cost[0]) { sfx('no'); p.cd.a = 0.2; return; }
@@ -709,7 +745,7 @@ function hitTile(w, tx, ty, dmg, by) {
   if (Net.role === 'client') return true;
   const k = ty * lv.w + tx, hp = (w.tileHp.has(k) ? w.tileHp.get(k) : TILE_HP[t]) - dmg;
   if (hp > 0.01) {
-    w.tileHp.set(k, hp); emit(['td', tx, ty]);
+    w.tileHp.set(k, hp); tilesDirty(w, tx); emit(['td', tx, ty]);
     burst(w, tx * T + 8, ty * T + 8, t === 4 ? '#c88a52' : '#9a9aa8', 4, 50, 0.3); sfx('block');
     return true;
   }
@@ -720,8 +756,10 @@ function hitTile(w, tx, ty, dmg, by) {
 function breakTile(w, tx, ty, by, quiet) {
   const lv = w.lv, t = lv.tiles[ty] && lv.tiles[ty][tx];
   if (t !== 4 && t !== 5) return;
-  lv.tiles[ty][tx] = 0; w.tileHp.delete(ty * lv.w + tx); w.broken.push([tx, ty]); w.depth = computeDepth(lv);
-  if (t === 5) for (const s of w.secrets) if (s.wx.includes(tx) && ty >= s.y0 && ty <= s.y1) s.open = true;   // revela o túnel
+  lv.tiles[ty][tx] = 0; w.tileHp.delete(ty * lv.w + tx); w.broken.push([tx, ty]);
+  tilesDirty(w, tx);
+  if (t === 5) for (const s of w.secrets) if (s.wx.includes(tx) && ty >= s.y0 && ty <= s.y1 && !s.open) { s.open = true; w.hide = secretHide(lv, w.secrets); tilesDirty(w, s.x0, s.x1); }   // revela o túnel
+  w.depth = computeDepth(lv, w.hide);
   if (quiet) return;
   emit(['tb', tx, ty]);
   const cx = tx * T + 8, cy = ty * T + 8;
@@ -898,7 +936,7 @@ function updatePlayer(w, dt, p, ctl) {
       const m = meleeRect(p);
       for (const e of w.enemies) if (!e.dead && e.active && !p.melee.hit.has(e) && overlap(m, e)) {
         p.melee.hit.add(e);
-        damageEnemy(w, e, p.melee.dmg, { by: p, dir: p.face, rect: m, sk: p.melee.sk });
+        damageEnemy(w, e, p.melee.dmg, { by: p, dir: p.face, rect: m, sk: p.melee.sk, kb: p.melee.kb });
       }
       if (!p.melee.tiles) { p.melee.tiles = true; breakTilesIn(w, m, p.melee.dmg * p.dmgK, p); }   // caixas e paredes falsas
       for (const q of w.eproj) if (q.type !== 'wave' && !q.big && !q.harmless && overlap(m, q)) { q.life = 0; burst(w, q.x, q.y, '#fff', 4, 50, 0.2); sfx('block'); }
@@ -949,8 +987,8 @@ function coinMagnet(p, c, dt) {
   return d < 13 || (Math.abs(dx) < 12 && Math.abs(dy) < 18);
 }
 function meleeRect(p) {
-  const reach = p.melee && p.melee.reach ? p.melee.reach : 24;
-  return { x: p.face > 0 ? p.x + p.w - 2 : p.x - reach + 2, y: p.y - 2, w: reach, h: p.h + 4 };
+  const reach = p.melee && p.melee.reach ? p.melee.reach : 24, up = p.melee && p.melee.up !== undefined ? p.melee.up : 2;
+  return { x: p.face > 0 ? p.x + p.w - 2 : p.x - reach + 2, y: p.y - up, w: reach, h: p.h + up + 3 };
 }
 
 // ---------- Inimigos ----------
@@ -1201,6 +1239,7 @@ function updateProj(w, dt) {
       q.vx = Math.cos(cur + clamp(d, -mx, mx)) * sp; q.vy = Math.sin(cur + clamp(d, -mx, mx)) * sp;
     }
     q.vy += q.g * dt; q.x += q.vx * dt; q.y += q.vy * dt; q.rot += dt * 10;
+    if (q.grow && q.w < q.gmax) { const nw = Math.min(q.gmax, q.w + q.grow * dt); q.x -= (nw - q.w) / 2; q.y -= nw - q.h; q.w = q.h = nw; }   // bola de neve crescendo (fica no chão)
     if (q.life <= 0) { if (q.then) q.then(w, q); continue; }
     if (q.harmless) continue;
     if (!q.pass && solidPx(lv, q.x + q.w / 2, q.y + q.h / 2)) { q.life = 0; if (q.then) q.then(w, q); else if (q.type !== 'wave') burst(w, q.x, q.y, q.col || '#bbb', 4, 40, 0.3); continue; }
@@ -1222,7 +1261,7 @@ function cosmetics(w, dt) {
     if (p.glide && Math.random() < 0.25 * k) part({ x: cxOf(p) - p.face * 6, y: p.y + 6, vx: rnd(-8, 8), vy: rnd(5, 20), life: 0.3, max: 0.3, col: '#ffd27a', g: 0, sz: 1 });
     if (p.flamer > 0) {          // jato do lança-chamas (gerado em cada aparelho a partir do estado)
       const m = flameMouth(p), len = flameLen(w.lv, p), f = p.flameDir;
-      for (let i = 0; i < 4 * k; i++) {   // labaredas: nascem finas e quentes, engrossam e esfriam até o fim do jato
+      for (let i = 0; i < 3 * k; i++) {   // labaredas: nascem finas e quentes, engrossam e esfriam até o fim do jato
         const sp = rnd(190, 250), life = Math.min(0.6, len / sp) * rnd(0.8, 1);
         flamePuff(w, m.x + f * rnd(0, 4), m.y + rnd(-1.5, 1.5), f * sp, rnd(-22, 22), life, rnd(1, 1.6), rnd(4.5, 7.5), { drag: 0.6, g: -55 });
       }
@@ -1235,11 +1274,13 @@ function cosmetics(w, dt) {
       }
     }
     if (p.diving && Math.random() < k) part({ x: cxOf(p) + rnd(-4, 4), y: p.y + rnd(-2, 10), vx: rnd(-10, 10), vy: rnd(-40, -10), life: 0.35, max: 0.35, col: Math.random() < 0.5 ? '#ff8a1f' : '#ffe27a', g: 0, sz: 2 });
+    if (p.inWater && Math.abs(p.vx) > 20 && Math.random() < 0.25 * k) part({ x: cxOf(p) - p.face * rnd(2, 6), y: p.y + p.h - 5, vx: -p.face * rnd(5, 25), vy: rnd(-50, -20), life: 0.35, max: 0.35, col: Math.random() < 0.5 ? '#8ac0a0' : '#d8f0e0', g: 260, sz: 1 });
     // poeira ao correr
-    if (p.ground && Math.abs(p.vx) > 60 && p.dash <= 0) { p.dustT -= dt; if (p.dustT <= 0) { p.dustT = 0.13; part({ x: cxOf(p) - p.face * 4, y: p.y + p.h - 1, vx: -p.face * rnd(5, 18), vy: rnd(-14, -4), life: 0.3, max: 0.3, col: '#cfc6b8', g: 0, sz: 1 }); } }
+    else if (p.ground && Math.abs(p.vx) > 60 && p.dash <= 0) { p.dustT -= dt; if (p.dustT <= 0) { p.dustT = 0.13; part({ x: cxOf(p) - p.face * 4, y: p.y + p.h - 1, vx: -p.face * rnd(5, 18), vy: rnd(-14, -4), life: 0.3, max: 0.3, col: '#cfc6b8', g: 0, sz: 1 }); } }
   }
   for (const e of w.enemies) {
     if (e.dead || !e.active) continue;
+    if (e.type === 'smith' && Math.random() < 0.1 * k) part({ x: cxOf(e) - e.dir * 12 + rnd(-2, 2), y: e.y + e.h - 42, vx: -e.dir * rnd(2, 8), vy: rnd(-26, -14), life: 0.9, max: 0.9, col: Math.random() < 0.5 ? '#4a4450' : '#6a6470', g: -6, sz: 2 });   // chaminé do ferreiro
     if (e.sts.burn > 0 && Math.random() < 0.5 * k) part({ x: cxOf(e) + rnd(-e.w / 2, e.w / 2), y: e.y + rnd(0, e.h), vx: rnd(-6, 6), vy: rnd(-40, -15), life: 0.4, max: 0.4, col: Math.random() < 0.5 ? '#ff8a1f' : '#ffe27a', g: 0, sz: 1 });
     if (e.sts.poison > 0 && Math.random() < 0.3 * k) part({ x: cxOf(e) + rnd(-e.w / 2, e.w / 2), y: e.y + rnd(0, e.h), vx: rnd(-4, 4), vy: rnd(-25, -8), life: 0.5, max: 0.5, col: '#7bd34a', g: 0, sz: 1 });
   }
@@ -1261,7 +1302,7 @@ const FIRE_RAMP = ['#fffdf0', '#fff3a8', '#ffd84a', '#ffaa2e', '#ff7f1f', '#ec4f
 const FIRE_CORE = ['#ffffff', '#ffffff', '#fffbe0', '#fff0a0', '#ffd84a', '#ffaa2e', '#ff7f1f', '#d8401a'];
 function flamePuff(w, x, y, vx, vy, life, r0, r1, o = {}) {
   (w.fire || (w.fire = [])).push({ x, y, vx, vy, life, max: life, r0, r1, g: o.g || 0, drag: o.drag || 0, smoke: !!o.smoke, hot: !!o.hot, heat: o.heat || 0, ph: Math.random() * 6.28 });
-  if (w.fire.length > 420) w.fire.splice(0, w.fire.length - 420);
+  if (w.fire.length > 300) w.fire.splice(0, w.fire.length - 300);
 }
 function updateFire(w, dt) {
   if (!w.fire) return;
@@ -1303,7 +1344,7 @@ function drawFire(g, w, cx, cy) {
   }
   // brilho aditivo
   g.globalCompositeOperation = 'lighter';
-  for (let n = 0; n < fl.length; n += 3) {
+  for (let n = 0; n < fl.length; n += 4) {
     const q = fl[n], t = 1 - q.life / q.max;
     if (t < 0.7) drawGlow(g, q.x - cx, q.y - cy, 10, '#ff7a2a', 0.16 * (1 - t));
   }
@@ -1312,7 +1353,7 @@ function drawFire(g, w, cx, cy) {
 
 // ---------- Partículas de ambiente ----------
 function initAmbient(w) {
-  const n = { forest: 26, spores: 30, dust: 30, embers: 34, snow: 60, swamp: 30, sand: 40, sparkle: 30, autumn: 34, frost: 34, thaw: 36, ash: 46, fog: 14 }[w.th.amb] || 20;
+  const n = { forest: 26, spores: 30, dust: 30, embers: 34, snow: 60, swamp: 30, sand: 40, sparkle: 30, autumn: 34, frost: 34, thaw: 36, ash: 46, fog: 14, goo: 34 }[w.th.amb] || 20;
   for (let i = 0; i < n; i++) w.amb.push(newAmb(w, true));
 }
 function newAmb(w, anywhere) {
@@ -1329,6 +1370,7 @@ function newAmb(w, anywhere) {
   else if (k === 'thaw') { if (Math.random() < 0.55) { a.kind = 'snow'; a.vx = rnd(-6, 2); a.vy = rnd(8, 18); a.sz = 1; if (!anywhere) a.y = w.cam.y - rnd(0, 16); } else { a.kind = 'bubble'; a.vx = rnd(-3, 3); a.vy = rnd(-12, -5); } }
   else if (k === 'ash' && Math.random() < 0.7) { a.kind = 'ash'; a.vx = rnd(-8, 8); a.vy = rnd(8, 20); if (!anywhere) a.y = w.cam.y - rnd(0, 16); }
   else if (k === 'fog') { a.kind = 'fog'; a.vx = rnd(4, 11); a.vy = rnd(-1, 1); a.y = w.cam.y + rnd(H * 0.35, H); a.sz = rnd(18, 40); if (!anywhere) a.x = w.cam.x - 18; }
+  else if (k === 'goo') { if (Math.random() < 0.55) { a.kind = 'drop'; a.vx = 0; a.vy = rnd(30, 60); if (!anywhere) a.y = w.cam.y - rnd(0, 16); } else { a.kind = 'bubble'; a.vx = rnd(-3, 3); a.vy = rnd(-12, -5); } }
   else if (k === 'frost') { a.kind = 'sparkle'; a.col = '#bfefff'; a.vx = rnd(-3, 3); a.vy = rnd(2, 8); a.y = w.cam.y + rnd(0, H); }
   else { a.kind = 'ember'; a.vx = rnd(-10, 10); a.vy = rnd(-45, -18); a.col = Math.random() < 0.5 ? '#ff8a2a' : '#ffd27a'; }
   return a;
@@ -1386,6 +1428,7 @@ function updateVisuals(w, dt) {
   w.fx = w.fx.filter(f => f.t > 0);
   for (const f of w.floats) { f.t -= dt; f.y += f.vy * dt; f.vy *= 0.96; }
   w.floats = w.floats.filter(f => f.t > 0);
+  if (w.bg2) w.th = THEMES[themeMix(w) > 0.5 ? w.lv.theme2 : w.lv.theme];
   updateAmbient(w, dt);
   for (const s of w.secrets) if (s.open && s.fade > 0) s.fade = Math.max(0, s.fade - dt * 2.2);
   // subiu de nível durante a fase: aviso só neste aparelho (os pontos são gastos na tela de Evolução)
@@ -1499,8 +1542,8 @@ function slashImg(kind, idx, step, accent) {
   if (_slash[key]) return _slash[key];
   const claw = kind === 'claw', g = new PX(160, 160), cxx = 80, cyy = 80;
   const ramp = claw ? ['#b02a12', '#ff6a1a', '#ffc060', '#fff6c8'] : [toneLo(accent, 0.35), accent, toneHi(accent, 0.45), '#ffffff'];
-  const R0 = claw ? 34 : 54, TM = claw ? 14 : 22;
-  const start = claw ? [-45, 70, -115][idx] : -105, span = claw ? [115, 115, 205][idx] : 185, dirn = claw && idx === 1 ? -1 : 1;
+  const R0 = claw ? 34 : idx === 2 ? 66 : 62, TM = claw ? 14 : idx === 2 ? 16 : 22;
+  const start = claw ? [-45, 70, -115][idx] : [-105, 85, -22][idx], span = claw ? [115, 115, 205][idx] : [185, 175, 44][idx], dirn = (claw || kind === 'sword') && idx === 1 ? -1 : 1;
   const headFrac = clamp((step + 1) / 5, 0.12, 1), headA = span * headFrac, tailA = Math.max(0, headA - span * 0.66);
   for (let y = 0; y < 160; y++) for (let x = 0; x < 160; x++) {
     const dx = x + 0.5 - cxx, dy = y + 0.5 - cyy, r = Math.hypot(dx, dy);
@@ -1533,6 +1576,8 @@ function playerImage(p) {
   else if (p.act === 'atk') {
     pose = 'atk';
     if (p.cls.id === 'dragonico') f = prog < 0.62 ? p.atkIdx : 3;
+    else if (p.atkIdx === 1) f = prog < 0.3 ? 3 : prog < 0.65 ? 2 : 1;          // corte de volta: de baixo para cima
+    else if (p.atkIdx === 2) f = prog < 0.2 ? 0 : 2;                              // estocada: braço esticado
     else f = prog < 0.25 ? 0 : prog < 0.5 ? 1 : prog < 0.8 ? 2 : 3;
   } else if (p.act === 'cast') { pose = 'cast'; f = prog < 0.5 ? 1 : 2; }
   else if (p.crouch) { pose = 'crouch'; f = p.ground && Math.abs(p.vx) > 10 ? 1 + Math.floor(p.anim * 9) % 4 : 0; }
@@ -1594,13 +1639,71 @@ function drawGlow(g, x, y, r, col, a) {
   g.globalAlpha = a; g.drawImage(glowSprite(col, r), Math.round(x - r), Math.round(y - r));
 }
 
+// ---------- Tiles em blocos ----------
+// Os tiles quase nunca mudam: cada bloco de CHUNK tiles de largura é desenhado uma vez numa tela própria e reaproveitado
+// (antes eram ~300 drawImage por quadro). Quebrar uma caixa/parede ou abrir um túnel secreto marca o bloco para redesenhar.
+const CHUNK = 16;
+function tilesDirty(w, tx0, tx1 = tx0) {
+  if (!w.chunks) return;
+  for (let c = Math.floor((tx0 - 1) / CHUNK); c <= Math.floor((tx1 + 1) / CHUNK); c++) { const k = w.chunks.get(c); if (k) k.dirty = true; }
+}
+function paintChunk(w, ci, ch) {
+  const lv = w.lv, g = ch.g, R = lv.tiles, hd = w.hide, LW = lv.w, x0 = ci * CHUNK;
+  const air = (yy, xx) => !isTerrain(R[yy][xx]) && !hd[yy * LW + xx];
+  g.setTransform(1, 0, 0, 1, 0, 0); g.clearRect(0, 0, ch.c.width, ch.c.height); g.setTransform(HR, 0, 0, HR, 0, 0);
+  for (let ty = 0; ty < lv.h; ty++) for (let tx = x0; tx < Math.min(x0 + CHUNK, lv.w); tx++) {
+    const t = R[ty][tx];
+    if (!t) continue;
+    const x = (tx - x0) * T, y = ty * T, name = themeAt(lv, tx);
+    if (t === 1 || t === 5) {
+      const mask = (ty > 0 && air(ty - 1, tx) ? 1 : 0) | (tx > 0 && air(ty, tx - 1) ? 2 : 0) | (tx < lv.w - 1 && air(ty, tx + 1) ? 4 : 0) | (ty < lv.h - 1 && air(ty + 1, tx) ? 8 : 0);
+      g.drawImage(solidTile(name, mask, w.depth[ty][tx], ((hash2(tx, ty) * 3) | 0)), x, y, T, T);
+      if (t === 5) g.drawImage(crackTile(w.tileHp.has(ty * lv.w + tx)), x, y, T, T);   // parede falsa: rachaduras discretas
+    } else if (t === 4) g.drawImage(crateTile(name, hash2(tx, ty, 7) < 0.4 ? 1 : 0, w.tileHp.has(ty * lv.w + tx)), x, y, T, T);
+    else if (t === 2) g.drawImage(platTile(name), x, y, T, T);
+    else g.drawImage(spikeTile(name), x, y, T, T);
+  }
+  ch.dirty = false;
+}
+function drawTiles(g, w, cx, cy) {
+  const lv = w.lv, map = w.chunks || (w.chunks = new Map()), c0 = Math.floor(cx / (CHUNK * T)), c1 = Math.floor((cx + W) / (CHUNK * T));
+  for (let ci = Math.max(0, c0); ci <= c1 && ci * CHUNK < lv.w; ci++) {
+    let ch = map.get(ci);
+    if (!ch) {
+      const c = mk(CHUNK * T * HR, lv.h * T * HR);
+      ch = { c, g: c.getContext('2d'), dirty: true }; ch.g.imageSmoothingEnabled = false; map.set(ci, ch);
+    }
+    if (ch.dirty) paintChunk(w, ci, ch);
+    g.drawImage(ch.c, ci * CHUNK * T - cx, -cy, CHUNK * T, lv.h * T);
+  }
+  for (const k of map.keys()) if (k < c0 - 2 || k > c1 + 2) map.delete(k);   // libera os blocos que ficaram longe
+}
+
+function drawWater(g, w, cx, cy) {
+  for (const q of w.lv.water) {
+    if (q.x + q.w < cx - 4 || q.x > cx + W + 4) continue;
+    const x0 = Math.round(q.x - cx), y0 = Math.round(q.y - cy) - 6, wd = q.w;
+    // margens de lama, corpo d'água (os pés de quem entra ficam submersos) e reflexos se mexendo
+    g.fillStyle = '#3a2e1c'; g.fillRect(x0 - 4, y0 + 1, 4, 18); g.fillRect(x0 + wd, y0 + 1, 4, 18); g.fillStyle = '#5a4a2a'; g.fillRect(x0 - 4, y0, 3, 2); g.fillRect(x0 + wd + 1, y0, 3, 2);
+    g.globalAlpha = 0.82; g.fillStyle = '#2a6a5a'; g.fillRect(x0, y0, wd, 6);
+    g.fillStyle = '#1e5048'; g.fillRect(x0, y0 + 6, wd, 6);
+    g.fillStyle = '#163a36'; g.fillRect(x0, y0 + 12, wd, 8);
+    g.globalAlpha = 0.9; g.fillStyle = '#9ad8c0';
+    for (let x = 0; x < wd; x += 2) if (Math.sin(x * 0.35 + w.t * 2.6) > 0.35) g.fillRect(x0 + x, y0, 2, 1);
+    g.globalAlpha = 0.55; g.fillStyle = '#d8fff0';
+    for (let k = 0; k < wd - 6; k += 17) { const sx = (k * 7 + Math.floor(w.t * 3) * 2) % (wd - 6); g.fillRect(x0 + sx, y0 + 3 + (k % 3) * 3, 5, 1); }
+    g.globalAlpha = 1;
+  }
+}
 function render(w) {
   const g = ctx, p = w.p, lv = w.lv, name = lv.theme;
   let cx = Math.round(w.cam.x), cy = Math.round(w.cam.y);
   g.setTransform(HR, 0, 0, HR, 0, 0); g.imageSmoothingEnabled = false;
   g.save();
   if (w.shake > 0) g.translate(Math.round(rnd(-2, 2)), Math.round(rnd(-2, 2)));
-  drawBg(g, w.bg, cx, Math.min(12, cy - (lv.h * T - H) + 12), w.t);   // fundo calibrado para a câmera no pé da fase
+  const mix = themeMix(w), bgy = Math.min(12, cy - (lv.h * T - H) + 12);   // fundo calibrado para a câmera no pé da fase
+  if (mix < 1) drawBg(g, w.bg, cx, bgy, w.t);
+  if (mix > 0) { g.globalAlpha = mix; drawBg(g, w.bg2, cx, bgy, w.t); g.globalAlpha = 1; }
 
   const inView = (x, wd = 40) => x - cx > -wd && x - cx < W + wd;
   const decorFrame = (d) => d.spr[d.spr.length === 1 ? 0 : Math.floor(w.t * (d.fast ? 9 : d.slow ? 2.5 : 3) + d.x * 0.07) % d.spr.length];
@@ -1612,20 +1715,7 @@ function render(w) {
   };
   drawDecor('back');
 
-  // tiles
-  const tx0 = Math.floor(cx / T), tx1 = tx0 + Math.ceil(W / T) + 1, ty0 = Math.floor(cy / T), ty1 = ty0 + Math.ceil(H / T) + 1;
-  for (let ty = ty0; ty <= Math.min(ty1, lv.h - 1); ty++) for (let tx = Math.max(0, tx0); tx <= Math.min(tx1, lv.w - 1); tx++) {
-    const t = lv.tiles[ty][tx];
-    if (!t) continue;
-    const x = tx * T - cx, y = ty * T - cy;
-    if (t === 1 || t === 5) {
-      const R = lv.tiles, mask = (ty > 0 && !isTerrain(R[ty - 1][tx]) ? 1 : 0) | (tx > 0 && !isTerrain(R[ty][tx - 1]) ? 2 : 0) | (tx < lv.w - 1 && !isTerrain(R[ty][tx + 1]) ? 4 : 0) | (ty < lv.h - 1 && !isTerrain(R[ty + 1][tx]) ? 8 : 0);
-      g.drawImage(solidTile(name, mask, w.depth[ty][tx], ((hash2(tx, ty) * 3) | 0)), x, y, T, T);
-      if (t === 5) g.drawImage(crackTile(w.tileHp.has(ty * lv.w + tx)), x, y, T, T);   // parede falsa: rachaduras discretas
-    } else if (t === 4) g.drawImage(crateTile(name, hash2(tx, ty, 7) < 0.4 ? 1 : 0, w.tileHp.has(ty * lv.w + tx)), x, y, T, T);
-    else if (t === 2) g.drawImage(platTile(name), x, y, T, T);
-    else g.drawImage(spikeTile(name), x, y, T, T);
-  }
+  drawTiles(g, w, cx, cy);
   drawDecor('mid');
 
   // checkpoints e objetivo
@@ -1672,7 +1762,7 @@ function render(w) {
   // túneis secretos ainda fechados: o interior parece terra maciça
   for (const s of w.secrets) if (s.fade > 0 && inView(s.x0 * T, (s.x1 - s.x0 + 2) * T)) {
     g.globalAlpha = s.fade;
-    for (let ty = s.y0; ty <= s.y1; ty++) for (let tx = s.x0; tx <= s.x1; tx++) g.drawImage(solidTile(name, 0, 1, ((hash2(tx, ty) * 3) | 0)), tx * T - cx, ty * T - cy, T, T);
+    for (let ty = s.y0; ty <= s.y1; ty++) for (let tx = s.x0; tx <= s.x1; tx++) g.drawImage(solidTile(themeAt(lv, tx), 0, Math.max(1, w.depth[ty][tx]), ((hash2(tx, ty) * 3) | 0)), tx * T - cx, ty * T - cy, T, T);
     g.globalAlpha = 1;
   }
   // inimigos
@@ -1717,6 +1807,7 @@ function render(w) {
   if (w.local) w.players.forEach((q, i) => drawPlayer(g, w, q, cx, cy, 'P' + (i + 1)));
   else { for (const q of w.players) if (q !== p) drawPlayer(g, w, q, cx, cy, true); drawPlayer(g, w, p, cx, cy, false); }
   drawDecor('front');
+  if (lv.water) drawWater(g, w, cx, cy);
   if (w.th.glow) { g.globalCompositeOperation = 'lighter'; for (const q of w.local ? w.players : [p]) if (!q.dead && !q.out) drawGlow(g, cxOf(q) - cx, q.y + 10 - cy, 46, w.th.glow, 0.2); g.globalAlpha = 1; g.globalCompositeOperation = 'source-over'; }
 
   // labaredas (lança-chamas e sopro) + brilho que ilumina o cenário
@@ -1840,7 +1931,7 @@ function render(w) {
   g.globalAlpha = 1; g.globalCompositeOperation = 'source-over';
   for (const a of w.amb) {
     const x = Math.round(a.x - cx), y = Math.round(a.y - cy);
-    if (a.kind === 'firefly') { const b = (Math.sin(a.ph * 3) + 1) / 2; g.globalAlpha = 0.3 + b * 0.7; g.fillStyle = '#e8ff7a'; g.fillRect(x, y, 2, 2); g.globalCompositeOperation = 'lighter'; drawGlow(g, x + 1, y + 1, 8, '#d6ff5a', 0.5 * b); g.globalCompositeOperation = 'source-over'; g.globalAlpha = 1; }
+    if (a.kind === 'firefly') { const b = (Math.sin(a.ph * 3) + 1) / 2; g.globalAlpha = 0.3 + b * 0.7; g.fillStyle = '#e8ff7a'; g.fillRect(x, y, 2, 2); if (b > 0.25 && x > -8 && x < W + 8) { g.globalCompositeOperation = 'lighter'; drawGlow(g, x + 1, y + 1, 7, '#d6ff5a', 0.5 * b); g.globalCompositeOperation = 'source-over'; } g.globalAlpha = 1; }
     else if (a.kind === 'leaf') { g.fillStyle = a.col ? (Math.floor(a.ph * 2) % 2 ? a.col : shade(a.col, -0.25)) : Math.floor(a.ph * 2) % 2 ? '#7ac070' : '#e0a040'; g.fillRect(x, y, 2, 1); g.fillRect(x + 1, y + 1, 1, 1); }
     else if (a.kind === 'spore') { g.globalAlpha = 0.4 + (Math.sin(a.ph * 2) + 1) * 0.3; g.fillStyle = a.col; g.fillRect(x, y, 1, 1); g.globalAlpha = 1; }
     else if (a.kind === 'dust') { g.globalAlpha = 0.25; g.fillStyle = '#e8e0ff'; g.fillRect(x, y, 1, 1); g.globalAlpha = 1; }
@@ -1848,6 +1939,7 @@ function render(w) {
     else if (a.kind === 'bubble') { g.globalAlpha = 0.6; g.fillStyle = '#b8f070'; g.fillRect(x, y, 2, 1); g.fillRect(x, y + 2, 2, 1); g.fillRect(x - 1, y + 1, 1, 1); g.fillRect(x + 2, y + 1, 1, 1); g.globalAlpha = 1; }
     else if (a.kind === 'ash') { g.globalAlpha = 0.7; g.fillStyle = Math.floor(a.ph * 3) % 2 ? '#b4aea8' : '#7e7874'; g.fillRect(x, y, 2, 1); g.globalAlpha = 1; }
     else if (a.kind === 'fog') { g.globalAlpha = 0.07; g.fillStyle = '#d8d0f0'; g.fillRect(x - a.sz / 2, y, a.sz, 4); g.fillRect(x - a.sz / 3, y - 2, a.sz * 0.66, 8); g.globalAlpha = 1; }
+    else if (a.kind === 'drop') { g.globalAlpha = 0.85; g.fillStyle = '#8ad83a'; g.fillRect(x, y, 1, 2); g.fillStyle = '#dcffa8'; g.fillRect(x, y + 2, 1, 1); g.globalAlpha = 1; }
     else if (a.kind === 'sand') { g.globalAlpha = 0.55; g.fillStyle = '#ffe0a0'; g.fillRect(x, y, 2, 1); g.globalAlpha = 1; }
     else if (a.kind === 'sparkle') { const b = (Math.sin(a.ph * 4) + 1) / 2; g.globalAlpha = 0.3 + b * 0.7; g.fillStyle = a.col || '#fff6c8'; g.fillRect(x, y, 1, 1); if (b > 0.8) { g.fillRect(x - 1, y, 3, 1); g.fillRect(x, y - 1, 1, 3); } g.globalAlpha = 1; }
     else { g.globalAlpha = 0.9; g.fillStyle = a.col; g.fillRect(x, y, 1 + (Math.floor(a.ph * 3) % 2), 1); g.globalAlpha = 1; }
@@ -1861,8 +1953,7 @@ function render(w) {
   }
   g.globalAlpha = 1;
   // vinheta + tinta do tema
-  g.drawImage(vignette(), 0, 0);
-  const [tc, ta] = w.bg.tint; g.globalAlpha = ta; g.fillStyle = tc; g.fillRect(0, 0, W, H); g.globalAlpha = 1;
+  g.drawImage(vignetteTint((mix > 0.5 ? w.bg2 : w.bg).tint), 0, 0, W, H);                 // vinheta + tinta do tema numa passada só
   if (w.flash > 0) { g.fillStyle = 'rgba(255,255,255,.35)'; g.fillRect(0, 0, W, H); }
   drawHud(g, w);
   if (w.cine > 0) { const k = Math.min(1, w.cine / 0.4, (2.4 - w.cine) / 0.4 + 0.001), bh = Math.round(22 * Math.min(1, k)); g.fillStyle = '#05030a'; g.fillRect(0, 0, W, bh); g.fillRect(0, H - bh, W, bh); }

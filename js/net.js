@@ -7,7 +7,7 @@
 // (sem reenvio e fora de ordem) para as fotos e posições: um pacote perdido no Wi-Fi não segura os seguintes.
 // O servidor público e gratuito do PeerJS só apresenta os aparelhos um ao outro; depois a conexão é direta
 // (ou passa por um "relay" TURN gratuito do PeerJS quando a rede não permite a ligação direta).
-const PROTO = 7, MAX_PLAYERS = 4, SNAP_EVERY = 2, FAST_ID = 100;
+const PROTO = 8, MAX_PLAYERS = 4, SNAP_EVERY = 2, FAST_ID = 100;
 const ID_PREFIX = 'heroisdepixel-v1-', CODE_CHARS = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789', CODE_LEN = 5;
 const PEERJS_URLS = ['https://cdnjs.cloudflare.com/ajax/libs/peerjs/1.5.4/peerjs.min.js', 'https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js'];
 
@@ -32,7 +32,7 @@ const PF = ['x', 'y', 'vx', 'vy', 'face', 'hp', 'maxHp', 'mana', 'manaDelay', 'a
 const OWN_BODY = new Set(['x', 'y', 'vx', 'vy', 'face', 'ground', 'h', 'crouch', 'glide', 'landT', 'flipT', 'block']);
 const EF = ['x', 'y', 'vx', 'vy', 'dir', 'hp', 'flash', 'sq', 'hurt', 'slow', 'stun', 'st', 't', 'throwT', 'ground', 'sts.burn', 'sts.poison', 'sts.freeze'];
 const QF = ['type', 'x', 'y', 'vx', 'vy', 'g', 'life', 'eli', 'stuck'];
-const RF = ['type', 'x', 'y', 'vx', 'vy', 'g', 'rot'];
+const RF = ['type', 'x', 'y', 'vx', 'vy', 'g', 'rot', 'w', 'h'];
 const WF = ['state', 'lives', 'coinsGot', 'nextLife', 'bossActive', 'cine', 'lifeT'];   // clarão/tremida vão por evento, só para quem causou
 const SMOOTH = new Set(['x', 'y']);    // posições: o convidado desliza até elas em vez de pular
 
@@ -343,7 +343,7 @@ function playEvent(w, ev) {
     case 'ck': if (w.checks[ev[1]]) w.checks[ev[1]].on = true; break;
     case 'pk': w.picks = ev[1]; break;
     case 'tb': breakTile(w, ev[1], ev[2], null, true); break;
-    case 'td': w.tileHp.set(ev[2] * w.lv.w + ev[1], 1); break;
+    case 'td': w.tileHp.set(ev[2] * w.lv.w + ev[1], 1); tilesDirty(w, ev[1]); break;
     case 'ch': if (w.chests[ev[1]]) w.chests[ev[1]].open = true; break;
   }
 }

@@ -151,7 +151,7 @@ const GLYPHS = {};
   };
   for (const k in rows) GLYPHS[k] = rows[k];
 }
-function drawText(g, str, x, y, col = '#fff', s = 1) {
+function drawTextRaw(g, str, x, y, col, s) {
   g.fillStyle = col;
   for (const ch of String(str)) {
     const gl = GLYPHS[ch] || GLYPHS[String(ch).toUpperCase()];
@@ -159,11 +159,32 @@ function drawText(g, str, x, y, col = '#fff', s = 1) {
     x += 4 * s;
   }
 }
+// Texto pronto em cache: cada letra eram até 15 retângulos (x5 com o contorno) desenhados todo quadro — pesava no HUD.
+const _txt = new Map();
+function textImg(str, col, s, edge) {
+  const key = str + '' + col + s + (edge || '');
+  let c = _txt.get(key);
+  if (c) return c;
+  if (_txt.size > 600) _txt.clear();
+  const k = typeof HR === 'number' ? HR : 2, pad = edge ? s : 0, w = Math.max(1, textW(str, s) + pad * 2), h = 5 * s + pad * 2;
+  c = mk(w * k, h * k); const g = c.getContext('2d'); g.scale(k, k);
+  if (edge) for (const [ox, oy] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) drawTextRaw(g, str, pad + ox * s, pad + oy * s, edge, s);
+  drawTextRaw(g, str, pad, pad, col, s);
+  c.lw = w; c.lh = h; c.pad = pad;
+  _txt.set(key, c);
+  return c;
+}
+function drawText(g, str, x, y, col = '#fff', s = 1) {
+  str = String(str); if (!str) return;
+  const c = textImg(str, col, s, null);
+  g.drawImage(c, x, y, c.lw, c.lh);
+}
 const textW = (str, s = 1) => String(str).length * 4 * s - s;
 // Texto com contorno escuro (legível sobre qualquer fundo)
 function drawTextO(g, str, x, y, col = '#fff', s = 1, edge = '#1b1423') {
-  for (const [ox, oy] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) drawText(g, str, x + ox * s, y + oy * s, edge, s);
-  drawText(g, str, x, y, col, s);
+  str = String(str); if (!str) return;
+  const c = textImg(str, col, s, edge);
+  g.drawImage(c, x - c.pad, y - c.pad, c.lw, c.lh);
 }
 
 // ---------- Áudio (sintetizado, sem arquivos) ----------

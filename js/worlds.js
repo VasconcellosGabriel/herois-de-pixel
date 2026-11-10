@@ -594,3 +594,65 @@ DECOR_PLACE.peak = o => {
   else if (r > 0.84) add({ spr: [D.rock], x, y: y + 1, layer: 'mid' });
   else if (r2 > 0.86) add({ spr: [D.cloud[(r * 2) | 0]], x: x + ((r * 6) | 0) - 3, y: y + 4, layer: 'front' });
 };
+
+// ---------- 3-3: Floresta de Gosma (a fase termina no pântano alagado, com lagos que deixam todos mais lentos) ----------
+const GOO = ['#1e5a12', '#3a8a1e', '#5ec02e', '#9ae85a', '#dcffa8'];
+Object.assign(THEMES, {
+  slimewood: {
+    seed: 19, style: 'dirt', song: 'swamp', amb: 'goo', tint: ['#4a2a6a', 0.08], glow: '#c8ff8a', goo: true, noRoots: true,
+    ground: ['#140e18', '#22182a', '#33243c', '#463250', '#5a4264'], cap: GOO,
+    edge: '#08040a', plat: '#6a5a30', sun: '#e8ffb0', platAs: 'forest', crateAs: 'forest',
+    sky: [[0, '#140e2a'], [0.45, '#262a44'], [0.75, '#3e6a44'], [1, '#a8d050']],
+  },
+});
+Object.assign(SLIME_COL, { slimewood: '#8ad83a' });
+// gosma escorrendo de uma borda (x0..x1 na altura y)
+function gooDrips(g, x0, x1, y, R, len = 10) {
+  for (let x = x0; x < x1; x += 2 + ((R() * 4) | 0)) {
+    const h = 2 + ((R() * len) | 0);
+    for (let k = 0; k < h; k++) g.px(x, y + k, k > h - 2 ? GOO[4] : k % 3 ? GOO[2] : GOO[3]);
+    if (h > len * 0.6) { g.px(x - 1, y + h, GOO[3]); g.px(x, y + h, GOO[4]); g.px(x + 1, y + h, GOO[3]); g.px(x, y + h + 1, GOO[2]); }
+  }
+}
+function gooTree(g, x, base, h, R, ramp) {
+  roundTree(g, x, base, h, ramp, (x * 7) | 0, ['#140e18', '#241a2c', '#36283e', '#4a3852']);
+  const r = h * 0.27;
+  gooDrips(g, x - r * 1.6, x + r * 1.6, base - h * 0.32, R, 16);                 // a copa pinga gosma
+  g.ell(x, base - 1, 10, 2.5, GOO[2], { hi: GOO[4], lo: GOO[0], depth: 1 });     // poça no pé da árvore
+}
+BG_BUILD.slimewood = th => {
+  const b = bgBase(th), R = b.R;
+  b.disc(220, 44, 40, '#d8ffa0', 0.07); b.disc(220, 44, 22, '#e8ffc0', 0.85);
+  b.layers.push({ img: mountainLayer(R, 262, ['#123020', '#1a4028', '#265232', '#3a6a40'], 6, 40, 90, false, ['#6aa04a', 0.25]).toCanvas(), par: 0.08 });
+  const far = b.mk2(); far.rect(0, 292, WW, WH - 292, '#163420');
+  wrap3(o => { for (let x = 10; x < WW; x += 34 + ((R() * 30) | 0)) gooTree(far, x + o, 298, 70 + ((R() * 50) | 0), R, ['#16301a', '#1e4a1e', '#2e6a22', '#46902a', '#62b034', '#86d048']); });
+  far.tint(0, 0, WW, WH, '#3a3a5a', 0.4);
+  b.layers.push({ img: far.toCanvas(), par: 0.2 });
+  const mid = b.mk2(); mid.rect(0, 304, WW, WH - 304, '#1a2e14');
+  wrap3(o => { for (let x = 40; x < WW; x += 90 + ((R() * 70) | 0)) gooTree(mid, x + o, 308, 110 + ((R() * 40) | 0), R, ['#1a4a12', '#2a6e1a', '#3e9424', '#5ebc32', '#8ade4e', '#c4ff86']); });
+  for (let x = 0; x < WW; x += 40 + ((R() * 50) | 0)) mid.ell(x, 306, 16 + R() * 14, 3, GOO[1], { hi: GOO[3], lo: GOO[0], depth: 1 });
+  mid.tint(0, 0, WW, WH, '#2a2a4a', 0.2);
+  b.layers.push({ img: mid.toCanvas(), par: 0.34 });
+  const near = b.mk2(); near.rect(0, 320, WW, WH - 320, '#1a1220');
+  wrap3(o => { for (let x = 30; x < WW; x += 70 + ((R() * 60) | 0)) { const r = 14 + R() * 12; near.lit(x + o, 320 - r * 0.4, r * 1.3, r, ['#1e5a12', '#2e7a1a', '#46a024', '#6ac832', '#a8ec6a'], (x * 3) | 0, { edge: 0.2 }); gooDrips(near, x + o - r, x + o + r, 320 - r * 0.3, R, 8); } });
+  b.layers.push({ img: near.toCanvas(), par: 0.5 });
+  return b.done();
+};
+DECO_BUILD.slimewood = (D, sp, spN, R) => {
+  DECO_BUILD.swamp(D, sp, spN);
+  D.gtree = [0, 1].map(v => sp(110, 130, g => gooTree(g, 55, 129, 110 + v * 16, rng(77 + v), ['#1a5212', '#2a761a', '#3e9e24', '#5ec632', '#8ae64e', '#c8ff8a'])));
+  D.blob = [0, 1].map(f => spN(30, 16, g => {                                    // montinho de gosma borbulhando
+    g.ell(15, 12, 13, 5 - f, GOO[2], { hi: GOO[4], lo: GOO[0], depth: 2 });
+    g.ell(9 + f * 4, 8 - f, 3, 3, GOO[3], { hi: '#ffffff', lo: GOO[1], depth: 1 });
+    for (let x = 0; x < 30; x++) g.clear(x, 15);
+  }));
+  D.gpuddle = spN(44, 6, g => { g.ell(22, 3, 20, 2.6, GOO[2], { hi: GOO[4], lo: GOO[0], depth: 1 }); g.rect(12, 2, 6, 1, '#f0ffd0'); });
+};
+DECOR_PLACE.slimewood = o => {
+  const { D, add, lights, x, y, r, r2, flat, tx, last } = o;
+  if (flat && tx - (last.big || -99) > 9 && r < 0.18) { add({ spr: [D.gtree[(r2 * 2) | 0]], x, y: y + 2, layer: 'back' }); last.big = tx; }
+  else if (flat && r > 0.9) { add({ spr: D.blob, x, y: y + 2, layer: 'mid', sway: true, slow: true }); lights.push({ x, y: y - 4, r: 20, col: '#8ad83a', a: 0.35 }); }
+  else if (r2 > 0.7) add({ spr: D.reed, x: x + ((r * 6) | 0) - 3, y: y + 2, layer: 'front', sway: true, slow: true });
+  else if (flat && r > 0.82) add({ spr: [D.gpuddle], x, y: y + 2, layer: 'mid' });
+  else if (r > 0.76) { add({ spr: D.shroom, x, y: y + 1, layer: 'mid', sway: true, slow: true }); lights.push({ x, y: y - 6, r: 16, col: '#8ad83a', a: 0.35 }); }
+};

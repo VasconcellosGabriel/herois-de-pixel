@@ -28,7 +28,8 @@ const LEVELS = [
     enemies: ['slime', 'frog', 'wolf', 'plant'], density: 0.7, gaps: 0.2, stones: 0.16, spikes: 0.1, plats: 0.22 },
   { id: 'pantano2', world: 3, name: 'Lodo das Rãs', theme: 'swamp', len: 150, seed: 602, hpK: 1.4,
     enemies: ['frog', 'frog', 'bigslime', 'plant', 'slime'], density: 0.75, gaps: 0.22, stones: 0.18, spikes: 0.12, plats: 0.2 },
-  { id: 'pantano3', world: 3, name: 'Charco Assombrado', theme: 'swamp', len: 155, seed: 607, hpK: 1.45,
+  // começa na floresta de gosma e termina no pântano alagado (lagos deixam heróis e inimigos mais lentos)
+  { id: 'pantano3', world: 3, name: 'Floresta de Gosma', theme: 'slimewood', theme2: 'swamp', split: 0.5, lakes: true, len: 160, seed: 607, hpK: 1.45,
     enemies: ['ghost', 'frog', 'bigslime', 'bigslime', 'plant'], density: 0.75, gaps: 0.22, stones: 0.16, spikes: 0.14, plats: 0.2 },
   { id: 'gosma', world: 3, name: 'Poço do Rei Gosma', theme: 'swamp', len: 36, seed: 690, boss: 'slimeking' },
   // ---- Mundo 4: Deserto Escaldante ----
@@ -79,6 +80,8 @@ function genLevel(def) {
   const R = rng(def.seed), w = def.len, h = LV_H;
   const tiles = Array.from({ length: h }, () => new Uint8Array(w));
   const L = { w, h, tiles, theme: def.theme, spawns: [], coins: [], picks: [], checks: [], chests: [], secrets: [], goal: null, start: null };
+  if (def.theme2) { L.theme2 = def.theme2; L.split = Math.round(w * (def.split || 0.5)); }
+  if (def.lakes) L.water = [];
   const ground = (x0, x1, g) => { for (let x = x0; x < x1 && x < w; x++) for (let y = g; y < h; y++) tiles[y][x] = 1; };
   const rint = (a, b) => a + Math.floor(R() * (b - a + 1));
   const coinRow = (tx, n, ty) => { for (let i = 0; i < n; i++) L.coins.push({ x: (tx + i) * T + 8, y: ty * T + 8 }); };
@@ -177,6 +180,18 @@ function genLevel(def) {
     x += len; sinceCheck += len; nests++;
   };
 
+  // Lago raso do pântano: dá para atravessar, mas todo mundo fica lento dentro d'água
+  let lakes = 0;
+  const lake = () => {
+    const len = rint(8, 13);
+    ground(x, x + len, gy);
+    L.water.push({ x: x * T + 4, w: len * T - 8, y: gy * T });
+    coinRow(x + 3, len - 6, gy - 3);
+    clear.push([x, x + len]);
+    addEnemies(x, len, gy);
+    x += len; sinceCheck += len; lakes++;
+    flat(2);
+  };
   let pickToggle = 0;
   while (x < w - 18) {
     if (sinceCheck > 36) {
@@ -190,6 +205,7 @@ function genLevel(def) {
     if (secrets < 2 && x > 20 && x < w - 34 && sinceCheck < 22 && ((secrets === 0 && x > w * 0.4) || R() < 0.05)) { secret(); continue; }
     if (ledges === 0 && x > w * 0.22 && x < w - 30) { ledge(); continue; }
     if (nests === 0 && x > w * 0.55 && x < w - 30) { nest(); continue; }
+    if (def.lakes && x > L.split + 2 + lakes * 16 && x < w - 24 && (lakes < 2 || R() < 0.12)) { lake(); continue; }
     // relevo: montes e vales aparecem em todas as fases (o terreno não fica tão reto)
     if (hills < 2 && x > w * (0.12 + hills * 0.4)) { hill(); continue; }
     if (R() < 0.3) { if (R() < 0.55 || gy + 2 > h - 1) hill(); else dip(); continue; }

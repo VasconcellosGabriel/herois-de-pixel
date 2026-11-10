@@ -202,47 +202,69 @@ function mummySprite(pose, f) {           // walk (4) | wind | grab
 }
 
 // ---------- Ferreiro demônio (Forja dos Demônios) ----------
-function smithSprite(pose, f) {           // walk (4) | wind (martelo no alto) | slam (martelo no chão)
-  const g = new PX(120, 96), cx = 48, feet = 94, R = ['#3e0808', '#721812', '#ac301c', '#e8643a'], C = sh(0, R[3], R[0], 2);
-  const ph = f / 4 * Math.PI * 2, s = pose === 'walk' ? Math.sin(ph) : 0, crouch = pose === 'slam' ? 5 : 0;
-  // martelo (atrás do corpo quando está no ombro)
+// Um ferreiro de verdade: corpo de ferro fundido com uma fornalha acesa no peito, chaminé nas costas soltando fumaça,
+// avental de couro com ferramentas, luvas grossas, óculos de solda na testa, martelo de forja e tenaz com um lingote em brasa.
+// pose: walk (4) | wind (martelo no alto) | slam (martelo no chão) | toss (arremessa o lingote)
+function smithSprite(pose, f) {
+  const g = new PX(120, 96), cx = 50, feet = 94;
+  const I = ['#141218', '#26222c', '#3a3440', '#565062'], C = sh(0, I[3], I[0], 2);          // pele de ferro fundido
+  const L = ['#2a160a', '#4a2a14', '#6e4422', '#9a6638'], CL = sh(0, L[3], L[0], 2);          // couro
+  const ph = f / 4 * Math.PI * 2, s = pose === 'walk' ? Math.sin(ph) : 0, cr = pose === 'slam' ? 5 : pose === 'toss' ? 2 : 0;
+  const hot = (x, y, r) => { g.ell(x, y, r, r * 0.7, '#ff7a2a', { hi: '#fff0a0', lo: '#c2361a', depth: 1 }); };
   const hammer = (hx, hy, tx, ty) => {
     g.cap(hx, hy, tx, ty, 4, '#5a3a22', sh(0, '#8a5a32', '#2a1a0e', 1));
-    const a = Math.atan2(ty - hy, tx - hx), px = -Math.sin(a), py = Math.cos(a), w2 = 9, l = 8;
-    const pts = [[tx + px * w2, ty + py * w2], [tx + px * w2 + Math.cos(a) * l, ty + py * w2 + Math.sin(a) * l], [tx - px * w2 + Math.cos(a) * l, ty - py * w2 + Math.sin(a) * l], [tx - px * w2, ty - py * w2]];
-    g.poly(pts, '#3a3a46', sh(0, '#6a6a7a', '#16161e', 2));
-    g.cap(tx + px * w2 * 0.8 + Math.cos(a) * l * 0.5, ty + py * w2 * 0.8 + Math.sin(a) * l * 0.5, tx - px * w2 * 0.8 + Math.cos(a) * l * 0.5, ty - py * w2 * 0.8 + Math.sin(a) * l * 0.5, 3, '#ff7a2a', { hi: '#ffe27a', lo: '#c2361a', depth: 1 });
+    const a = Math.atan2(ty - hy, tx - hx), px = -Math.sin(a), py = Math.cos(a), w2 = 10, l = 9;
+    g.poly([[tx + px * w2, ty + py * w2], [tx + px * w2 + Math.cos(a) * l, ty + py * w2 + Math.sin(a) * l], [tx - px * w2 + Math.cos(a) * l, ty - py * w2 + Math.sin(a) * l], [tx - px * w2, ty - py * w2]], '#4a4a58', sh(0, '#8a8a9a', '#1a1a22', 2));
+    g.cap(tx + px * (w2 - 1), ty + py * (w2 - 1), tx + px * (w2 - 1) + Math.cos(a) * l, ty + py * (w2 - 1) + Math.sin(a) * l, 2, '#ffb04a', { flat: true });   // face do martelo em brasa
   };
-  if (pose === 'walk') hammer(cx + 14, 50, cx - 14, 14 + Math.round(s));
-  if (pose === 'wind') hammer(cx + 6, 22, cx - 18, 4);
-  // pernas de bode e cascos
+  // chaminé nas costas
+  const ty = 46 + cr;
+  g.poly([[cx - 18, ty - 4], [cx - 10, ty - 6], [cx - 12, ty - 34], [cx - 19, ty - 33]], '#2e2a30', sh(0, '#5a5460', '#100e12', 2));
+  g.rect(cx - 21, ty - 38, 12, 5, '#3a3440'); g.rect(cx - 21, ty - 38, 12, 1, '#6a6474'); g.rect(cx - 19, ty - 37, 8, 2, '#ff6a1a');
+  if (pose === 'walk') hammer(cx + 12, 50, cx - 12, 16 + Math.round(s));
+  if (pose === 'wind') hammer(cx + 6, 22, cx - 16, 4);
+  // pernas grossas com botas de ferro
   for (const side of [-1, 1]) {
-    const fx = cx + side * 8 + Math.round(s * 6 * side), col = side > 0 ? R[2] : R[1];
-    const k = ik(cx + side * 7, 64 + crouch, fx, feet - 4, 15, 15, 1, 6);
-    g.cap(cx + side * 7, 64 + crouch, k.ex, k.ey, 11, col, C); g.cap(k.ex, k.ey, k.hx, k.hy, 7, col, C);
-    g.poly([[k.hx - 5, feet - 6], [k.hx + 6, feet - 6], [k.hx + 7, feet], [k.hx - 5, feet]], '#1a1014', sh(0, '#4a3a40', '#08060a', 1));
+    const fx = cx + side * 8 + Math.round(s * 6 * side), col = side > 0 ? I[2] : I[1];
+    const k = ik(cx + side * 7, 66 + cr, fx, feet - 6, 14, 14, 1, 5);
+    g.cap(cx + side * 7, 66 + cr, k.ex, k.ey, 12, col, C); g.cap(k.ex, k.ey, k.hx, k.hy, 10, col, C);
+    g.poly([[k.hx - 7, feet - 9], [k.hx + 8, feet - 9], [k.hx + 10, feet], [k.hx - 7, feet]], '#3a3a46', sh(0, '#7a7a8a', '#14141c', 2));
+    g.rect(k.hx - 7, feet - 9, 15, 2, '#5a5a6a');
   }
-  // tronco musculoso e avental de couro
-  const ty = 46 + crouch;
-  g.ell(cx, ty, 19, 18, R[2], sh(0, R[3], R[0], 3));
-  g.line(cx - 8, ty - 6, cx, ty - 2, R[0]); g.line(cx + 8, ty - 6, cx, ty - 2, R[0]); g.line(cx, ty - 2, cx, ty + 8, R[0]);
-  g.poly([[cx - 12, ty - 2], [cx + 13, ty - 2], [cx + 15, 76 + crouch], [cx - 14, 76 + crouch]], '#5a3820', sh(0, '#8a5a32', '#2a1a0c', 2));
-  g.rect(cx - 12, ty - 4, 25, 3, '#3a2414'); g.rect(cx - 2, ty - 4, 4, 3, '#c8a050');
-  for (const [x, y] of [[cx - 6, 64], [cx + 5, 58], [cx + 8, 70]]) { g.px(x, y + crouch, '#2a1a0c'); g.px(x + 1, y + crouch, '#ff8a3a'); }   // queimaduras de faísca
-  // cabeça: chifres, barba de brasa, olhos acesos
-  const hx = cx + 6, hy = 22 + crouch;
-  for (const sd of [-1, 1]) g.poly([[hx + sd * 5, hy - 6], [hx + sd * 14, hy - 12], [hx + sd * 16, hy - 22], [hx + sd * 11, hy - 14], [hx + sd * 2, hy - 9]], '#d8c8a0', sh(0, '#ffffff', '#7a6a50', 1));
-  g.ell(hx, hy, 9, 9, R[2], C);
-  g.poly([[hx - 4, hy + 5], [hx + 9, hy + 5], [hx + 7, hy + 13], [hx + 2, hy + 17], [hx - 2, hy + 12]], '#1e0a08', sh(0, '#5a1a10', '#0a0202', 1));
-  for (const [x, y] of [[hx, hy + 9], [hx + 4, hy + 11], [hx + 2, hy + 14], [hx + 6, hy + 8]]) { g.px(x, y, '#ff8a2a'); g.px(x, y - 1, '#ffd27a'); }
-  g.rect(hx, hy - 3, 3, 2, '#ffe94d'); g.rect(hx + 5, hy - 3, 3, 2, '#ffe94d');
-  g.line(hx - 2, hy - 6, hx + 3, hy - 4, R[0]); g.line(hx + 10, hy - 6, hx + 5, hy - 4, R[0]);
-  g.rect(hx + 1, hy + 3, 7, 1, '#140404'); g.px(hx + 2, hy + 4, '#ffffff'); g.px(hx + 6, hy + 4, '#ffffff');
-  // braços
-  const arm = (sx, sy, tx, ty2, col) => { const k = ik(sx, sy, tx, ty2, 13, 13, -1, 5); g.cap(sx, sy, k.ex, k.ey, 10, col, C); g.cap(k.ex, k.ey, k.hx, k.hy, 9, col, C); g.ell(k.hx, k.hy, 5, 5, col, C); };
-  if (pose === 'walk') { arm(cx - 14, ty - 8, cx - 18, ty + 18 - Math.round(s * 2), R[1]); arm(cx + 14, ty - 8, cx + 14, 50, R[2]); }
-  else if (pose === 'wind') { arm(cx - 12, ty - 10, cx + 4, 22, R[1]); arm(cx + 14, ty - 10, cx + 8, 20, R[2]); }
-  else { arm(cx - 12, ty - 8, cx + 24, ty + 16, R[1]); arm(cx + 14, ty - 8, cx + 28, ty + 16, R[2]); hammer(cx + 26, ty + 16, cx + 50, feet - 10); }
+  // tronco: barril de ferro com a fornalha acesa no peito
+  g.ell(cx, ty, 21, 19, I[2], sh(0, I[3], I[0], 3));
+  for (const [x0, y0, x1, y1] of [[cx - 16, ty - 8, cx - 10, ty + 2], [cx + 15, ty - 6, cx + 9, ty + 4]]) g.line(x0, y0, x1, y1, '#ff6a1a');   // rachaduras em brasa
+  g.rect(cx - 9, ty - 10, 18, 14, '#1a1418'); g.rect(cx - 8, ty - 9, 16, 12, '#ff6a1a');
+  g.ell(cx, ty - 1, 6, 4, '#ffd27a', { flat: true }); g.ell(cx, ty, 3, 2, '#fff6d0', { flat: true });
+  for (let i = 0; i < 4; i++) g.rect(cx - 7 + i * 4, ty - 9, 2, 12, '#2a2228');                    // grade da fornalha
+  g.rect(cx - 10, ty - 11, 20, 2, '#5a5462'); g.rect(cx - 10, ty + 3, 20, 2, '#3a3440');
+  // avental de couro com bolso e ferramentas
+  g.poly([[cx - 15, ty + 6], [cx + 15, ty + 6], [cx + 16, 80 + cr], [cx - 15, 80 + cr]], L[2], CL);
+  g.rect(cx - 15, ty + 5, 31, 3, L[0]); g.rect(cx - 2, ty + 5, 4, 3, '#c8a050');
+  g.rect(cx - 9, ty + 14, 12, 8, L[1]); g.rect(cx - 9, ty + 14, 12, 1, L[3]);                      // bolso
+  g.rect(cx - 7, ty + 9, 2, 7, '#8a8a9a'); g.rect(cx - 8, ty + 8, 4, 2, '#5a5a6a');                  // chave no bolso
+  g.rect(cx - 2, ty + 10, 2, 6, '#5a3a22'); g.rect(cx - 3, ty + 9, 4, 2, '#8a8a9a');                // martelinho no bolso
+  for (const [x, y] of [[cx + 7, 70], [cx - 12, 74], [cx + 10, 62]]) { g.px(x, y + cr, '#1a0c06'); g.px(x + 1, y + cr, '#ff8a3a'); }   // queimaduras de faísca
+  // cabeça careca, chifrinhos tortos, óculos de solda na testa e barba trançada
+  const hx = cx + 6, hy = 22 + cr;
+  for (const sd of [-1, 1]) g.poly([[hx + sd * 6, hy - 5], [hx + sd * 11, hy - 10], [hx + sd * 10, hy - 15], [hx + sd * 3, hy - 8]], '#c8b890', sh(0, '#f0e4c4', '#7a6a50', 1));
+  g.ell(hx, hy, 10, 9, I[2], C);
+  g.rect(hx - 10, hy - 5, 21, 3, L[1]);                                                            // tira dos óculos
+  for (const ox of [-3, 5]) { g.ell(hx + ox, hy - 5, 3.4, 3, '#2a2a34', { flat: true }); g.ell(hx + ox, hy - 5, 2.2, 1.8, '#5ab0d8', { flat: true }); g.px(hx + ox - 1, hy - 6, '#ffffff'); }
+  g.rect(hx, hy - 1, 3, 2, '#ffd23f'); g.rect(hx + 5, hy - 1, 3, 2, '#ffd23f');                      // olhos acesos
+  g.poly([[hx - 5, hy + 4], [hx + 10, hy + 4], [hx + 8, hy + 11], [hx + 4, hy + 18], [hx + 1, hy + 18], [hx - 3, hy + 10]], '#2a2a30', sh(0, '#5a5a66', '#0a0a0e', 1));   // barba de fuligem
+  g.rect(hx + 1, hy + 13, 4, 2, '#c8a050'); g.rect(hx + 1, hy + 13, 4, 1, '#ffe27a');                // argola na trança
+  g.rect(hx + 1, hy + 5, 7, 1, '#140404');
+  // braços com luvas de couro
+  const arm = (sx, sy, tx, ty2, col) => { const k = ik(sx, sy, tx, ty2, 13, 13, -1, 5); g.cap(sx, sy, k.ex, k.ey, 10, col, C); g.cap(k.ex, k.ey, k.hx, k.hy, 9, L[2], CL); g.ell(k.hx, k.hy, 6, 5.5, L[2], CL); return k; };
+  const tongs = (x, y, tx, ty2, glow) => {                                                         // tenaz segurando o lingote quente
+    g.cap(x, y, tx, ty2, 2, '#4a4a58', { flat: true }); g.cap(x + 2, y + 1, tx + 2, ty2 + 1, 2, '#3a3a46', { flat: true });
+    if (glow) { g.rect(tx - 4, ty2 - 2, 9, 5, '#ff7a2a'); g.rect(tx - 3, ty2 - 2, 7, 2, '#ffe27a'); }
+  };
+  if (pose === 'walk') { const k = arm(cx - 14, ty - 8, cx - 20, ty + 14 - Math.round(s * 2), I[1]); tongs(k.hx, k.hy, k.hx - 6, k.hy + 12, true); arm(cx + 14, ty - 8, cx + 14, 50, I[2]); }
+  else if (pose === 'wind') { arm(cx - 12, ty - 10, cx + 4, 22, I[1]); arm(cx + 14, ty - 10, cx + 8, 20, I[2]); }
+  else if (pose === 'toss') { const k = arm(cx + 12, ty - 8, cx + 28, ty - 14, I[2]); tongs(k.hx, k.hy, k.hx + 10, k.hy - 6, false); arm(cx - 12, ty - 8, cx - 16, ty + 16, I[1]); hot(k.hx + 16, k.hy - 9, 4); }
+  else { arm(cx - 12, ty - 8, cx + 24, ty + 16, I[1]); arm(cx + 14, ty - 8, cx + 28, ty + 16, I[2]); hammer(cx + 26, ty + 16, cx + 50, feet - 10); }
   return outline(g.toCanvas(), INK);
 }
 
@@ -288,7 +310,7 @@ ENEMY_IMG.bigslime = (e, lv) => {
   return spr2('bsl' + col + p + f, () => bigslimeSprite(col, p, f));
 };
 ENEMY_IMG.mummy = e => { const p = e.st === 'wind' || e.st === 'grab' ? e.st : 'walk', f = p === 'walk' && Math.abs(e.vx) > 1 ? fr(e, 5, 4) : 0; return spr2('mum' + p + f, () => mummySprite(p, f)); };
-ENEMY_IMG.smith = e => { const p = e.st === 'wind' ? 'wind' : e.st === 'slam' ? 'slam' : 'walk', f = p === 'walk' && Math.abs(e.vx) > 1 ? fr(e, 5, 4) : 0; return spr2('smith' + p + f, () => smithSprite(p, f)); };
+ENEMY_IMG.smith = e => { const p = e.st === 'wind' ? 'wind' : e.st === 'slam' ? 'slam' : e.st === 'toss' ? 'toss' : 'walk', f = p === 'walk' && Math.abs(e.vx) > 1 ? fr(e, 5, 4) : 0; return spr2('smith' + p + f, () => smithSprite(p, f)); };
 ENEMY_IMG.spider = (e, lv) => {
   const k = SPIDER_PAL[lv && lv.theme] ? lv.theme : 'cave', p = e.st === 'hang' ? 'hang' : e.st === 'leap' || e.st === 'drop' ? 'leap' : 'walk', f = p === 'walk' ? fr(e, 8, 2) : 0;
   return spr2('spd' + k + p + f, () => spiderSprite(p, f, SPIDER_PAL[k]));
@@ -353,9 +375,20 @@ Object.assign(E_AI, {
     else if (e.st === 'rest') { e.vx = 0; e.stT -= dt; if (e.stT <= 0) e.st = null; }
     else { walk(w, e, e.speed, 150); e.cd -= dt; if (e.cd <= 0 && Math.abs(dx) < 44 && Math.abs(p.y - e.y) < 30) { e.st = 'wind'; e.stT = 0.5; e.cd = 2.0; e.dir = dx > 0 ? 1 : -1; } }
   },
-  // Ferreiro demônio: levanta o martelo em brasa e bate no chão (onda de choque + faíscas)
+  // Ferreiro demônio: levanta o martelo em brasa e bate no chão (onda de choque + faíscas);
+  // de longe, arremessa com a tenaz o lingote em brasa que estava esquentando
   smith(w, e, dt) {
     const p = e.tgt, dx = cxOf(p) - cxOf(e);
+    if (e.st === 'toss') {
+      e.vx = 0; e.stT -= dt;
+      if (e.stT <= 0) {
+        e.st = 'rest'; e.stT = 0.4;
+        lob(w, cxOf(e) + e.dir * 12, e.y + 4, cxOf(p), p.y + p.h - 3, 0.75, 520, { type: 'ingot', w: 7, h: 4, col: '#ff7a2a',
+          then: (w2, q) => { burst(w2, q.x + 3, q.y + 2, '#ffb347', 10, 90, 0.4); burst(w2, q.x + 3, q.y + 2, '#fff0a0', 4, 60, 0.3); sfx('clang'); } });
+        sfx('spear');
+      }
+      return;
+    }
     if (e.st === 'wind') {
       e.vx = 0; e.stT -= dt;
       if (e.stT <= 0) {
@@ -370,6 +403,7 @@ Object.assign(E_AI, {
       if (e.hurt > 0) { e.vx *= 0.9; return; }
       walk(w, e, e.speed, 140); e.cd -= dt;
       if (e.cd <= 0 && Math.abs(dx) < 80 && Math.abs(p.y - e.y) < 40) { e.st = 'wind'; e.stT = 0.7; e.cd = 2.8; e.dir = dx > 0 ? 1 : -1; sfx('growl'); }
+      else if (e.cd <= 0 && Math.abs(dx) < 170 && Math.abs(p.y - e.y) < 70) { e.st = 'toss'; e.stT = 0.55; e.cd = 3.2; e.dir = dx > 0 ? 1 : -1; }
     }
   },
   // Aranha: pendurada no fio; cai quando o herói passa por baixo e depois persegue dando saltos
@@ -400,3 +434,6 @@ Object.assign(ENEMY_SKIN, { graveyard: { bat: 'blood', ghost: 'crimson' }, peak:
 Object.assign(WOLF_SKIN, { thaw: 'snow', savanna: 'brown', ash: 'hell', graveyard: 'dark' });
 Object.assign(HAWK_SKIN, { savanna: 'sand', peak: 'gold' });
 SPIDER_PAL.graveyard = SPIDER_PAL.vampire;
+
+// lingote em brasa arremessado pelo ferreiro (7x4)
+EPROJ_DRAW.ingot = (g, q, x, y) => { g.fillStyle = '#c2361a'; g.fillRect(x, y, 7, 4); g.fillStyle = '#ff7a2a'; g.fillRect(x, y, 7, 3); g.fillStyle = '#ffe27a'; g.fillRect(x + 1, y, 5, 1); glowAt(g, x + 3, y + 2, 9, '#ff8a2a', 0.4); };

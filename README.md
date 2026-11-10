@@ -123,6 +123,7 @@ No celular: abrir o link → menu do navegador → "Adicionar à tela inicial".
 - `js/game.js`: física, combate, status, críticos, vidas, inimigos, chefe, renderização, HUD. Suporta vários heróis (`w.players`; `w.p` é o deste aparelho); cada herói lê o próprio controle (`p.inp`)
 - `js/bestiary.js`: falcão, sapo, escorpião, diabrete e os 6 chefes novos (sprites gerados sob demanda, IA, projéteis)
 - `js/fauna.js`: lobo, naja, slime gigante, múmia, ferreiro demônio, aranha e as skins de cada mundo (`ENEMY_SKIN`)
+- `js/spritepack.js` + `sprites/`: heróis montados com **folhas PNG em camadas** (corpo, roupa, cabelo, chapéu, arma...) recoloridas com as cores do criador de personagem. As folhas-base saem de `node tools/exportar-sprites.js`; o guia para o artista está em [sprites/LEIA-ME.md](sprites/LEIA-ME.md). Sem as folhas (ou com `?procedural` na URL) o herói é desenhado por código.
 - `js/net.js`: multiplayer online (salas, conexão P2P, "fotos" do mundo, eventos de efeitos)
 - `js/local.js`: multiplayer local (sala, aparelho de cada herói)
 - `js/ui.js`: menus, criador de personagem, tela de Evolução, botões de toque, laço principal

@@ -22,6 +22,7 @@ const INK = '#0a0610';
 class PX {
   constructor(w, h) { this.w = w; this.h = h; this.d = new Uint8ClampedArray(w * h * 4); }
   px(x, y, hex) {
+    if (this.mute) return;                     // camada desligada (exportação por camadas)
     x = Math.round(x); y = Math.round(y);
     if (x < 0 || y < 0 || x >= this.w || y >= this.h) return;
     const i = (y * this.w + x) * 4, c = C(hex);
@@ -109,8 +110,37 @@ class PX {
 }
 
 // Sombras com matiz frio (roxo/azul) e luzes quentes: dá o ar "pintado" dos sprites de referência
-const toneLo = (hex, a = 0.3) => mix(shade(hex, -a), '#2a1a5a', Math.min(0.5, a * 0.6));
-const toneHi = (hex, a = 0.3) => mix(shade(hex, a * 0.85), '#fff3c4', Math.min(0.4, a * 0.4));
+const toneLo = (hex, a = 0.3) => { const k = KEYMODE && keyOf(hex); return k ? keyHex(k.h, k.v * (1 - a)) : mix(shade(hex, -a), '#2a1a5a', Math.min(0.5, a * 0.6)); };
+const toneHi = (hex, a = 0.3) => { const k = KEYMODE && keyOf(hex); return k ? keyHex(k.h, k.v + (1 - k.v) * Math.min(1, a * KEY_HI)) : mix(shade(hex, a * 0.85), '#fff3c4', Math.min(0.4, a * 0.4)); };
+
+// ---------- Paleta-chave ----------
+// Nas folhas PNG, as partes que o jogador pinta usam cores-chave: matiz fixo por canal, saturação 100%,
+// e o brilho diz o tom (0.7 = cor escolhida; mais escuro = sombra; mais claro = luz). Ver sprites/LEIA-ME.md.
+const KEY_BASE = 0.7, KEY_HI = 1.6;
+const KEY_CH = [
+  ['skin', 0, 'Pele'], ['hairColor', 27, 'Cabelo'], ['primary', 54, 'Roupa (principal)'], ['secondary', 81, 'Roupa (secundária)'],
+  ['accent', 108, 'Destaque'], ['weaponColor', 135, 'Metal da arma'], ['headColor', 162, 'Chapéu/elmo'], ['capeColor', 189, 'Capa'],
+  ['accColor', 216, 'Acessório'], ['eyes', 243, 'Olhos'], ['armor', 270, 'Armadura (da roupa principal)'], ['vest', 297, 'Camisa do colete (da pele)'], ['cheek', 324, 'Bochecha (da pele)'],
+];
+const KEY_HUE = Object.fromEntries(KEY_CH.map(([k, h]) => [k, h]));
+function keyHex(h, v) {
+  v = clamp(v, 0.1, 1); const f = (n) => { const k = (n + h / 60) % 6; return v - v * Math.max(0, Math.min(k, 4 - k, 1)); };
+  return rgbToHex(f(5) * 255, f(3) * 255, f(1) * 255);
+}
+// cor -> { canal, h, v } se for cor-chave (saturação ~100% e matiz de um canal)
+function keyRGB(r, g, b) {
+  const mx = Math.max(r, g, b), mn = Math.min(r, g, b);
+  if (mx < 22 || mn > mx * 0.06 + 2) return null;
+  const d = mx - mn; let h;
+  if (mx === r) h = ((g - b) / d) * 60; else if (mx === g) h = ((b - r) / d + 2) * 60; else h = ((r - g) / d + 4) * 60;
+  h = (h + 360) % 360;
+  for (let i = 0; i < KEY_CH.length; i++) { let dh = Math.abs(h - KEY_CH[i][1]); dh = Math.min(dh, 360 - dh); if (dh <= 9) return { i, h: KEY_CH[i][1], v: mx / 255 }; }
+  return null;
+}
+function keyOf(hex) { if (typeof hex !== 'string' || hex[0] !== '#') return null; const c = C(hex); return keyRGB(c[0], c[1], c[2]); }
+// cores derivadas (antes calculadas com mix): continuam seguindo as escolhas do jogador
+const ARMOR_OF = ch => mix(ch.primary, '#aab4c0', 0.55), VEST_OF = ch => mix(ch.skin, '#f4efe0', 0.6), CHEEK_OF = ch => mix(ch.skin, '#ff7a8a', 0.4);
+const ACC_OF = ch => ch.accColor || (ch.acc === 5 ? ch.secondary : ch.acc === 3 ? ch.accent : ch.acc === 1 ? '#14101a' : '#16121c');
 const rampAt = (ramp, v) => ramp[clamp(Math.floor(v * ramp.length), 0, ramp.length - 1)];
 // ruído de valor periódico (tiles sem emendas visíveis)
 function pn(x, y, cell, per, seed) {
@@ -120,7 +150,7 @@ function pn(x, y, cell, per, seed) {
   return lerp(lerp(h(x0, y0), h(x0 + 1, y0), sx), lerp(h(x0, y0 + 1), h(x0 + 1, y0 + 1), sx), sy);
 }
 Object.assign(PX.prototype, {
-  clear(x, y) { x = Math.round(x); y = Math.round(y); if (x < 0 || y < 0 || x >= this.w || y >= this.h) return; this.d[(y * this.w + x) * 4 + 3] = 0; },
+  clear(x, y) { if (this.mute) return; x = Math.round(x); y = Math.round(y); if (x < 0 || y < 0 || x >= this.w || y >= this.h) return; this.d[(y * this.w + x) * 4 + 3] = 0; },
   has(x, y) { return x >= 0 && y >= 0 && x < this.w && y < this.h && this.d[(y * this.w + x) * 4 + 3] > 0; },
   // mistura uma cor sobre os pixels já pintados
   tint(x0, y0, w, h, hex, a) {
@@ -263,11 +293,13 @@ function drawBlade(g, x, y, angDeg, len, wd, col, colL, hilt, guard) {
   g.ell(...P(-9, 0), 2.6, 2.6, guard, { depth: 1 });
 }
 
-function drawChar(ch, pose, f) {
+// o.only = desenha só uma camada (exportação das folhas PNG) · o.raw = sem contorno
+function drawChar(ch, pose, f, o = {}) {
   if (pose === 'roll' || pose === 'flip') {
-    const base = drawChar(ch, 'tuck', 0);
-    return rotated(base, pose === 'roll' ? f : -f, CX, FEET - 24);
+    const base = drawChar(ch, 'tuck', 0, o);
+    return o.raw ? base : rotated(base, pose === 'roll' ? f : -f, CX, FEET - 24);
   }
+  const on = s => !o.only || o.only === s;
   const cls = ch.cls, isAim = pose === 'aim';
   const S0 = skeletonFor(pose, f, cls, isAim ? aimDeg(f) : 0);
   const S = { ...S0 };
@@ -283,18 +315,20 @@ function drawChar(ch, pose, f) {
   const metal = ch.weaponColor, metalD = toneLo(metal, 0.35), metalL = toneHi(metal, 0.45), acc = ch.accent, accL = toneHi(acc, 0.5), accD = toneLo(acc, 0.35);
   const wood = '#8a5a2b', woodD = '#5b3b20', woodL = '#b07a3e', gold = '#ffd23f', goldD = '#c9962a', goldL = '#fff2a0';
   // cor do acessório (óculos, tapa-olho, máscara, cachecol); heróis antigos sem ela usam as cores de antes
-  const ax = ch.accColor || (ch.acc === 5 ? ch.secondary : ch.acc === 3 ? acc : ch.acc === 1 ? '#14101a' : '#16121c'), axD = toneLo(ax, 0.3), axL = toneHi(ax, 0.3);
+  const ax = KEYMODE ? keyHex(KEY_HUE.accColor, KEY_BASE) : ACC_OF(ch), axD = toneLo(ax, 0.3), axL = toneHi(ax, 0.3);
+  const armorC = KEYMODE ? keyHex(KEY_HUE.armor, KEY_BASE) : ARMOR_OF(ch), vestC = KEYMODE ? keyHex(KEY_HUE.vest, KEY_BASE) : VEST_OF(ch), cheekC = KEYMODE ? keyHex(KEY_HUE.cheek, KEY_BASE) : CHEEK_OF(ch);
   const cx = CX, feet = FEET, lean = S.lean, flow = S.flow;
   const hipY = feet - legH * 1 + S.sq, torsoH = 16, torsoTop = hipY - torsoH + S.bob;
   const tx = Math.round(cx - tw / 2 + lean * 0.5);
   const hx0 = Math.round(cx - 12 + lean), hy = Math.round(torsoTop - 21 + S.hdy), hcx = hx0 + 12;
   const drag = cls === 'dragonico';
-  const sleeve = ch.outfit === 3 ? skin : ch.outfit === 1 ? mix(pri, '#aab4c0', 0.55) : pri;
+  const sleeve = ch.outfit === 3 ? skin : ch.outfit === 1 ? armorC : pri;
   const pants = ch.outfit === 1 ? toneLo(sec, 0.1) : secD, boot = toneLo(sec, 0.55), bootL = toneLo(sec, 0.25);
   const H = pts => pts.map(p => [hx0 + p[0], hy + p[1]]);          // coordenadas locais da cabeça -> mundo
   const sway = Math.round(flow * 0.8);
 
   // ---------- asas e cauda do dragônico (atrás de tudo) ----------
+  g.mute = !on('asas');
   if (drag) {
     const wm = toneLo(acc, 0.1), wmD = toneLo(acc, 0.4), bone = toneLo(skin, 0.15);
     const wx = tx + 4, wy = torsoTop + 2;
@@ -317,6 +351,7 @@ function drawChar(ch, pose, f) {
   }
 
   // ---------- capa ----------
+  g.mute = !on('capa');
   if (ch.cape) {
     const len = ch.cape === 1 ? 20 : 34, cc = ch.capeColor, ccD = toneLo(cc, 0.32), ccL = toneHi(cc, 0.2);
     const off = Math.round(flow * 1.6);
@@ -327,6 +362,7 @@ function drawChar(ch, pose, f) {
   }
 
   // ---------- cabelo traseiro ----------
+  g.mute = !on('cabelo_tras');
   if (ch.hair === 1 || ch.hair === 2 || ch.hair === 5) { // mechas soltas que acompanham o movimento
     const tr = Math.round(flow * 1.5) + (pose === 'idle' ? [0, 1, 1, 0, 0][f] : 0);
     for (const [y0, len, th] of [[2, 12, 3], [7, 15, 3], [12, 10, 2]]) {
@@ -341,6 +377,7 @@ function drawChar(ch, pose, f) {
   }
 
   // ---------- equipamento nas costas ----------
+  g.mute = !on('costas');
   if (cls === 'guerreiro' && pose !== 'block') {
     g.ell(tx - 1, torsoTop + 10, 9, 9.5, sec, { hi: secL, lo: secD, depth: 2 });
     g.ell(tx - 1, torsoTop + 10, 3.6, 3.6, acc, { depth: 1, hi: accL });
@@ -351,6 +388,7 @@ function drawChar(ch, pose, f) {
   }
 
   // ---------- braço de trás ----------
+  g.mute = !on('braco_tras');
   const shB = { x: cx - 3 + lean * 0.5, y: torsoTop + 4 }, shF = { x: cx + 1 + lean * 0.5, y: torsoTop + 4 };
   const armLen = 7.4, foreC = ch.outfit === 3 ? skin : sleeve;       // manga cobre o antebraço (só o colete deixa o braço de fora)
   if (isAim) {
@@ -368,6 +406,7 @@ function drawChar(ch, pose, f) {
   }
 
   // ---------- pernas ----------
+  g.mute = !on('pernas');
   const hipFx = cx + Math.round(tw / 4) + lean * 0.5, hipBx = cx - Math.round(tw / 4) + lean * 0.5;
   const L = legH * 0.55 + 1.6;
   const drawLeg = (hipx, fx, lift, back) => {
@@ -384,6 +423,7 @@ function drawChar(ch, pose, f) {
   drawLeg(hipFx, S.legF[0], S.legF[1], false);
 
   // ---------- tronco ----------
+  g.mute = !on('tronco');
   g.rect(cx - 3 + lean * 0.5, torsoTop - 2, 7, 5, toneLo(skin, 0.1));
   const T = [[tx, torsoTop + 1], [tx + tw, torsoTop + 1], [tx + tw - 1, hipY], [tx + 1, hipY]];
   switch (ch.outfit) {
@@ -397,7 +437,7 @@ function drawChar(ch, pose, f) {
       break;
     }
     case 1: { // armadura
-      const a = mix(pri, '#aab4c0', 0.55), aL = toneHi(a, 0.4), aD = toneLo(a, 0.36);
+      const a = armorC, aL = toneHi(a, 0.4), aD = toneLo(a, 0.36);
       g.poly(T, a, { hi: aL, lo: aD, depth: 2 });
       g.rect(tx + 3, torsoTop + 5, tw - 6, 1, aD); g.rect(tx + 3, torsoTop + 10, tw - 6, 1, aD); g.rect(cx + lean * 0.5, torsoTop + 2, 1, torsoH - 4, aD);
       g.rect(cx - 5 + lean * 0.5, torsoTop + 3, 3, 2, aL);
@@ -416,14 +456,16 @@ function drawChar(ch, pose, f) {
       break;
     }
     case 3: { // colete
-      g.poly(T, mix(skin, '#f4efe0', 0.6), { hi: '#fffaf0', lo: shade('#f4efe0', -0.2) });
+      g.poly(T, vestC, { hi: '#fffaf0', lo: shade('#f4efe0', -0.2) });
       g.poly([[tx, torsoTop + 1], [tx + 6, torsoTop + 1], [tx + 5, hipY], [tx + 1, hipY]], pri, { hi: priL, lo: priD });
       g.poly([[tx + tw - 6, torsoTop + 1], [tx + tw, torsoTop + 1], [tx + tw - 1, hipY], [tx + tw - 5, hipY]], pri, { hi: priL, lo: priD });
       g.rect(tx, hipY - 5, tw, 4, sec); g.rect(tx, hipY - 5, tw, 1, secL); g.rect(cx - 2 + lean * 0.5, hipY - 5, 4, 4, gold);
       break;
     }
   }
+  g.mute = !on('capa_fecho');
   if (ch.cape) { g.rect(tx + 1, torsoTop, tw - 1, 4, ch.capeColor); g.rect(tx + 1, torsoTop, tw - 1, 1, toneHi(ch.capeColor, 0.25)); g.ell(cx + lean * 0.5, torsoTop + 3, 2.5, 2.5, acc, { depth: 1, hi: accL }); }
+  g.mute = !on('cachecol');
   if (ch.acc === 5) { // cachecol
     g.poly([[tx - 2, torsoTop - 3], [tx + tw + 2, torsoTop - 3], [tx + tw + 2, torsoTop + 4], [tx - 2, torsoTop + 4]], ax, { depth: 1, hi: axL, lo: axD });
     const w2 = Math.round(flow);
@@ -431,10 +473,11 @@ function drawChar(ch, pose, f) {
   }
 
   // ---------- cabeça ----------
+  g.mute = !on('cabeca');
   sup(g, hcx, hy + 11, 12, 11, skin, { hi: skinL, lo: skinD, depth: 2, depthD: 1 });
   g.rect(hx0 + 1, hy + 11, 3, 6, skinD); g.rect(hx0 + 1, hy + 12, 2, 4, toneLo(skin, 0.3));   // orelha
   g.px(hx0 + 24, hy + 14, skin); g.px(hx0 + 25, hy + 15, skin); g.px(hx0 + 25, hy + 16, skinD); g.px(hx0 + 24, hy + 16, skinD); // nariz
-  g.rect(hx0 + 14, hy + 16, 3, 2, mix(skin, '#ff7a8a', 0.4)); // bochecha rosada
+  g.rect(hx0 + 14, hy + 16, 3, 2, cheekC); // bochecha rosada
   const irisC = ch.eyes;
   const eye = (ex, ey, wide) => {
     const w = wide ? 6 : 5;
@@ -465,6 +508,7 @@ function drawChar(ch, pose, f) {
   }
 
   // ---------- cabelo da frente ----------
+  g.mute = !on('cabelo_frente');
   const hairM = (pts, o = {}) => { const M = g.poly(H(pts), hair, { hi: hairL, lo: hairD, depth: 2, ...o }); g.speckle(M, hairLL, 10, 3 + ch.hair); g.speckle(M, hairL, 14, 9 + ch.hair); return M; };
   const FRONT = [[-2, 14], [-4, 6], [0, -3], [6, -7], [14, -8], [20, -5], [25, 0], [25, 4], [26, 7], [22, 6], [20, 9], [17, 5], [14, 8], [11, 5], [7, 7], [5, 13], [2, 11]];
   switch (ch.hair) {
@@ -476,6 +520,7 @@ function drawChar(ch, pose, f) {
   }
 
   // ---------- chifres do dragônico ----------
+  g.mute = !on('chifres');
   if (drag) {
     const hc = toneHi(acc, 0.1), hcD = toneLo(acc, 0.35);
     g.poly(H([[3, 2], [-3, -4], [-9, -12], [-4, -18], [-3, -9], [5, -1]]), hc, { hi: toneHi(acc, 0.5), lo: hcD, depth: 1 });
@@ -483,6 +528,7 @@ function drawChar(ch, pose, f) {
   }
 
   // ---------- acessórios do rosto ----------
+  g.mute = !on('acessorio');
   switch (ch.acc) {
     case 1: g.rect(hx0 + 6, hy + 7, 9, 10, ax); g.rect(hx0 + 7, hy + 8, 7, 8, '#8fdcff'); g.rect(hx0 + 7, hy + 8, 3, 2, '#ffffff'); g.rect(hx0 + 14, hy + 7, 9, 10, ax); g.rect(hx0 + 15, hy + 8, 7, 8, '#8fdcff'); g.rect(hx0 + 15, hy + 8, 3, 2, '#ffffff'); g.rect(hx0 + 13, hy + 10, 2, 2, ax); g.rect(hx0 + 1, hy + 10, 6, 2, ax); break;
     case 2: g.poly(H([[15, 6], [24, 6], [24, 17], [15, 17]]), ax, { depth: 1, hi: axL }); g.line(hx0 - 1, hy + 4, hx0 + 25, hy + 8, ax); g.line(hx0 - 1, hy + 5, hx0 + 25, hy + 9, ax); break;
@@ -491,6 +537,7 @@ function drawChar(ch, pose, f) {
   }
 
   // ---------- chapéus e elmos ----------
+  g.mute = !on('chapeu');
   const hc = ch.headColor, hcD = toneLo(hc, 0.32), hcL = toneHi(hc, 0.32), ho = { hi: hcL, lo: hcD };
   switch (ch.head) {
     case 1: { // chapéu de mago
@@ -530,6 +577,7 @@ function drawChar(ch, pose, f) {
       break;
     case 7: // capuz
       g.poly(H([[-3, 24], [-5, 8], [-1, -5], [8, -10], [18, -9], [24, -3], [25, 4], [22, 5], [19, 0], [13, -1], [8, 3], [6, 10], [6, 22]]), hc, { ...ho, depth: 3 });
+      g.mute = !on('capuz_ombro');
       g.poly([[tx - 4, torsoTop + 1], [tx + tw + 4, torsoTop + 1], [tx + tw + 2, torsoTop + 9], [tx - 2, torsoTop + 9]], hcD, { depth: 1, hi: hc });
       break;
   }
@@ -538,11 +586,14 @@ function drawChar(ch, pose, f) {
   const a1 = ik(shF.x, shF.y, shF.x + S.armF[0], shF.y + S.armF[1], armLen, armLen, 1, S0.bendMax);
   const hnd = { x: a1.hx, y: a1.hy };
   const hand = () => {
+    const was = g.mute; g.mute = !on('braco_frente');
     g.limb2(shF.x, shF.y, a1.ex, a1.ey, a1.hx, a1.hy, aw, sleeve, { depth: 1 });
     if (ch.outfit !== 3) g.cap(a1.ex + (a1.hx - a1.ex) * 0.74, a1.ey + (a1.hy - a1.ey) * 0.74, a1.hx, a1.hy, aw, sec, { depth: 1 });
     g.ell(hnd.x, hnd.y, 3, 3, skin, { hi: skinL, lo: skinD, depth: 1 });
     if (drag) { g.px(hnd.x + 2, hnd.y + 2, goldL); g.px(hnd.x + 3, hnd.y + 3, goldL); g.px(hnd.x + 3, hnd.y + 1, goldL); }
+    g.mute = was;
   };
+  g.mute = !on('arma');
   const dir = a => ({ x: Math.sin(a * Math.PI / 180), y: Math.cos(a * Math.PI / 180) });
 
   if (cls === 'guerreiro') {
@@ -590,18 +641,22 @@ function drawChar(ch, pose, f) {
     hand();
   }
 
-  return outline(g.toCanvas(), INK);
+  g.mute = false;
+  return o.raw ? g.toCanvas() : outline(g.toCanvas(), INK);
 }
 
-// Conjunto de sprites com cache preguiçoso (só desenha a pose quando ela é usada)
+// Conjunto de sprites com cache preguiçoso (só desenha a pose quando ela é usada).
+// Com as folhas PNG carregadas (js/spritepack.js), o herói é montado com elas; senão, desenhado por código.
 function buildPlayerSprites(ch) {
   const cache = {};
   return {
     ch,
     get(pose, f = 0) {
+      const gen = typeof Pack !== 'undefined' ? Pack.gen : 0;
+      if (cache.gen !== gen) { for (const k in cache) delete cache[k]; cache.gen = gen; }   // as folhas PNG terminaram de carregar: refaz
       const n = POSES[pose]; f = ((f % n) + n) % n;
       const k = pose + f;
-      return cache[k] || (cache[k] = drawChar(ch, pose, f));
+      return cache[k] || (cache[k] = (typeof packChar === 'function' && packChar(ch, pose, f)) || drawChar(ch, pose, f));
     },
     // rosto minimalista para o HUD (vidas): recorte da cabeça, 36x36 px de alta resolução
     face() {

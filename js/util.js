@@ -29,8 +29,12 @@ function hexToRgb(h) {
 function rgbToHex(r, g, b) {
   return '#' + [r, g, b].map(v => clamp(Math.round(v), 0, 255).toString(16).padStart(2, '0')).join('');
 }
+// Modo cor-chave (exportação das folhas PNG recoloríveis, ver js/spritepack.js): os tons de uma cor-chave
+// mudam só o brilho, para o jogo saber depois qual cor do personagem pintar ali
+let KEYMODE = false;
 // amt < 0 escurece, amt > 0 clareia (-1..1)
 function shade(hex, amt) {
+  if (KEYMODE) { const k = keyOf(hex); if (k) return keyHex(k.h, amt < 0 ? k.v * (1 + amt) : k.v + (1 - k.v) * amt); }
   const [r, g, b] = hexToRgb(hex), t = amt < 0 ? 0 : 255, p = Math.abs(amt);
   return rgbToHex(r + (t - r) * p, g + (t - g) * p, b + (t - b) * p);
 }

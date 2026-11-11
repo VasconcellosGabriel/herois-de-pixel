@@ -232,6 +232,26 @@ body.touch #chat-btn { width: calc(44px * var(--chat-k, 1)); height: calc(40px *
 .up-row .btn { min-width: 0; font-size: 8px; padding: 6px 8px; }
 .up-row.off { opacity: .45; }
 @media (max-width: 640px) { .up-cols { grid-template-columns: 1fr; } }
+/* Meu personagem: retrato + nome no topo, espaço da árvore de habilidades no fim */
+.up-head { display: flex; align-items: center; gap: 12px; margin-bottom: 4px; }
+.up-head h2 { margin-bottom: 4px; }
+.up-head canvas, .hr-pick canvas { width: 72px; height: 72px; image-rendering: pixelated; background: var(--panel2); border: 3px solid var(--line); flex: none; }
+.up-tree { margin-top: 12px; padding: 8px 10px; border: 3px dashed var(--line); opacity: .75; }
+.up-tree .hint { max-width: none; }
+/* ---------- Seleção de heróis ---------- */
+#hr-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 10px; width: min(500px, 88vw); }
+.hr-card { display: flex; flex-direction: column; background: var(--panel2); border: 3px solid var(--line); }
+.hr-card.on { outline: 3px solid var(--acc); }
+.hr-pick { display: flex; align-items: center; gap: 10px; padding: 10px; background: none; border: 0; font: inherit; color: var(--ink); cursor: pointer; text-align: left; }
+.hr-pick:hover { background: #4a3c70; }
+.hr-pick .t { display: flex; flex-direction: column; gap: 5px; line-height: 1.4; min-width: 0; }
+.hr-pick b { font-size: 11px; color: var(--acc); font-weight: normal; overflow-wrap: anywhere; }
+.hr-pick small { font-size: 8px; color: var(--mute); }
+.hr-acts { display: flex; justify-content: flex-end; gap: 5px; padding: 0 8px 8px; }
+.hr-acts .chip { padding: 5px 8px; }
+.hr-new { align-items: center; justify-content: center; gap: 6px; min-height: 110px; font: inherit; font-size: 10px; color: var(--mute); border-style: dashed; cursor: pointer; }
+.hr-new span { font-size: 22px; color: var(--acc); }
+.hr-new:hover { background: #4a3c70; color: var(--ink); }
 /* foco ao navegar pelos menus com o controle */
 .padfocus { outline: 3px solid var(--acc) !important; outline-offset: 2px; }
 #s-win .gain { color: #c8a8ff; }

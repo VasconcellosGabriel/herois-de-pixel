@@ -121,12 +121,56 @@ function cleanBuild(b) {
 // ---------- Estado global ----------
 const Game = { mode: 'title', world: null, save: null, t: 0 };
 
+// Vários heróis salvos: cada um tem o próprio visual, fases liberadas, recordes, moedas, vidas e evolução.
+// O herói escolhido fica "aberto" direto em Game.save (save.char, save.coins...); persist() devolve para save.heroes[cur].
+const HERO_KEYS = ['char', 'unlocked', 'best', 'coins', 'lives', 'prog', 'sp'];
+const MAX_HEROES = 4;
+function newHero(ch) { return { char: ch, unlocked: 1, best: {}, coins: 0, lives: START_LIVES, prog: {}, sp: 0 }; }
+// abre o herói i (−1 = nenhum)
+function useHero(sv, i) {
+  sv.cur = sv.heroes[i] ? i : -1;
+  const h = { ...newHero(null), ...(sv.heroes[sv.cur] || {}) };
+  for (const k of HERO_KEYS) sv[k] = h[k];
+}
 function loadSave() {
-  const base = { char: null, unlocked: 1, best: {}, mute: false, coins: 0, lives: START_LIVES, prog: {} };
-  try { const s = JSON.parse(localStorage.getItem('heroisdepixel_v1') || 'null'); if (s) { Object.assign(base, s); if (base.char && !CLASSES[base.char.cls]) base.char.cls = 'guerreiro'; return base; } } catch (e) {}
+  const base = { mute: false, heroes: [], cur: -1 };
+  let s = null;
+  try { s = JSON.parse(localStorage.getItem('heroisdepixel_v1') || 'null'); } catch (e) {}
+  if (s && typeof s === 'object') {
+    Object.assign(base, s);
+    if (!Array.isArray(s.heroes)) {                // save antigo (um herói só): vira o primeiro herói da lista
+      base.heroes = []; base.cur = -1;
+      if (s.char) { const h = newHero(null); for (const k of HERO_KEYS) if (s[k] !== undefined) h[k] = s[k]; base.heroes.push(h); base.cur = 0; }
+    }
+  }
+  base.heroes = base.heroes.filter(h => h && h.char);
+  for (const h of base.heroes) if (!CLASSES[h.char.cls]) h.char.cls = 'guerreiro';
+  useHero(base, base.cur | 0);
   return base;
 }
-function persist() { try { localStorage.setItem('heroisdepixel_v1', JSON.stringify(Game.save)); } catch (e) {} }
+function persist() {
+  const sv = Game.save, out = {};
+  if (sv.cur >= 0 && sv.heroes[sv.cur]) { const h = sv.heroes[sv.cur]; for (const k of HERO_KEYS) h[k] = sv[k]; }
+  for (const k in sv) if (!HERO_KEYS.includes(k)) out[k] = sv[k];
+  try { localStorage.setItem('heroisdepixel_v1', JSON.stringify(out)); } catch (e) {}
+}
+// troca o herói aberto (guarda o atual antes)
+function selectHero(i) { persist(); useHero(Game.save, i); persist(); Game.titleSpr = null; }
+// cria um herói novo e já abre ele; devolve false se não couber mais
+function addHero(ch) {
+  if (Game.save.heroes.length >= MAX_HEROES) return false;
+  persist(); Game.save.heroes.push(newHero({ ...ch })); selectHero(Game.save.heroes.length - 1);
+  return true;
+}
+function deleteHero(i) {
+  persist();
+  const sv = Game.save, cur = sv.cur;
+  sv.heroes.splice(i, 1);
+  useHero(sv, cur === i ? (sv.heroes.length ? 0 : -1) : cur > i ? cur - 1 : cur);
+  persist(); Game.titleSpr = null;
+}
+// garante que há um herói aberto (multiplayer sem ter criado nenhum: entra com o herói padrão)
+function ensureHero() { if (Game.save.cur < 0) addHero(DEFAULT_CHAR); }
 
 // ---------- Helpers ----------
 const overlap = (a, b) => a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;

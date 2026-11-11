@@ -16,7 +16,7 @@ function firstDev() {
 const slotChar = s => s.pick < 0 ? (Game.save.char || DEFAULT_CHAR) : PRESETS[s.pick];
 
 function openLocal() {
-  if (!Game.save.char) { Game.save.char = { ...DEFAULT_CHAR }; persist(); }
+  ensureHero();
   Local.on = true; Game.mode = 'menu'; Input.enabled = false; Local.openT = performance.now();
   if (!Local.slots.length) Local.slots = [{ dev: firstDev(), pick: -1 }];
   renderLocal(); show('local');

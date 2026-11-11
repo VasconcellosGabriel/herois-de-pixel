@@ -116,7 +116,7 @@ function goLevels() {
 }
 function beginLevel(i) {
   if (Net.role === 'client') return;                 // no multiplayer quem escolhe a fase é o anfitrião
-  if (!Game.save.char) { openCreator(); return; }
+  if (!Game.save.char) { openHeroes('play'); return; }
   hideScreens();
   if (Net.role === 'host') { Net.roster[0].ch = Game.save.char; Net.roster[0].b = myBuild(); startLevel(i, Net.roster, 0); }
   else if (Local.on) startLevel(i, localRoster(), 0);
@@ -208,7 +208,10 @@ function padMenu(m) {
 Input.onPadMenu = padMenu;
 
 // ---------- Criador de personagem ----------
-const Creator = { ch: null, tab: 'classe', pose: 0, spr: null, t: 0, from: 'title', wardrobe: false };
+// mode: 'new' = criando um herói novo · 'edit' = mudando a aparência de um herói salvo (a classe fica)
+const Creator = { ch: null, tab: 'classe', pose: 0, spr: null, t: 0, from: 'title', wardrobe: false, mode: 'new' };
+// classe e elemento travados: trocando de roupa na pausa ou editando um herói que já tem evolução
+const crLocked = () => Creator.wardrobe || Creator.mode === 'edit';
 
 // Trocar de roupa no meio da campanha (menu de pausa): muda só a aparência; a classe e o elemento ficam
 function openWardrobe() {
@@ -229,14 +232,14 @@ function applyWardrobe() {
   Creator.wardrobe = false;
   banner('Visual novo!', '', 1200); show('pause');
 }
-function openCreator(from = 'title') {
-  Game.mode = 'creator'; Input.enabled = false; Creator.from = from; Creator.wardrobe = false;
-  const sv = Game.save.char || {};
+function openCreator(mode = 'new', from = 'play') {
+  Game.mode = 'creator'; Input.enabled = false; Creator.from = from; Creator.wardrobe = false; Creator.mode = mode;
+  const sv = mode === 'edit' && Game.save.char || {};
   // heróis salvos antes da cor do acessório existir: começa com a cor que já aparecia
   const oldAcc = sv.acc === 5 ? sv.secondary : sv.acc === 3 ? sv.accent : sv.acc === 1 ? '#14101a' : sv.acc === 2 ? '#16121c' : undefined;
   Creator.ch = { ...DEFAULT_CHAR, ...(sv.accColor || !oldAcc ? {} : { accColor: oldAcc }), ...sv };
-  Creator.tab = 'classe'; Creator.pose = 0;
-  $('#cr-name').value = Creator.ch.name;
+  Creator.tab = mode === 'edit' ? 'corpo' : 'classe'; Creator.pose = 0;
+  $('#cr-name').value = mode === 'edit' ? Creator.ch.name : '';
   renderTabs(); renderPanel(); renderPoses(); renderPresets(); rebuildPreview();
   Snd.music('menu');
   show('creator');
@@ -245,7 +248,7 @@ function rebuildPreview() { Creator.spr = buildPlayerSprites(Creator.ch); }
 function renderTabs() {
   const el = $('#cr-tabs'); el.innerHTML = '';
   TABS.forEach(t => {
-    if (Creator.wardrobe && t.id === 'classe') return;
+    if (crLocked() && t.id === 'classe') return;
     const b = document.createElement('button');
     b.className = 'tab' + (t.id === Creator.tab ? ' on' : ''); b.textContent = t.label;
     b.onclick = () => { Creator.tab = t.id; Snd.sfx('click'); renderTabs(); renderPanel(); };
@@ -268,7 +271,7 @@ function renderPresets() {
   PRESETS.forEach(p => {
     const b = document.createElement('button');
     b.className = 'chip'; b.textContent = p.name; b.title = 'Usar personagem pronto';
-    b.onclick = () => { Creator.ch = Creator.wardrobe ? { ...p, cls: Creator.ch.cls, elem: Creator.ch.elem } : { ...p }; $('#cr-name').value = p.name; changed(true); };
+    b.onclick = () => { Creator.ch = crLocked() ? { ...p, cls: Creator.ch.cls, elem: Creator.ch.elem } : { ...p }; $('#cr-name').value = p.name; changed(true); };
     el.appendChild(b);
   });
 }
@@ -330,7 +333,7 @@ function randomChar() {
   const pick = a => a[(Math.random() * a.length) | 0], ri = n => (Math.random() * n) | 0;
   const c = Creator.ch;
   Object.assign(c, {
-    elem: Creator.wardrobe ? c.elem : ri(3), height: ri(3), build: ri(3), skin: pick(PAL.skin), face: ri(OPTS.faces.length), eyes: pick(PAL.eyes),
+    elem: crLocked() ? c.elem : ri(3), height: ri(3), build: ri(3), skin: pick(PAL.skin), face: ri(OPTS.faces.length), eyes: pick(PAL.eyes),
     hair: ri(OPTS.hairs.length), hairColor: pick(PAL.hair), outfit: ri(OPTS.outfits.length), primary: pick(PAL.cloth), secondary: pick(PAL.cloth),
     head: Math.random() < 0.5 ? 0 : 1 + ri(OPTS.heads.length - 1), headColor: pick(PAL.cloth), cape: ri(3), capeColor: pick(PAL.cloth),
     acc: Math.random() < 0.5 ? 0 : 1 + ri(OPTS.accs.length - 1), accColor: pick(PAL.cloth), weaponColor: pick(PAL.metal), accent: pick(PAL.accent),
@@ -357,9 +360,86 @@ function drawPreview(t) {
 function saveCharacter() {
   Creator.ch.name = ($('#cr-name').value.trim() || 'Herói').slice(0, 14);
   if (Creator.wardrobe) { applyWardrobe(); return; }
-  Game.save.char = { ...Creator.ch }; persist();
-  Game.titleSpr = null;
-  if (Creator.from === 'mp') openMp(); else goLevels();
+  if (Creator.mode === 'edit') {
+    Game.save.char = { ...Creator.ch, cls: Game.save.char.cls, elem: Game.save.char.elem }; persist(); Game.titleSpr = null;
+    if (upFrom === 'heroes') openHeroes(heroFrom); else openUpgrades(upFrom);
+    return;
+  }
+  if (!addHero(Creator.ch)) { openHeroes(Creator.from); return; }
+  if (Creator.from === 'mp') openMp(); else if (Creator.from === 'up') openUpgrades('title'); else goLevels();
+}
+function creatorBack() {
+  if (Creator.wardrobe) { Creator.wardrobe = false; show('pause'); }
+  else if (Creator.mode === 'edit') { if (upFrom === 'heroes') openHeroes(heroFrom); else openUpgrades(upFrom); }
+  else if (Game.save.heroes.length) openHeroes(Creator.from);
+  else if (Creator.from === 'mp') openMp(); else goTitle();
+}
+
+// ---------- Seleção / criação de heróis ----------
+// from: 'play' (escolheu → fases) · 'mp' (→ multiplayer) · 'up' (→ Meu personagem)
+let heroFrom = 'play';
+const Previews = [];                                   // retratos animados das telas de menu: { cv, spr }
+function drawPreviews(t) {
+  for (const p of Previews) {
+    if (p.cv.offsetParent === null) continue;
+    const g = p.cv.getContext('2d');
+    g.clearRect(0, 0, p.cv.width, p.cv.height);
+    g.drawImage(p.spr.get('idle', Math.floor(t * 3.5) % POSES.idle), 0, 0);
+  }
+}
+// onde o herói está na campanha
+function heroStage(h) {
+  if (h.best && h.best[LEVELS[LEVELS.length - 1].id]) return '🏆 Campanha completa';
+  const lv = LEVELS[Math.min(h.unlocked || 1, LEVELS.length) - 1];
+  return lv.boss ? `☠ Chefe do Mundo ${lv.world}` : `Fase ${lv.wn}-${lv.ln}`;
+}
+function openHeroes(from = 'play') {
+  heroFrom = from; Game.mode = 'menu'; Input.enabled = false;
+  persist();
+  const sv = Game.save, list = $('#hr-list');
+  list.innerHTML = ''; Previews.length = 0;
+  $('#hr-sub').textContent = `Cada herói tem as próprias fases, moedas e evolução (até ${MAX_HEROES}).`;
+  sv.heroes.forEach((h, i) => {
+    const ch = h.char, cls = CLASSES[ch.cls], lvl = (h.prog && h.prog[ch.cls] && h.prog[ch.cls].lvl) || 1;
+    const card = document.createElement('div'); card.className = 'hr-card' + (i === sv.cur ? ' on' : '');
+    const pick = document.createElement('button'); pick.className = 'hr-pick';
+    const cv = Object.assign(document.createElement('canvas'), { width: 96, height: 96 });
+    const t = document.createElement('span'); t.className = 't';
+    t.innerHTML = `<b></b><small>${cls.icon} ${cls.name} · Nível ${lvl}</small><small>${heroStage(h)} · 🪙 ${h.coins || 0}</small>`;
+    $('b', t).textContent = ch.name;
+    pick.append(cv, t);
+    pick.onclick = () => { Snd.init(); Snd.sfx('click'); selectHero(i); heroChosen(); };
+    const acts = document.createElement('div'); acts.className = 'hr-acts';
+    const look = Object.assign(document.createElement('button'), { className: 'chip', textContent: '🎨', title: 'Mudar aparência' });
+    look.onclick = () => { Snd.sfx('click'); selectHero(i); upFrom = 'heroes'; openCreator('edit'); };
+    const del = Object.assign(document.createElement('button'), { className: 'chip', textContent: '🗑', title: 'Excluir herói' });
+    del.onclick = () => {
+      if (!confirm(`Excluir ${ch.name}? Todo o progresso deste herói (fases, moedas e evolução) será perdido.`)) return;
+      deleteHero(i); openHeroes(heroFrom);
+    };
+    acts.append(look, del);
+    card.append(pick, acts); list.appendChild(card);
+    Previews.push({ cv, spr: buildPlayerSprites({ ...DEFAULT_CHAR, ...ch }) });
+  });
+  if (sv.heroes.length < MAX_HEROES) {
+    const b = document.createElement('button'); b.className = 'hr-card hr-new';
+    b.innerHTML = '<span>＋</span>Criar novo herói';
+    b.onclick = () => { Snd.init(); Snd.sfx('click'); openCreator('new', heroFrom); };
+    list.appendChild(b);
+  }
+  Snd.music('menu');
+  show('heroes'); drawPreviews(Game.t);
+}
+const upBack = () => upFrom === 'heroes' ? 'title' : upFrom;
+function heroChosen() {
+  if (heroFrom === 'mp') openMp();
+  else if (heroFrom === 'up') openUpgrades(upBack());
+  else goLevels();
+}
+function heroesBack() {
+  if (heroFrom === 'mp') openMp();
+  else if (heroFrom === 'up' && Game.save.cur >= 0) openUpgrades(upBack());
+  else goTitle();
 }
 
 // ---------- Tela de multiplayer ----------
@@ -399,7 +479,7 @@ function renderRoom() {
     : 'Aguardando o anfitrião escolher a fase...';
 }
 async function mpHost() {
-  if (!Game.save.char) { Game.save.char = { ...DEFAULT_CHAR }; persist(); }
+  ensureHero();
   setMpBusy(true, 'Criando sala...');
   try { await hostRoom(); openRoom(); }
   catch (e) { leaveRoom(e.message || String(e)); }
@@ -407,7 +487,7 @@ async function mpHost() {
 async function mpJoin() {
   const code = cleanCode($('#mp-code').value);
   if (code.length !== CODE_LEN) { $('#mp-msg').textContent = `O código tem ${CODE_LEN} letras/números.`; return; }
-  if (!Game.save.char) { Game.save.char = { ...DEFAULT_CHAR }; persist(); }
+  ensureHero();
   goFullscreen();
   setMpBusy(true, 'Conectando...');
   try { await joinRoom(code); if (!Net.inLevel) openRoom(); }
@@ -427,16 +507,20 @@ async function mpCopy() {
 // ---------- Evolução: atributos (pontos de nível) e ferreiro (moedas) ----------
 let upFrom = 'title';
 function openUpgrades(from) {
+  if (Game.save.cur < 0) { upFrom = 'title'; openHeroes('up'); return; }   // ainda não tem herói: cria/escolhe primeiro
   upFrom = from; Game.mode = 'menu'; Input.enabled = false;
-  if (!Game.save.char) { Game.save.char = { ...DEFAULT_CHAR }; persist(); }
   $('#up-msg').textContent = '';
-  renderUpgrades(); show('up');
+  // trocar de herói ou de visual só fora de uma partida em andamento
+  const free = from !== 'win' && !Net.role && !Local.on;
+  $('#b-up-heroes').style.display = $('#b-up-look').style.display = free ? '' : 'none';
+  Previews.length = 0; Previews.push({ cv: $('#up-pv'), spr: buildPlayerSprites({ ...DEFAULT_CHAR, ...Game.save.char }) });
+  renderUpgrades(); show('up'); drawPreviews(Game.t);
 }
 const pips = (n, max) => '<b>' + '■'.repeat(n) + '</b>' + '■'.repeat(Math.max(0, max - n));
 function renderUpgrades() {
   const ch = Game.save.char, cls = CLASSES[ch.cls], pr = progOf(ch.cls), coins = Game.save.coins || 0;
-  $('#up-title').textContent = `Evolução — ${cls.icon} ${cls.name}`;
-  $('#up-sub').textContent = `${ch.name} · Nível ${pr.lvl} · XP ${pr.xp}/${xpNeed(pr.lvl)}`;
+  $('#up-title').textContent = ch.name;
+  $('#up-sub').textContent = `${cls.icon} ${cls.name} · Nível ${pr.lvl} · XP ${pr.xp}/${xpNeed(pr.lvl)} · ${heroStage(Game.save)}`;
   $('#up-pts').textContent = pr.pts ? `(${pr.pts} ponto${pr.pts > 1 ? 's' : ''} para gastar)` : '(sem pontos)';
   $('#up-coins').textContent = `(🪙 ${coins} moedas)`;
   const stats = $('#up-stats'); stats.innerHTML = '';
@@ -467,6 +551,7 @@ function closeUpgrades() {
   if (upFrom === 'levels') goLevels();
   else if (upFrom === 'win') show('win');
   else if (upFrom === 'mp') openMp();
+  else if (upFrom === 'heroes') openHeroes(heroFrom);
   else goTitle();
 }
 
@@ -620,12 +705,15 @@ function resetControls() {
 }
 
 // ---------- Ligações ----------
-click('#b-play', () => { if (Game.save.char) goLevels(); else openCreator(); });
-click('#b-create', () => openCreator());
+click('#b-play', () => { if (Game.save.heroes.length) openHeroes('play'); else openCreator('new', 'play'); });
+click('#b-create', () => openUpgrades('title'));
+click('#b-hr-back', heroesBack);
+click('#b-up-look', () => openCreator('edit'));
+click('#b-up-heroes', () => openHeroes('up'));
 click('#b-mp', () => openMp());
 click('#b-mp-host', mpHost);
 click('#b-mp-join', mpJoin);
-click('#b-mp-hero', () => openCreator('mp'));
+click('#b-mp-hero', () => openHeroes('mp'));
 click('#b-mp-back', goTitle);
 click('#b-mp-share', mpShare);
 click('#b-mp-copy', mpCopy);
@@ -635,7 +723,6 @@ click('#b-win-leave', () => leaveRoom());
 $('#mp-code').addEventListener('keydown', e => { if (e.key === 'Enter') mpJoin(); });
 $('#mp-code').addEventListener('input', e => { e.target.value = cleanCode(e.target.value); });
 click('#b-sound', toggleSound);
-click('#b-up', () => openUpgrades('title'));
 click('#b-lv-up', () => openUpgrades('levels'));
 click('#b-win-up', () => openUpgrades('win'));
 click('#b-up-back', closeUpgrades);
@@ -651,7 +738,7 @@ addEventListener('gamepaddisconnected', () => { if ($('#s-controls').classList.c
 click('#b-sound2', toggleSound);
 click('#b-lv-back', () => { if (Net.role === 'host') openRoom(); else if (Local.on) openLocal(); else goTitle(); });
 click('#b-random', randomChar);
-click('#b-cr-back', () => { if (Creator.wardrobe) { Creator.wardrobe = false; show('pause'); } else if (Creator.from === 'mp') openMp(); else goTitle(); });
+click('#b-cr-back', creatorBack);
 click('#b-wardrobe', openWardrobe);
 click('#b-chatsz', () => setChatSize(((Game.save.chatSize === undefined ? 1 : Game.save.chatSize) + 1) % CHAT_SIZES.length));
 click('#b-cr-done', saveCharacter);
@@ -782,6 +869,7 @@ function frame(now) {
     acc = 0; renderTitle(Game.t);
   }
   if (Creator.wardrobe) drawPreview(Game.t);             // trocando de roupa na pausa
+  if (Previews.length) drawPreviews(Game.t);             // retratos da seleção de heróis / Meu personagem
 }
 
 // ---------- Início ----------

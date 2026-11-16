@@ -137,8 +137,12 @@ body.touch.playing #touch { display: block; }
 #touch .sk.low small { color: #ff9aa5; }
 #touch .sp b { position: absolute; left: 0; right: 0; bottom: 0; height: 0; background: rgba(255, 210, 63, .55); }
 #touch .sp span { position: relative; font-size: 22px; color: #ffe27a; text-shadow: 1px 1px 0 #000; }
-#touch .sp.ready { border-color: #ffd23f; animation: sp-pulse .5s infinite alternate; }
-@keyframes sp-pulse { from { box-shadow: 0 0 0 0 rgba(255,210,63,.7); } to { box-shadow: 0 0 14px 6px rgba(255,210,63,.55); } }
+#touch .sp.ready { border-color: #ffd23f; background: rgba(255, 150, 40, .35); animation: sp-pulse .45s infinite alternate; }
+#touch .sp.ready span { color: #fff; font-size: 26px; }
+@keyframes sp-pulse { from { box-shadow: 0 0 0 0 rgba(255,210,63,.7); transform: scale(1); } to { box-shadow: 0 0 14px 6px rgba(255,150,40,.6); transform: scale(1.1); } }
+/* fogo em pixels em volta do botão do especial quando a barra está cheia (desenhado em updateTouchHud) */
+#sp-fire { position: absolute; right: 144px; bottom: 84px; width: 102px; height: 108px; image-rendering: pixelated; pointer-events: none; }
+#sp-fire[hidden] { display: none; }
 .pausebtn { top: 8px; right: 8px; width: 44px !important; height: 44px !important; font-size: 12px !important; }
 /* joystick de mira (aparece ao arrastar o botão de ataque do mago/arqueiro) */
 #stick { position: fixed; width: 104px; height: 104px; margin: -52px 0 0 -52px; border: 3px solid rgba(255,255,255,.45); border-radius: 50%; background: rgba(255,255,255,.08); pointer-events: none; display: none; z-index: 4; }

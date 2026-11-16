@@ -28,7 +28,7 @@ const CLASSES = {
     id: 'mago', name: 'Mago', icon: '🪄', hp: 4, mana: 100, crit: 0.08,
     desc: 'Frágil, mas com magias poderosas. A mana recarrega devagar!',
     skills: [
-      { key: 'J', name: 'Magia elemental', desc: 'Fogo, Gelo ou Veneno: chance de queimar, congelar ou envenenar. 10 de mana.', icon: '🔥' },
+      { key: 'J', name: 'Magia elemental', desc: 'Fogo, Gelo ou Veneno: chance de queimar, congelar ou envenenar. Troque de elemento quando quiser (tecla G). 10 de mana.', icon: '🔥' },
       { key: 'K', name: 'Raio', desc: 'Dano enorme em linha reta e atordoa. 40 de mana.', icon: '⚡' },
       { key: 'L', name: 'Cura', desc: 'Recupera 2 corações (e 1 dos aliados por perto). 35 de mana.', icon: '💚' },
     ],
@@ -145,6 +145,12 @@ function loadSave() {
   }
   base.heroes = base.heroes.filter(h => h && h.char);
   for (const h of base.heroes) if (!CLASSES[h.char.cls]) h.char.cls = 'guerreiro';
+  // versão 20: as expressões do rosto viraram características (cicatriz, barba, pintura) e a barba deixou de ser acessório.
+  // Heróis salvos antes disso: a antiga "Cicatriz" continua cicatriz, a barba vira característica e o resto fica liso.
+  if ((base.faceV | 0) < 2) {
+    for (const h of base.heroes) { const c = h.char; c.face = c.acc === 4 ? 4 : c.face === 4 ? 1 : 0; if (c.acc === 4) c.acc = 0; }
+    base.faceV = 2;
+  }
   useHero(base, base.cur | 0);
   return base;
 }
@@ -279,7 +285,7 @@ function rise(w, x, y, rx, ry, n, life) {
 
 // ---------- Comandos por jogador ----------
 // Cada herói lê um "controle" próprio: o local vem do teclado/toque; os remotos chegam pela rede.
-const CTL_KEYS = ['left', 'right', 'jump', 'down', 'a', 'b', 'c', 'aimup', 'aimdown', 'special'];
+const CTL_KEYS = ['left', 'right', 'jump', 'down', 'a', 'b', 'c', 'aimup', 'aimdown', 'special', 'elem'];
 const CTL_BIT = Object.fromEntries(CTL_KEYS.map((k, i) => [k, 1 << i]));
 // am (modo de mira): 'keys' = teclas Q/E · 'pointer' = direção livre (mouse, joystick de toque, analógico) · 'auto' = mira sozinha no inimigo
 function makeCtl() {
@@ -374,6 +380,7 @@ function addPlayer(w, r) {
     ground: false, coyote: 0, jbuf: 0, hp: maxHp, maxHp, mana: maxMana, maxMana, manaDelay: 0,
     cd: { a: 0, b: 0, c: 0 }, act: null, actT: 0, actDur: 0, inv: 0, hurtT: 0, block: false, dash: 0, dashSpd: 0, dashKind: null, dashHit: null,
     melee: null, anim: 0, dead: false, deadT: 0, out: false, drop: 0, landT: 0, flipT: 0, jumps: 0, glide: false, diving: false, diveWait: false, combo: 0, comboT: 0, atkIdx: 0, dustT: 0,
+    elem: clamp(ch.elem | 0, 0, ELEMENTS.length - 1),      // elemento da magia do mago (troca durante a fase: cycleElem)
     kaim: 0, aimDeg: 0, aimFace: 1, lastVy: 0, shotAim: false, sp, xpGot: 0, crouch: false, flamer: 0, flameDir: 1, flameTk: 0, ep: 0, rp: null, remote: false, stompT: 0,
     // evolução: atributos (XP) e melhorias (moedas)
     spdK: 1 + st.spd * 0.06, jumpK: 1 + st.jump * 0.05, dmgK: 1 + up.dmg * 0.15,
@@ -633,7 +640,7 @@ function skillA(w, p) {
     sfx('slash');
     addFx(w, { type: 'slash', t: 0.2, max: 0.2, p, face: f, kind: 'sword', idx: p.combo });
   } else if (id === 'mago') {
-    const eli = p.ch.elem || 0, el = ELEMENTS[eli];
+    const eli = p.elem || 0, el = ELEMENTS[eli];
     if (p.mana < p.cost[0]) { sfx('no'); p.cd.a = 0.2; return; }
     p.mana -= p.cost[0]; p.manaDelay = MANA_DELAY; setCd(p, 'a', 0.4); act(p, 'cast', 0.25); sfx(el.sfx);
     // mira: mouse/joystick apontam livremente; senão a magia mira sozinha no inimigo mais próximo à frente
@@ -654,6 +661,19 @@ function skillA(w, p) {
     sfx('slash');
     addFx(w, { type: 'slash', t: 0.18, max: 0.18, p, face: f, kind: 'claw', idx: p.combo });
   }
+}
+// Mago: troca o elemento da magia (Fogo → Gelo → Veneno) a qualquer momento da fase. Vale para a magia (habilidade 1)
+// e para o ataque especial. O elemento fica guardado no herói (ver elemSync, em ui.js).
+function cycleElem(w, p) {
+  if (p.cls.id !== 'mago' || p.dead || p.out) return;
+  p.elem = ((p.elem | 0) + 1) % ELEMENTS.length;
+  const el = ELEMENTS[p.elem];
+  // o herói de um convidado (cópia guardada pelo anfitrião) leva o elemento novo para a próxima fase
+  const r = Net.role === 'host' && p.id !== 0 && w.roster && w.roster.find(x => x.id === p.id);
+  if (r) { r.ch.elem = p.elem; p.chKey = JSON.stringify(r.ch); }
+  sfx(el.sfx);
+  floatText(w, cxOf(p), p.y - 8, el.name.toUpperCase(), el.col, true);
+  burst(w, cxOf(p), p.y + 6, el.col, 10, 70, 0.45, 60); burst(w, cxOf(p), p.y + 6, el.col2, 5, 50, 0.4, 40);
 }
 function skillB(w, p) {
   if (p.cd.b > 0 || p.block) return;
@@ -740,7 +760,7 @@ function special(w, p) {
     burst(w, pc, py, p.ch.accent, 26, 170, 0.6);
   } else if (id === 'mago') {       // Tempestade arcana: raios em todos os inimigos à vista
     act(p, 'cast', 0.5);
-    const el = ELEMENTS[p.ch.elem || 0], rect = { x: pc - W / 2 - 10, y: p.y - 120, w: W + 20, h: 200 };
+    const el = ELEMENTS[p.elem || 0], rect = { x: pc - W / 2 - 10, y: p.y - 120, w: W + 20, h: 200 };
     for (const e of w.enemies) if (!e.dead && e.active && overlap(rect, e)) {
       const ex = cxOf(e), ey = cyOf(e), pts = [];
       for (let i = 0; i <= 6; i++) pts.push([r1(ex + (i && i < 6 ? rnd(-7, 7) : 0)), r1(ey - 120 + i * 20)]);
@@ -970,6 +990,7 @@ function updatePlayer(w, dt, p, ctl) {
       if (c.hit('c')) skillC(w, p);
     }
     if (c.hit('special')) special(w, p);
+    if (c.hit('elem')) cycleElem(w, p);
   }
 
   // golpe corpo a corpo
@@ -2008,7 +2029,7 @@ function render(w) {
 // Ícones das habilidades (26x26 de alta resolução)
 const _skIcons = {};
 function skillIcon(p, i) {
-  const id = p.cls.id, el = id === 'mago' ? (p.ch.elem || 0) : 0, key = id + i + el;
+  const id = p.cls.id, el = id === 'mago' ? (p.elem !== undefined ? p.elem : p.ch.elem) || 0 : 0, key = id + i + el;
   if (_skIcons[key]) return _skIcons[key];
   const g = new PX(26, 26);
   const Y = '#ffd23f';
@@ -2106,6 +2127,8 @@ function drawHud(g, w) {
       drawTextO(g, keys[i], x + 1, sy + 1, '#ffffff');
       if (p.cost[i]) drawTextO(g, p.cost[i], x + (p.cost[i] > 9 ? 3 : 5), sy + 8, lowMana ? '#ff9aa5' : '#bfe0ff');
     });
+    // mago: elemento atual e a tecla que troca
+    if (p.cls.id === 'mago') { const el = ELEMENTS[p.elem || 0]; drawTextO(g, (usePad ? padName(PadCfg.map.elem[0]) : keyLabel('elem')) + ' ' + el.name.toUpperCase(), 4, sy + 17, el.col); }
   }
   // moedas
   g.drawImage(ICON.coin[0], W - 56, 2);

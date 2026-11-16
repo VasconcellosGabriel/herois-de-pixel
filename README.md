@@ -46,6 +46,7 @@ O anfitrião roda a simulação (inimigos, golpes, dano); os convidados recebem 
 | Habilidades 1 e 2 | J / K · botões esquerdo/direito do mouse | X / Y | botões à direita (com ícone e recarga) |
 | Esquiva / escudo / cura / mergulho | **Q** (ou L) | B ou LB | botão pequeno à direita |
 | Ataque especial | **E** (ou C, botão do meio do mouse) | RB ou RT | ★ |
+| Trocar o elemento da magia (Mago) | **G** (ou V) | LT | botão ↻ (a borda mostra a cor do elemento) |
 | Mirar (Mago e Arqueiro) | Mouse · ou I / O | analógico direito | **segure e arraste o botão de ataque**: o tiro sai ao **soltar**; toque rápido = mira automática; voltar o dedo ao centro cancela |
 | Pausa | Esc / P | Start | ❚❚ |
 
@@ -59,6 +60,8 @@ No celular cada dedo é tratado à parte (dá para andar, pular e atacar ao mesm
 - **Guerreiro** (6 ♥): J espada (combo de 3: corte, corte de volta e estocada com avanço; alcance maior, rebate projéteis) · K lança arremessável (atravessa inimigos) · L escudo (segure: defende pela frente e pelas costas; só passa o que vem de cima ou de baixo)
 - **Mago** (4 ♥, mana): J magia elemental (10 mana; dano 3 fogo / 2 gelo / 2 veneno) · K raio (40 mana, 10 de dano, atordoa) · L cura (35 mana, +2 ♥ e +1 ♥ nos aliados por perto).
   A mana recarrega devagar (4,5/s) e só depois de ~1 s sem gastar.
+  O **elemento** (Fogo → Gelo → Veneno) troca a qualquer momento da fase: tecla G, LT no controle, botão ↻ no celular ou o botão *Magia* da pausa.
+  Vale para a magia e para o ataque especial, e a escolha fica guardada no herói (também dá para mudar em *Aparência → Equipamento*).
 - **Arqueiro** (4 ♥, foco em mobilidade): J flecha mirada (2 de dano; quanto mais longe o alvo, maior a chance de crítico e o crítico chega a ×3) · K tiro triplo (3 flechas que atravessam o primeiro alvo) · L rolamento invulnerável. Passivo: **pulo duplo** (cambalhota).
 - **Dragônico** (6 ♥): J garras (combo de 3, a última é mais forte) · K sopro de fogo (jato de chamas que queima) · L mergulho (despenca e explode ao pousar). Passivo: pulo duplo com batida de asas e **planar** segurando o pulo.
 
@@ -76,6 +79,13 @@ No celular cada dedo é tratado à parte (dá para andar, pular e atacar ao mesm
 A primeira fase de cada mundo faz a ponte com o mundo anterior, e o cenário muda aos poucos até o tema novo.
 
 Cada chefe tem uma fase de **fúria** (abaixo de 50% da vida): fica mais rápido e ataca mais. Nos mundos avançados os inimigos comuns são mais resistentes.
+
+## Mapa do mundo
+A seleção de fases é um mapa: as 30 fases são pontos de uma trilha que atravessa os 7 mundos (cada um com o próprio terreno e o
+marco do chefe). O herói aberto fica em cima da fase escolhida e **anda pela trilha** até a próxima: clique/toque num ponto (ou ← →
+no teclado, direcional no controle) para ele ir até lá; clique de novo, Enter, A ou *▶ Jogar* para começar. Pontos dourados = fases
+feitas (com as estrelas embaixo), vermelho pulsando = fase nova, cinza com cadeado = fechada; os mundos ainda fechados ficam na névoa.
+Ao voltar de uma fase vencida, o herói sai dela e caminha sozinho até a fase recém-liberada.
 
 ## Inimigos
 Cada fase tem inimigos que combinam com o lugar (morcegos só em cavernas e castelos, demônios na forja etc.).
@@ -104,8 +114,12 @@ Cada fase tem inimigos que combinam com o lugar (morcegos só em cavernas e cast
 - **Ambiente**: partículas por mundo (vaga-lumes, esporos, neve, bolhas, areia, brasas, brilhos), luzes de tochas e cristais, faixas de cinema na entrada do chefe.
 
 ## Personalização
-Classe, altura, porte, pele, expressão, olhos, 8 cabelos + cor, 4 roupas + 2 cores, 8 chapéus + cor,
+Classe, corpo (masculino ou feminino), altura, porte, pele, olhos, 10 cabelos + cor, 4 roupas + 2 cores, 8 chapéus + cor,
 3 capas + cor, 6 acessórios + cor (na aba Extras), cor da arma e da magia — mais personagens prontos e botão aleatório.
+**Rosto**: em vez de expressões, características — 3 cicatrizes (no olho, na bochecha, no nariz), barba, bigode, cavanhaque,
+pintura de guerra, faixa pintada nos olhos e sardas (as pinturas usam a cor da joia/magia).
+Escolher a classe já veste o herói com o visual dela (armadura de placas, manto e chapéu de bruxo, capuz de arqueiro, asas e chifres);
+os 8 personagens prontos são as 4 classes nas versões masculina e feminina.
 Em cada cor, o quadrado vazio com "+" abre o seletor para escolher exatamente a cor do item.
 O personagem fica salvo no aparelho (localStorage). Dá para **trocar de roupa durante a campanha** pelo menu de pausa (👕): muda a aparência, mas não a classe.
 
@@ -115,7 +129,7 @@ No celular: abrir o link → menu do navegador → "Adicionar à tela inicial".
 
 ## Estrutura
 - `js/util.js`: constantes, contorno automático dos sprites, fonte de pixels, áudio sintetizado, entrada (teclado, mouse, toque; cada controle separado em `Pads`)
-- `js/sprites.js`: motor de pixels com sombreamento automático (`PX`) e personagem desenhado por **esqueleto** (cinemática inversa) a 2x de resolução, poses/animações, ícones
+- `js/sprites.js`: motor de pixels com sombreamento automático (`PX`) e personagem desenhado por **esqueleto** (cinemática inversa) a 2x de resolução, em estilo chibi 3/4 (`skeletonFor` = poses, `drawChar` = desenho de cada camada), ícones
 - `js/enemies.js`: sprites e animações dos inimigos do mundo 1 e do Rei Golem
 - `js/world.js`: tiles e cenário em alta resolução (terreno com ruído, bordas/cantos, árvores, cristais, tochas), fundos em camadas (parallax, nuvens), decoração, luzes
 - `js/worlds.js`: temas dos mundos 2 a 7 (cores, fundos, decoração)
@@ -126,6 +140,7 @@ No celular: abrir o link → menu do navegador → "Adicionar à tela inicial".
 - `js/spritepack.js` + `sprites/`: heróis montados com **folhas PNG em camadas** (corpo, roupa, cabelo, chapéu, arma...) recoloridas com as cores do criador de personagem. As folhas-base saem de `node tools/exportar-sprites.js`; o guia para o artista está em [sprites/LEIA-ME.md](sprites/LEIA-ME.md). Sem as folhas (ou com `?procedural` na URL) o herói é desenhado por código.
 - `js/net.js`: multiplayer online (salas, conexão P2P, "fotos" do mundo, eventos de efeitos)
 - `js/local.js`: multiplayer local (sala, aparelho de cada herói)
+- `js/mapa.js`: mapa do mundo da seleção de fases (terreno e enfeites de cada mundo desenhados por código, trilha, pontos, herói andando)
 - `js/ui.js`: menus, criador de personagem, tela de Evolução, botões de toque, laço principal
 
 ## Adicionando conteúdo

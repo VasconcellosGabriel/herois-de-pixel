@@ -4,7 +4,8 @@
 // ATENÇÃO: sobrescreve as folhas existentes. Se um artista já editou alguma, faça backup (ou use o git) antes.
 // Para gerar só as que ainda não existem: node tools/exportar-sprites.js --so-novas
 const fs = require('fs'), path = require('path'), os = require('os'), { execFileSync } = require('child_process');
-const root = path.join(__dirname, '..'), out = path.join(root, 'sprites'), onlyNew = process.argv.includes('--so-novas');
+const pasta = 'sprites';
+const root = path.join(__dirname, '..'), out = path.join(root, pasta), onlyNew = process.argv.includes('--so-novas');
 
 const browsers = [process.env.EDGE, 'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe', 'C:/Program Files/Microsoft/Edge/Application/msedge.exe',
   'C:/Program Files/Google/Chrome/Application/chrome.exe', '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome', '/usr/bin/google-chrome', '/usr/bin/chromium'].filter(Boolean);
@@ -27,8 +28,26 @@ if (!m) { console.error('A página não devolveu resultado.'); process.exit(1); 
 const r = JSON.parse(m[1].replace(/&quot;/g, '"').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&'));
 if (r.erro) { console.error(r.erro); process.exit(1); }
 
+// O navegador grava PNG com compressão rápida; como as folhas são quase todas transparentes, recomprimir no máximo
+// deixa cada uma várias vezes menor (mesmos pixels, só o bloco IDAT é refeito).
+const zlib = require('zlib');
+const CRC = Array.from({ length: 256 }, (_, n) => { for (let k = 0; k < 8; k++) n = n & 1 ? 0xedb88320 ^ (n >>> 1) : n >>> 1; return n >>> 0; });
+const crc32 = b => { let c = 0xffffffff; for (const x of b) c = CRC[(c ^ x) & 255] ^ (c >>> 8); return (c ^ 0xffffffff) >>> 0; };
+function recomprimir(buf) {
+  const partes = [buf.subarray(0, 8)], idat = [];
+  const bloco = (tipo, dados) => { const b = Buffer.alloc(12 + dados.length); b.writeUInt32BE(dados.length, 0); b.write(tipo, 4, 'latin1'); dados.copy(b, 8); b.writeUInt32BE(crc32(b.subarray(4, 8 + dados.length)), 8 + dados.length); return b; };
+  for (let p = 8; p < buf.length;) {
+    const n = buf.readUInt32BE(p), tipo = buf.toString('latin1', p + 4, p + 8), dados = buf.subarray(p + 8, p + 8 + n);
+    if (tipo === 'IDAT') idat.push(dados);
+    else { if (tipo === 'IEND') partes.push(bloco('IDAT', zlib.deflateSync(zlib.inflateSync(Buffer.concat(idat)), { level: 9 }))); partes.push(buf.subarray(p, p + 12 + n)); }
+    p += 12 + n;
+  }
+  const out = Buffer.concat(partes);
+  return out.length < buf.length ? out : buf;
+}
+
 let novas = 0;
-const png = (file, url) => { fs.mkdirSync(path.dirname(file), { recursive: true }); fs.writeFileSync(file, Buffer.from(url.split(',')[1], 'base64')); };
+const png = (file, url) => { fs.mkdirSync(path.dirname(file), { recursive: true }); fs.writeFileSync(file, recomprimir(Buffer.from(url.split(',')[1], 'base64'))); };
 for (const [f, url] of Object.entries(r.files)) {
   const file = path.join(out, f + '.png');
   if (onlyNew && fs.existsSync(file)) continue;
@@ -49,4 +68,4 @@ const SPRITE_PACK = {
   arquivos: ${JSON.stringify(all, null, 2).replace(/\n/g, '\n  ')},
 };
 `);
-console.log(`${novas} folhas gravadas em sprites/ (${all.length} no total) + paleta-chave.png + pack.js`);
+console.log(`${novas} folhas gravadas em ${pasta}/ (${all.length} no total) + paleta-chave.png + pack.js`);

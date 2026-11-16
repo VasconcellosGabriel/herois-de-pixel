@@ -1,18 +1,25 @@
 'use strict';
 // ---------- Personagens prontos ----------
+// O herói padrão é o Guerreiro da folha de referência das classes; os prontos são as 4 classes, masculino e feminino.
 const DEFAULT_CHAR = {
-  name: 'Herói', cls: 'guerreiro', elem: 0, height: 1, build: 1, skin: '#f1c27d', face: 2, eyes: '#2b6cb0',
-  hair: 1, hairColor: '#5a3825', outfit: 0, primary: '#3b6fd6', secondary: '#8a5a2b',
-  head: 0, headColor: '#9aa5b1', cape: 0, capeColor: '#c0392b', acc: 0, accColor: '#c0392b', accent: '#ffd23f', weaponColor: '#cfd8e3',
+  name: 'Herói', cls: 'guerreiro', elem: 0, body: 0, height: 1, build: 1, skin: '#f2c79a', face: 0, eyes: '#6b3a22',
+  hair: 1, hairColor: '#d8452a', outfit: 1, primary: '#aab3c2', secondary: '#b3261e',
+  head: 0, headColor: '#9aa5b1', cape: 2, capeColor: '#b3261e', acc: 0, accColor: '#c0392b', accent: '#ffd23f', weaponColor: '#dfe6f0',
 };
+const LOOKS = {
+  guerreiro: {},
+  mago: { skin: '#f6d3b0', eyes: '#6a3fb0', hair: 8, hairColor: '#cfc6ea', outfit: 2, primary: '#4a2f86', secondary: '#b9aee0', head: 1, headColor: '#4a2f86', cape: 2, capeColor: '#b8402a', accent: '#c04df0', weaponColor: '#d9a441' },
+  arqueiro: { eyes: '#4a7a3a', hair: 1, hairColor: '#8a4a2a', outfit: 0, primary: '#4f7a34', secondary: '#7a4a28', head: 7, headColor: '#5a8a3a', cape: 2, capeColor: '#4f7a34', weaponColor: '#9a5a2e' },
+  dragonico: { eyes: '#e0a030', hair: 2, hairColor: '#b0203a', outfit: 1, primary: '#3a2630', secondary: '#8f1f2e', cape: 0, accent: '#7a1c3c' },
+};
+const LOOKS_F = { guerreiro: { hair: 6 }, mago: { hair: 3, cape: 0 }, arqueiro: { hair: 9 }, dragonico: { hair: 3 } };
+// visual de referência de uma classe (as cores e peças da folha), para o corpo masculino (0) ou feminino (1)
+const lookOf = (cls, body = 0) => ({ ...DEFAULT_CHAR, ...LOOKS[cls], ...(body ? LOOKS_F[cls] : {}), cls, body });
 const PRESETS = [
-  { ...DEFAULT_CHAR, name: 'Sir Aço', build: 2, height: 2, face: 1, outfit: 1, head: 2, cape: 2, skin: '#e0ac69' },
-  { ...DEFAULT_CHAR, name: 'Aurora', cls: 'mago', elem: 1, height: 0, build: 0, skin: '#ffe0c8', hair: 3, hairColor: '#e8e8ff', eyes: '#9b59b6', outfit: 2, primary: '#8e44ad', secondary: '#f2a900', head: 1, headColor: '#6d3fb8', accent: '#6fd8ff', weaponColor: '#8a5a2b' },
-  { ...DEFAULT_CHAR, name: 'Robin', cls: 'arqueiro', skin: '#c68642', hair: 2, hairColor: '#d9a441', eyes: '#2f9e44', outfit: 3, primary: '#2e9c5a', secondary: '#5c3a1e', head: 7, headColor: '#2e9c5a', cape: 1, capeColor: '#1f6b3c', weaponColor: '#8a5a2b', accent: '#ff4d6d' },
-  { ...DEFAULT_CHAR, name: 'Kuro', skin: '#8d5524', face: 4, hair: 5, hairColor: '#c0392b', eyes: '#e63946', outfit: 3, primary: '#222831', secondary: '#c0392b', acc: 2, accColor: '#16121c', build: 2 },
-  { ...DEFAULT_CHAR, name: 'Merlina', cls: 'mago', elem: 2, height: 0, hair: 4, hairColor: '#e86ab0', skin: '#ffe0c8', eyes: '#16a8a8', outfit: 2, primary: '#16a8a8', secondary: '#e8e8e8', head: 6, accent: '#7bff9a', weaponColor: '#e8e0c8' },
-  { ...DEFAULT_CHAR, name: 'Ignis', cls: 'dragonico', build: 2, height: 2, skin: '#c0392b', face: 1, hair: 0, eyes: '#ffd23f', outfit: 1, primary: '#5a3a3a', secondary: '#2a2028', head: 0, acc: 0, accent: '#ffd23f', weaponColor: '#9aa5b1' },
-  { ...DEFAULT_CHAR, name: 'Rex', cls: 'arqueiro', skin: '#9be29b', build: 0, height: 2, face: 3, hair: 0, eyes: '#f2a900', outfit: 0, primary: '#ff8a1f', secondary: '#5c3a1e', head: 5, headColor: '#8a5a2b', acc: 5, accColor: '#5c3a1e', capeColor: '#8a5a2b', weaponColor: '#b87333' },
+  { ...lookOf('guerreiro', 0), name: 'Sir Aço' }, { ...lookOf('guerreiro', 1), name: 'Rubi' },
+  { ...lookOf('mago', 0), name: 'Orion', elem: 1 }, { ...lookOf('mago', 1), name: 'Aurora', elem: 2 },
+  { ...lookOf('arqueiro', 0), name: 'Robin' }, { ...lookOf('arqueiro', 1), name: 'Flora' },
+  { ...lookOf('dragonico', 0), name: 'Ignis' }, { ...lookOf('dragonico', 1), name: 'Brasa' },
 ];
 const PAL = {
   skin: ['#ffe0c8', '#f1c27d', '#e0ac69', '#c68642', '#8d5524', '#5c3a1e', '#9be29b', '#a0c4ff', '#d9b3ff', '#f5a3a3'],
@@ -25,13 +32,15 @@ const PAL = {
 const TABS = [
   { id: 'classe', label: 'Classe', fields: [
     { type: 'class' },
-    { k: 'elem', type: 'choice', label: 'Elemento da magia (tecla J)', opts: ELEMENTS.map(e => e.icon + ' ' + e.name), when: c => c.cls === 'mago' },
+    { k: 'elem', type: 'choice', label: 'Elemento inicial da magia (dá para trocar durante a fase)', opts: ELEMENTS.map(e => e.icon + ' ' + e.name), when: c => c.cls === 'mago' },
   ] },
   { id: 'corpo', label: 'Corpo', fields: [
+    { k: 'body', label: 'Corpo', type: 'choice', opts: OPTS.bodies },
     { k: 'height', label: 'Altura', type: 'choice', opts: OPTS.heights },
     { k: 'build', label: 'Porte', type: 'choice', opts: OPTS.builds },
     { k: 'skin', label: 'Pele', type: 'color', pal: 'skin' },
-    { k: 'face', label: 'Expressão', type: 'choice', opts: OPTS.faces },
+    { k: 'face', label: 'Rosto (cicatrizes, barba, pintura)', type: 'choice', opts: OPTS.faces },
+    { k: 'accent', label: 'Cor da pintura (a mesma da joia / magia)', type: 'color', pal: 'accent', when: c => c.face === 7 || c.face === 8 },
     { k: 'eyes', label: 'Cor dos olhos', type: 'color', pal: 'eyes' },
   ] },
   { id: 'cabelo', label: 'Cabelo', fields: [
@@ -47,13 +56,15 @@ const TABS = [
     { k: 'head', label: 'Chapéu / elmo', type: 'choice', opts: OPTS.heads },
     { k: 'headColor', label: 'Cor do chapéu', type: 'color', pal: 'cloth', when: c => c.head > 0 },
     { k: 'cape', label: 'Capa', type: 'choice', opts: OPTS.capes },
-    { k: 'capeColor', label: 'Cor da capa', type: 'color', pal: 'cloth', when: c => c.cape > 0 },
+    { k: 'capeColor', label: 'Cor da capa e do lenço', type: 'color', pal: 'cloth', when: c => c.cape > 0 || c.cls === 'guerreiro' },
     { k: 'acc', label: 'Acessório', type: 'choice', opts: OPTS.accs },
-    { k: 'accColor', label: 'Cor do acessório', type: 'color', pal: 'cloth', when: c => [1, 2, 3, 5].includes(c.acc) },
+    { k: 'accColor', label: 'Cor do acessório', type: 'color', pal: 'cloth', when: c => c.acc > 0 },
   ] },
   { id: 'equip', label: 'Equipamento', fields: [
     { k: 'weaponColor', label: 'Cor da arma', type: 'color', pal: 'metal' },
     { k: 'accent', label: 'Cor da joia / magia', type: 'color', pal: 'accent' },
+    // herói já criado: o elemento inicial muda aqui (durante a fase, troca-se com a tecla/botão de elemento ou na pausa)
+    { k: 'elem', type: 'choice', label: 'Elemento da magia (dá para trocar durante a fase)', opts: ELEMENTS.map(e => e.icon + ' ' + e.name), when: c => c.cls === 'mago' && Creator.mode === 'edit' && !Creator.wardrobe },
   ] },
 ];
 const POSE_LIST = {
@@ -74,6 +85,7 @@ function banner(title, sub = '', ms = 2200) {
 }
 function show(name) {
   $$('.screen').forEach(s => s.classList.toggle('on', s.id === 's-' + name));
+  Mapa.on = name === 'levels';
   document.body.classList.toggle('playing', name === null);
 }
 function hideScreens() { show(null); }
@@ -93,30 +105,17 @@ function goTitle() { Net.toLobby(); Local.on = false; Game.mode = 'menu'; Input.
 function goLevels() {
   Net.toLobby();
   Game.mode = 'menu'; Input.enabled = false;
-  const list = $('#lv-list'); list.innerHTML = '';
-  let world = 0, next = null;
-  LEVELS.forEach((lv, i) => {
-    if (lv.world !== world) {                       // título de cada mundo
-      world = lv.world;
-      const h = Object.assign(document.createElement('h3'), { className: 'lv-world', textContent: `Mundo ${world} · ${WORLDS[world]}` });
-      if (i + 1 > Game.save.unlocked) h.classList.add('off');
-      list.appendChild(h);
-    }
-    const b = document.createElement('button'), best = Game.save.best[lv.id], locked = i + 1 > Game.save.unlocked;
-    b.className = 'lv' + (lv.boss ? ' boss' : ''); b.disabled = locked;
-    const stars = best ? '★'.repeat(best.stars) + '<i>' + '★'.repeat(3 - best.stars) + '</i>' : '<i>★★★</i>';
-    const sub = locked ? '🔒 Complete a fase anterior' : best ? 'Moedas: ' + best.coins : lv.boss ? (i === LEVELS.length - 1 ? 'Chefe final' : 'Chefe do mundo') : 'Nova!';
-    b.innerHTML = `<span class="n">${lv.boss ? '☠' : lv.wn + '-' + lv.ln}</span><span class="t">${lv.name}<br><small>${sub}</small></span><span class="st">${stars}</span>`;
-    b.addEventListener('click', () => { Snd.init(); Snd.sfx('click'); beginLevel(i); });
-    if (!locked && !best && !next) next = b;
-    list.appendChild(b);
-  });
+  // a seleção de fases é o mapa do mundo (js/mapa.js): o herói fica na fase escolhida e anda pela trilha até a próxima
+  openMap();
   show('levels');
-  if (next) next.scrollIntoView({ block: 'center' });      // rola até a próxima fase a jogar
+  mapLayout();
+  const b = $$('#map-inner .map-node')[Mapa.sel];
+  if (b && !document.body.classList.contains('touch')) b.focus({ preventScroll: true });   // Enter já começa; ← → escolhem
 }
 function beginLevel(i) {
   if (Net.role === 'client') return;                 // no multiplayer quem escolhe a fase é o anfitrião
   if (!Game.save.char) { openHeroes('play'); return; }
+  Mapa.at = i; Mapa.hero = Game.save.cur;            // ao voltar ao mapa, o herói sai desta fase
   hideScreens();
   if (Net.role === 'host') { Net.roster[0].ch = Game.save.char; Net.roster[0].b = myBuild(); startLevel(i, Net.roster, 0); }
   else if (Local.on) startLevel(i, localRoster(), 0);
@@ -150,7 +149,34 @@ function pauseGame() {
   $('#b-restart').style.display = Net.role === 'client' ? 'none' : '';
   $('#b-quit').textContent = Net.role === 'client' ? 'Sair da sala' : 'Sair para o menu';
   $('#b-chatsz').style.display = Net.role ? '' : 'none';
+  elemLabel();
   show('pause');
+}
+// ---------- Elemento da magia do mago ----------
+// Botão da pausa: mostra o elemento atual do herói deste aparelho (só para magos) e troca ao clicar
+function elemLabel() {
+  const p = Game.world && Game.world.p, mago = !!p && p.cls.id === 'mago', el = mago && ELEMENTS[p.elem || 0];
+  $('#b-elem').style.display = mago ? '' : 'none';
+  if (mago) $('#b-elem').textContent = `${el.icon} Magia: ${el.name} (trocar)`;
+}
+function elemButton() {
+  const w = Game.world, p = w && w.p;
+  if (!p || p.cls.id !== 'mago') return;
+  if (Net.role === 'client') { Input.pressed.elem = true; setTimeout(elemLabel, 350); }   // quem troca é o anfitrião: vai como um toque de botão
+  else { asOwner(p, () => cycleElem(w, p)); elemSync(w); elemLabel(); }
+}
+// Chamado a cada quadro: quando o elemento do herói deste aparelho muda (tecla, botão ou pausa), atualiza o botão de
+// toque e guarda a escolha no herói salvo (menos se o jogador 1 do multiplayer local estiver com um personagem pronto)
+function elemSync(w) {
+  const p = w && w.p;
+  if (!p || p.cls.id !== 'mago' || p.elem === undefined || w.elemSeen === p.elem) return;
+  const first = w.elemSeen === undefined;
+  w.elemSeen = p.elem;
+  $('#tb-el').style.borderColor = ELEMENTS[p.elem].col;
+  const img = $('#tb-a img'); if (img) img.src = skillIcon(p, 0).toDataURL();
+  if (first) return;
+  const sv = Game.save.char, own = !Local.on || (Local.slots[0] && Local.slots[0].pick < 0);
+  if (own && sv && sv.cls === 'mago' && sv.elem !== p.elem) { sv.elem = p.elem; persist(); }
 }
 function resumeGame() { if (Game.mode !== 'pause') return; Creator.wardrobe = false; hideScreens(); Game.mode = 'play'; Input.enabled = true; Input.clear(); }
 
@@ -164,6 +190,8 @@ function setupTouch(p) {
     b.appendChild(Object.assign(document.createElement('i'), { className: 'cd' }));
     if (p.cost[i]) b.appendChild(Object.assign(document.createElement('small'), { textContent: p.cost[i] }));
   });
+  // mago: botão que troca o elemento da magia
+  const elb = $('#tb-el'); elb.hidden = p.cls.id !== 'mago'; elb.style.borderColor = p.cls.id === 'mago' ? ELEMENTS[p.elem || 0].col : '';
   // botão de agachar mostra o próprio herói agachado
   const dn = $('#touch .down');
   if (dn) { dn.innerHTML = ''; const img = new Image(); img.src = p.spr.get('crouch', 0).toDataURL(); img.alt = 'Agachar'; dn.append(img, Object.assign(document.createElement('small'), { textContent: 'AGACHAR' })); }
@@ -292,7 +320,8 @@ function renderPanel() {
         b.className = 'card' + (ch.cls === id ? ' on' : '');
         const hp = '❤'.repeat(c.hp) + (c.mana ? ' · mana' : '');
         b.innerHTML = `<h3>${c.icon} ${c.name}</h3><p>${c.desc}<br>${hp}</p><ul>${c.skills.map(s => `<li><b>${s.key}</b> ${s.name}<span>${s.desc}</span></li>`).join('')}</ul>`;
-        b.onclick = () => { ch.cls = id; Snd.sfx('click'); changed(true); };
+        // trocar de classe veste o herói com o visual de referência dela (dá para mudar tudo nas outras abas)
+        b.onclick = () => { Object.assign(ch, lookOf(id, ch.body | 0), { name: ch.name, elem: ch.elem, height: ch.height, build: ch.build, face: ch.face }); Snd.sfx('click'); changed(true); };
         grid.appendChild(b);
       }
       box.appendChild(grid);
@@ -333,7 +362,7 @@ function randomChar() {
   const pick = a => a[(Math.random() * a.length) | 0], ri = n => (Math.random() * n) | 0;
   const c = Creator.ch;
   Object.assign(c, {
-    elem: crLocked() ? c.elem : ri(3), height: ri(3), build: ri(3), skin: pick(PAL.skin), face: ri(OPTS.faces.length), eyes: pick(PAL.eyes),
+    elem: crLocked() ? c.elem : ri(3), body: ri(OPTS.bodies.length), height: ri(3), build: ri(3), skin: pick(PAL.skin), face: ri(OPTS.faces.length), eyes: pick(PAL.eyes),
     hair: ri(OPTS.hairs.length), hairColor: pick(PAL.hair), outfit: ri(OPTS.outfits.length), primary: pick(PAL.cloth), secondary: pick(PAL.cloth),
     head: Math.random() < 0.5 ? 0 : 1 + ri(OPTS.heads.length - 1), headColor: pick(PAL.cloth), cape: ri(3), capeColor: pick(PAL.cloth),
     acc: Math.random() < 0.5 ? 0 : 1 + ri(OPTS.accs.length - 1), accColor: pick(PAL.cloth), weaponColor: pick(PAL.metal), accent: pick(PAL.accent),
@@ -361,7 +390,7 @@ function saveCharacter() {
   Creator.ch.name = ($('#cr-name').value.trim() || 'Herói').slice(0, 14);
   if (Creator.wardrobe) { applyWardrobe(); return; }
   if (Creator.mode === 'edit') {
-    Game.save.char = { ...Creator.ch, cls: Game.save.char.cls, elem: Game.save.char.elem }; persist(); Game.titleSpr = null;
+    Game.save.char = { ...Creator.ch, cls: Game.save.char.cls }; persist(); Game.titleSpr = null;
     if (upFrom === 'heroes') openHeroes(heroFrom); else openUpgrades(upFrom);
     return;
   }
@@ -739,7 +768,9 @@ click('#b-sound2', toggleSound);
 click('#b-lv-back', () => { if (Net.role === 'host') openRoom(); else if (Local.on) openLocal(); else goTitle(); });
 click('#b-random', randomChar);
 click('#b-cr-back', creatorBack);
+click('#b-map-play', mapPlay);
 click('#b-wardrobe', openWardrobe);
+click('#b-elem', elemButton);
 click('#b-chatsz', () => setChatSize(((Game.save.chatSize === undefined ? 1 : Game.save.chatSize) + 1) % CHAT_SIZES.length));
 click('#b-cr-done', saveCharacter);
 click('#b-next', () => beginLevel(Game.world.idx + 1));
@@ -868,6 +899,8 @@ function frame(now) {
   } else {
     acc = 0; renderTitle(Game.t);
   }
+  if (Mapa.on) mapFrame(dt);                               // mapa do mundo: herói andando pela trilha
+  if (Game.world) elemSync(Game.world);
   if (Creator.wardrobe) drawPreview(Game.t);             // trocando de roupa na pausa
   if (Previews.length) drawPreviews(Game.t);             // retratos da seleção de heróis / Meu personagem
 }

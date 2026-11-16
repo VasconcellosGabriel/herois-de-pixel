@@ -10,31 +10,36 @@
 const PACK_ROWS = [['idle', 5], ['run', 8], ['jump', 3], ['land', 1], ['crouch', 5], ['atk', 4], ['cast', 3], ['block', 1], ['hurt', 1], ['dash', 1], ['glide', 2], ['aim', 12], ['tuck', 1]];
 const PACK_CELL = 96, PACK_COLS = 12;
 // ordem de empilhamento (de trás para a frente)
-const PACK_SLOTS = ['asas', 'capa', 'cabelo_tras', 'costas', 'braco_tras', 'pernas', 'tronco', 'capa_fecho', 'cachecol', 'cabeca', 'cabelo_frente', 'chifres', 'acessorio', 'chapeu', 'capuz_ombro', 'arma', 'braco_frente'];
+const PACK_SLOTS = LAYER_ORDER;
 const slugOf = s => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '');
-const PACK_ALT = OPTS.heights.map(slugOf), PACK_FIS = OPTS.builds.map(slugOf), PACK_LEG = [9, 11, 14];
+const PACK_ALT = OPTS.heights.map(slugOf), PACK_FIS = OPTS.builds.map(slugOf), PACK_LEG = LEG_HS;
+const PACK_HUM = ['guerreiro', 'mago', 'arqueiro'];
 
 // Camadas de um herói: { slot, file, shift }. shift = a folha foi desenhada para a altura "Alto" e só desce
 // com a altura escolhida (tudo da cintura para cima; as pernas têm uma folha por altura).
+// O corpo (pernas, tronco, cabeça, cabelo, chapéu, capa) é o mesmo para guerreiro, mago e arqueiro; o que muda com
+// a classe são os braços (cada uma segura a arma de um jeito), a arma e o que vai nas costas.
 function packParts(ch) {
-  const fam = ch.cls === 'dragonico' ? 'dragonico' : 'humano', b = PACK_FIS[ch.build | 0], out = [];
+  const fam = ch.cls === 'dragonico' ? 'dragonico' : 'humano', cls = fam === 'humano' && !PACK_HUM.includes(ch.cls) ? 'guerreiro' : ch.cls;
+  const b = PACK_FIS[ch.build | 0], fem = ch.body === 1 ? '_f' : '', braco = fam === 'humano' ? '_' + cls : '', out = [];
   const add = (slot, file, shift = true) => out.push({ slot, file: fam + '/' + file, shift });
   const roupa = slugOf(OPTS.outfits[ch.outfit | 0]);
   if (fam === 'dragonico') add('asas', 'asas_' + b);
   if (ch.cape) { add('capa', 'capa/' + slugOf(OPTS.capes[ch.cape]) + '_' + b); add('capa_fecho', 'capa/fecho_' + b); }
   if (ch.hair) { add('cabelo_tras', 'cabelo/' + slugOf(OPTS.hairs[ch.hair]) + '_tras'); add('cabelo_frente', 'cabelo/' + slugOf(OPTS.hairs[ch.hair]) + '_frente'); }
-  if (ch.cls === 'guerreiro' || ch.cls === 'arqueiro') add('costas', 'costas/' + ch.cls + '_' + b);
-  add('braco_tras', 'roupa/' + roupa + '_' + b + '_braco_tras');
-  add('pernas', 'pernas/' + PACK_ALT[ch.height | 0] + '_' + b, false);
-  add('tronco', 'roupa/' + roupa + '_' + b + '_tronco');
+  if (cls === 'guerreiro' || cls === 'arqueiro') add('costas', 'costas/' + cls + '_' + b);
+  add('braco_tras', 'roupa/' + roupa + '_' + b + '_braco_tras' + braco);
+  add('pernas', 'pernas/' + roupa + '_' + PACK_ALT[ch.height | 0] + '_' + b, false);
+  add('tronco', 'roupa/' + roupa + '_' + b + fem + '_tronco');
   if (ch.acc === 5) add('cachecol', 'acessorio/cachecol_' + b);
-  add('cabeca', 'rosto/' + slugOf(OPTS.faces[ch.face | 0]));
+  else if (cls === 'guerreiro') add('cachecol', 'acessorio/lenco_guerreiro');
+  add('cabeca', 'rosto/' + slugOf(OPTS.faces[ch.face | 0]) + fem);
   if (fam === 'dragonico') add('chifres', 'chifres');
   if (ch.acc >= 1 && ch.acc <= 4) add('acessorio', 'acessorio/' + slugOf(OPTS.accs[ch.acc]));
   if (ch.head) add('chapeu', 'chapeu/' + slugOf(OPTS.heads[ch.head]));
-  if (ch.head === 7) add('capuz_ombro', 'chapeu/capuz_ombros_' + b);
-  if (fam === 'humano') add('arma', 'arma/' + ch.cls);
-  add('braco_frente', 'roupa/' + roupa + '_' + b + '_braco_frente');
+  if (ch.head === 7) { add('capuz_ombro', 'chapeu/capuz_ombros_' + b); add('capuz_braco', 'chapeu/capuz_braco'); }
+  if (fam === 'humano') add('arma', 'arma/' + cls);
+  add('braco_frente', 'roupa/' + roupa + '_' + b + '_braco_frente' + braco);
   return out.sort((x, y) => PACK_SLOTS.indexOf(x.slot) - PACK_SLOTS.indexOf(y.slot));
 }
 
@@ -84,7 +89,7 @@ function packLut(ch) {
 const DEF_COLORS = { skin: '#f1c27d', hairColor: '#5a3825', primary: '#3b6fd6', secondary: '#8a5a2b', accent: '#ffd23f', weaponColor: '#dfe6f0', headColor: '#9aa5b1', capeColor: '#c0392b', eyes: '#2b6cb0' };
 
 function packChar(ch, pose, f) {
-  if (!Pack.on) return null;
+  if (!Pack.on || RIG) return null;                                  // no rig (?rig) o herói é montado por drawChar + js/rig.js
   if (pose === 'roll' || pose === 'flip') {
     const base = packChar(ch, 'tuck', 0);
     return base && rotated(base, pose === 'roll' ? f : -f, CX, FEET - 24);
@@ -95,17 +100,32 @@ function packChar(ch, pose, f) {
   if (!packNeed(parts.map(p => p.file))) return null;               // ainda baixando: desenha por código por enquanto
   const c = mk(PACK_CELL, PACK_CELL), g = c.getContext('2d'), dy = PACK_LEG[2] - PACK_LEG[ch.height | 0];
   let any = false;
+  // cabelo debaixo de chapéu, elmo ou capuz: as folhas têm o cabelo inteiro; aqui some o que ficaria para fora
+  const cover = HAT_COVERS[ch.head] || 0, fr = cover ? heroFrame(ch, pose, f) : null, clip = cover ? hairClip(cover, fr.hx0, fr.hy) : null;
+  // guarda de qual camada é cada pixel, para o traço de contato entre camadas (occlude, em sprites.js)
+  const ids = new Uint8Array(PACK_CELL * PACK_CELL), tc = mk(PACK_CELL, PACK_CELL), tg = tc.getContext('2d', { willReadFrequently: true });
   for (const p of parts) {
     const im = Pack.img[p.file];
     if (!im) continue;
-    g.drawImage(im, f * PACK_CELL, row * PACK_CELL, PACK_CELL, PACK_CELL, 0, p.shift ? dy : 0, PACK_CELL, PACK_CELL);
+    tg.clearRect(0, 0, PACK_CELL, PACK_CELL);
+    tg.drawImage(im, f * PACK_CELL, row * PACK_CELL, PACK_CELL, PACK_CELL, 0, p.shift ? dy : 0, PACK_CELL, PACK_CELL);
+    let a, td;
+    try { td = tg.getImageData(0, 0, PACK_CELL, PACK_CELL); a = td.data; }
+    catch (e) { Pack.on = false; Pack.gen++; return null; }          // jogo aberto direto do arquivo (file://): o navegador não deixa ler os PNGs
+    if (clip && HAIR_LAYERS.has(p.slot)) {
+      for (let y = 0; y < PACK_CELL; y++) for (let x = 0; x < PACK_CELL; x++) if (!clip(x, y)) a[(y * PACK_CELL + x) * 4 + 3] = 0;
+      tg.putImageData(td, 0, 0);
+    }
+    const lid = LAYER_ORDER.indexOf(p.slot) + 1;
+    for (let j = 0; j < ids.length; j++) if (a[j * 4 + 3]) ids[j] = lid;
+    g.drawImage(tc, 0, 0);
     any = true;
   }
   if (!any) return null;
   // troca as cores-chave pelas cores do personagem
   let id;
   try { id = g.getImageData(0, 0, PACK_CELL, PACK_CELL); }
-  catch (e) { Pack.on = false; Pack.gen++; return null; }          // jogo aberto direto do arquivo (file://): o navegador não deixa ler os PNGs
+  catch (e) { Pack.on = false; Pack.gen++; return null; }
   const d = id.data, L = packLut(ch);
   for (let i = 0; i < d.length; i += 4) {
     if (!d[i + 3]) continue;
@@ -114,8 +134,9 @@ function packChar(ch, pose, f) {
     const t = L[k.i], j = Math.round(k.v * 255) * 3;
     d[i] = t[j]; d[i + 1] = t[j + 1]; d[i + 2] = t[j + 2];
   }
+  occlude(d, ids, PACK_CELL, PACK_CELL);
   g.putImageData(id, 0, 0);
-  return outline(c, INK);
+  return heroFinish(c, ids, ch);
 }
 
 // ---------- Exportação das folhas-base (usada por tools/exportar-sprites.js) ----------
@@ -139,11 +160,15 @@ function exportPack() {
   };
   KEYMODE = true;
   try {
-    for (const cls of ['guerreiro', 'dragonico']) {
-      const base = { ...DEFAULT_CHAR, ...keyCh, cls, height: 2, build: 1, hair: 0, head: 0, cape: 0, acc: 0, outfit: 0, face: 0 };
+    for (const cls of ['mago', 'dragonico']) {         // 'mago' = corpo humano sem as peças próprias de uma classe
+      const base = { ...DEFAULT_CHAR, ...keyCh, cls, body: 0, height: 2, build: 1, hair: 0, head: 0, cape: 0, acc: 0, outfit: 0, face: 0 };
+      const classes = cls === 'dragonico' ? ['dragonico'] : PACK_HUM;
       for (let b = 0; b < 3; b++) {
-        for (let h = 0; h < 3; h++) job(base, { height: h, build: b }, 'pernas');
-        for (let o = 0; o < OPTS.outfits.length; o++) for (const s of ['braco_tras', 'tronco', 'braco_frente']) job(base, { outfit: o, build: b }, s);
+        for (let o = 0; o < OPTS.outfits.length; o++) {
+          for (let h = 0; h < 3; h++) job(base, { outfit: o, height: h, build: b }, 'pernas');
+          for (let k = 0; k < OPTS.bodies.length; k++) job(base, { outfit: o, build: b, body: k }, 'tronco');
+          for (const c2 of classes) for (const s of ['braco_tras', 'braco_frente']) job(base, { cls: c2, outfit: o, build: b }, s);
+        }
         for (let k = 1; k < OPTS.capes.length; k++) job(base, { cape: k, build: b }, 'capa');
         job(base, { cape: 1, build: b }, 'capa_fecho');
         job(base, { acc: 5, build: b }, 'cachecol');
@@ -151,12 +176,13 @@ function exportPack() {
         if (cls === 'dragonico') job(base, { build: b }, 'asas');
         else for (const c2 of ['guerreiro', 'arqueiro']) job(base, { cls: c2, build: b }, 'costas');
       }
-      for (let k = 0; k < OPTS.faces.length; k++) job(base, { face: k }, 'cabeca');
+      for (let k = 0; k < OPTS.faces.length; k++) for (let j = 0; j < OPTS.bodies.length; j++) job(base, { face: k, body: j }, 'cabeca');
       for (let k = 1; k < OPTS.hairs.length; k++) { job(base, { hair: k }, 'cabelo_tras'); job(base, { hair: k }, 'cabelo_frente'); }
       for (let k = 1; k <= 4; k++) job(base, { acc: k }, 'acessorio');
       for (let k = 1; k < OPTS.heads.length; k++) job(base, { head: k }, 'chapeu');
+      job(base, { head: 7 }, 'capuz_braco');
       if (cls === 'dragonico') job(base, {}, 'chifres');
-      else for (const c2 of ['guerreiro', 'mago', 'arqueiro']) job(base, { cls: c2 }, 'arma');
+      else { job(base, { cls: 'guerreiro' }, 'cachecol'); for (const c2 of PACK_HUM) job(base, { cls: c2 }, 'arma'); }
     }
   } finally { KEYMODE = false; }
   // paleta-chave de referência para o artista (cada linha um canal, do escuro ao claro)

@@ -34,20 +34,29 @@ h2 { font-size: clamp(12px, 2.6vw, 18px); margin: 0 0 10px; color: var(--acc); }
 .row { display: flex; gap: 10px; justify-content: center; margin-top: 10px; flex-wrap: wrap; }
 .row.end { justify-content: space-between; }
 
-/* ---------- Fases ---------- */
-#lv-list { display: grid; gap: 10px; min-width: min(480px, 80vw); }
-.lv { display: flex; align-items: center; gap: 14px; padding: 12px 14px; background: var(--panel2); border: 3px solid var(--line); cursor: pointer; text-align: left; font: inherit; color: var(--ink); }
-.lv:hover:not(:disabled) { background: #4a3c70; }
-.lv:disabled { opacity: .45; cursor: not-allowed; }
-.lv .n { font-size: 20px; color: var(--acc); width: 28px; }
-.lv .t { flex: 1; line-height: 1.7; font-size: 10px; }
-.lv .t small { color: var(--mute); font-size: 8px; }
-.lv .st { color: var(--acc); font-size: 14px; letter-spacing: 2px; white-space: nowrap; }
-.lv .n { white-space: nowrap; font-size: 14px; min-width: 40px; width: auto; }
-.lv.boss { border-color: #a8424a; background: #3a2236; }
-.lv-world { margin: 10px 0 0; font-size: 11px; color: var(--acc); letter-spacing: 1px; border-bottom: 3px solid var(--line); padding-bottom: 6px; }
-.lv-world:first-child { margin-top: 0; }
-.lv-world.off { opacity: .45; }
+/* ---------- Fases: mapa do mundo (js/mapa.js) ---------- */
+.panel.map { width: min(1120px, 96vw); padding: 14px 16px; display: flex; flex-direction: column; gap: 10px; }
+.panel.map h2 { margin: 0; text-align: center; }
+.panel.map .row { margin-top: 0; }
+.panel.map .hint { margin: 0; text-align: center; }
+#map-scroll { overflow-x: auto; overflow-y: hidden; border: 4px solid var(--line); background: #1d3f76; scrollbar-color: #5b3fd1 var(--line); }
+#map-inner { position: relative; width: max-content; margin: 0 auto; line-height: 0; }
+#map-cv { display: block; image-rendering: pixelated; image-rendering: crisp-edges; }
+/* botões invisíveis em cima dos pontos das fases (o desenho é do canvas) */
+.map-node { position: absolute; width: 1.6%; height: 13%; transform: translate(-50%, -50%); background: transparent; border: 0; padding: 0; border-radius: 50%; cursor: pointer; }
+.map-node.boss { width: 1.9%; height: 16%; }
+.map-node:disabled { cursor: not-allowed; }
+.map-node:focus { outline: none; }
+.map-world { position: absolute; top: 4%; transform: translateX(-50%); font-size: calc(4.5px * var(--ms, 2)); line-height: 1; color: #fff3c4; white-space: nowrap; pointer-events: none; text-shadow: 1px 1px 0 #14101e, -1px 1px 0 #14101e, 1px -1px 0 #14101e, -1px -1px 0 #14101e, 0 2px 0 #14101e; }
+.map-world.off { color: #8a84a4; }
+.panel.map .hint { max-width: none; }
+#map-info { display: flex; align-items: center; justify-content: space-between; gap: 12px; background: var(--panel2); border: 3px solid var(--line); padding: 8px 12px; }
+#map-info .mi-t { display: flex; flex-direction: column; gap: 6px; min-width: 0; text-align: left; }
+#map-info b { font-size: 12px; color: var(--acc); line-height: 1.5; }
+#map-info small { font-size: 8px; color: var(--mute); line-height: 1.6; }
+#map-info .st { color: var(--acc); font-size: 12px; letter-spacing: 2px; margin: 0 6px; white-space: nowrap; }
+#map-info .st i { color: #5b4f80; font-style: normal; }
+#map-info .btn { min-width: 150px; flex: none; }
 /* ---------- Multiplayer local ---------- */
 #lc-slots { display: grid; gap: 8px; min-width: min(560px, 88vw); }
 .lc-slot { display: flex; align-items: center; gap: 10px; padding: 8px 10px; background: var(--panel2); border: 3px solid var(--line); text-align: left; }
@@ -58,7 +67,6 @@ h2 { font-size: clamp(12px, 2.6vw, 18px); margin: 0 0 10px; color: var(--acc); }
 .lc-info small { color: var(--mute); font-size: 8px; }
 .lc-wait { flex: 1; font-size: 8px; color: var(--mute); }
 .lc-slot .btn.small { padding: 6px 9px; }
-.lv .st i { color: #5b4f80; font-style: normal; }
 
 /* ---------- Criador ---------- */
 .creator { display: flex; gap: 14px; background: var(--panel); border: 4px solid var(--line); box-shadow: 0 0 0 4px var(--panel2); padding: 14px; width: min(880px, 98vw); max-height: 96vh; }
@@ -117,6 +125,9 @@ body.touch.playing #touch { display: block; }
 #tb-b { right: 76px; bottom: 98px; width: 66px !important; height: 66px !important; }
 #tb-c { right: 0; bottom: 100px; width: 64px !important; height: 64px !important; }
 #tb-sp { right: 166px; bottom: 100px; width: 58px !important; height: 58px !important; }
+/* mago: troca o elemento da magia (a borda mostra a cor do elemento atual) */
+#tb-el { right: 190px; bottom: 26px; width: 50px !important; height: 50px !important; font-size: 20px !important; }
+#tb-el[hidden] { display: none; }
 /* ícone da habilidade no próprio botão + recarga enchendo de baixo para cima */
 #touch .sk img { width: 62%; height: 62%; image-rendering: pixelated; position: relative; z-index: 1; vertical-align: middle; }
 #touch .sk .cd { position: absolute; left: 0; right: 0; top: 0; height: 0; background: rgba(10, 6, 16, .62); z-index: 2; }
@@ -142,7 +153,7 @@ body.touch.playing #touch { display: block; }
   .panel { padding: 10px 14px; gap: 6px; } h1 { font-size: 22px; } .btn { padding: 7px 12px; font-size: 10px; } .btn.big { font-size: 12px; padding: 9px 14px; }
   .creator { padding: 8px; gap: 8px; } .cr-left { width: 150px; } .cr-left canvas { width: 120px; height: 120px; }
   .tab { padding: 6px 7px; font-size: 8px; } .chip { padding: 5px 7px; font-size: 8px; } .sw button { width: 22px; height: 22px; }
-  .lv { padding: 8px 10px; } #lv-list { gap: 6px; }
+  .panel.map { padding: 8px 10px; gap: 6px; } .panel.map .hint { display: none; } #map-info { padding: 5px 8px; } #map-info b { font-size: 10px; } #map-info .btn { min-width: 110px; }
 }
 @media (max-width: 640px) { .creator { flex-direction: column; overflow: auto; } .cr-left { width: 100%; } .cls { grid-template-columns: 1fr; } }
 

@@ -32,8 +32,10 @@ function rgbToHex(r, g, b) {
 // Modo cor-chave (exportação das folhas PNG recoloríveis, ver js/spritepack.js): os tons de uma cor-chave
 // mudam só o brilho, para o jogo saber depois qual cor do personagem pintar ali
 let KEYMODE = false;
+// Protótipo do rig de recortes (js/rig.js): heróis montados com peças desenhadas uma vez. Para ver: ?rig na URL.
+let RIG = typeof location !== 'undefined' && /[?&]rig/.test(location.search);
 // Versão do jogo (aparece no menu inicial). Ao publicar, suba junto com o CACHE do sw.js.
-const VERSAO = 14;
+const VERSAO = 20;
 // amt < 0 escurece, amt > 0 clareia (-1..1)
 function shade(hex, amt) {
   if (KEYMODE) { const k = keyOf(hex); if (k) return keyHex(k.h, amt < 0 ? k.v * (1 + amt) : k.v + (1 - k.v) * amt); }
@@ -348,19 +350,19 @@ const Input = {
 const ACTIONS = [
   ['left', 'Mover para a esquerda'], ['right', 'Mover para a direita'], ['jump', 'Pular / planar'], ['down', 'Agachar / descer da plataforma'],
   ['a', 'Habilidade 1'], ['b', 'Habilidade 2'], ['c', 'Habilidade 3 (escudo / esquiva / cura / mergulho)'], ['special', 'Ataque especial'],
-  ['aimup', 'Mirar para cima'], ['aimdown', 'Mirar para baixo'], ['pause', 'Pausar'],
+  ['aimup', 'Mirar para cima'], ['aimdown', 'Mirar para baixo'], ['elem', 'Trocar o elemento da magia (mago)'], ['pause', 'Pausar'],
 ];
 const BIND_VERSION = 2;                         // mudou o padrão: controles salvos antes disso voltam ao novo padrão
 const BIND_PRESETS = {
   padrao: { label: 'Padrão (WASD/setas + J K · Q esquiva · E especial)', keys: {
     left: ['ArrowLeft', 'KeyA'], right: ['ArrowRight', 'KeyD'], jump: ['Space', 'ArrowUp'], down: ['ArrowDown', 'KeyS'],
     a: ['KeyJ', 'KeyZ'], b: ['KeyK', 'KeyX'], c: ['KeyQ', 'KeyL'], special: ['KeyE', 'KeyC'],
-    aimup: ['KeyI', 'KeyR'], aimdown: ['KeyO', 'KeyF'], pause: ['Escape', 'KeyP'] },
+    aimup: ['KeyI', 'KeyR'], aimdown: ['KeyO', 'KeyF'], elem: ['KeyG', 'KeyV'], pause: ['Escape', 'KeyP'] },
     mouse: { 0: 'a', 2: 'b', 1: 'special' } },
   mouse: { label: 'WASD + mouse (Q esquiva/escudo · E especial · 1 2 3 4)', keys: {
     left: ['KeyA', 'ArrowLeft'], right: ['KeyD', 'ArrowRight'], jump: ['Space', 'KeyW'], down: ['KeyS', 'ArrowDown'],
     a: ['Digit1', 'KeyJ'], b: ['Digit2', 'KeyK'], c: ['KeyQ', 'Digit3'], special: ['KeyE', 'Digit4'],
-    aimup: ['KeyR', ''], aimdown: ['KeyF', ''], pause: ['Escape', 'KeyP'] },
+    aimup: ['KeyR', ''], aimdown: ['KeyF', ''], elem: ['KeyG', 'KeyV'], pause: ['Escape', 'KeyP'] },
     mouse: { 0: 'a', 2: 'b', 1: 'special' } },
 };
 const Binds = { keys: {}, mouse: {} };
@@ -368,7 +370,10 @@ let KEYMAP = {};
 function setBinds(src) {
   const base = BIND_PRESETS.padrao;
   Binds.keys = {}; Binds.mouse = { ...base.mouse, ...((src && src.mouse) || {}) };
-  for (const [act] of ACTIONS) { const v = (src && src.keys && src.keys[act]) || base.keys[act]; Binds.keys[act] = [v[0] || '', v[1] || '']; }
+  const novas = [];
+  for (const [act] of ACTIONS) { const sv = src && src.keys && src.keys[act], v = sv || base.keys[act]; Binds.keys[act] = [v[0] || '', v[1] || '']; if (!sv && src && src.keys) novas.push(act); }
+  // ação que não existia quando os controles foram salvos: não toma uma tecla que o jogador já usa em outra ação
+  for (const act of novas) Binds.keys[act] = Binds.keys[act].map(c => c && ACTIONS.some(([o]) => o !== act && Binds.keys[o].includes(c)) ? '' : c);
   KEYMAP = {};
   for (const [act] of ACTIONS) for (const code of Binds.keys[act]) if (code) KEYMAP[code] = act;
 }
@@ -524,9 +529,9 @@ const PAD_BTN = ['A', 'B', 'X', 'Y', 'LB', 'RB', 'LT', 'RT', 'Select', 'Start', 
 const padName = i => i === undefined || i < 0 ? '—' : PAD_BTN[i] || 'Botão ' + i;
 const PAD_ACTIONS = [
   ['jump', 'Pular / planar'], ['down', 'Agachar / descer da plataforma'], ['a', 'Habilidade 1'], ['b', 'Habilidade 2'],
-  ['c', 'Habilidade 3 (escudo / esquiva / cura / mergulho)'], ['special', 'Ataque especial'], ['pause', 'Pausar'],
+  ['c', 'Habilidade 3 (escudo / esquiva / cura / mergulho)'], ['special', 'Ataque especial'], ['elem', 'Trocar o elemento da magia (mago)'], ['pause', 'Pausar'],
 ];
-const PAD_DEFAULT = { jump: [0, -1], down: [13, -1], a: [2, -1], b: [3, -1], c: [1, 4], special: [5, 7], pause: [9, -1] };
+const PAD_DEFAULT = { jump: [0, -1], down: [13, -1], a: [2, -1], b: [3, -1], c: [1, 4], special: [5, 7], elem: [6, -1], pause: [9, -1] };
 // sens: 1 (mira gira devagar) a 10 (instantânea) · dead: zona morta dos analógicos · invY: inverte a mira vertical
 const PadCfg = { map: {}, sens: 7, dead: 0.3, invY: false, rumble: true };
 function setPadCfg(src) {

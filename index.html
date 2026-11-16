@@ -28,6 +28,7 @@
   </div>
   <div class="pad pr">
     <button data-k="special" id="tb-sp" class="sp"><b></b><span>★</span></button>
+    <button data-k="elem" id="tb-el" class="el" hidden><span>↻</span></button>
     <button data-k="c" id="tb-c" class="sk"></button>
     <button data-k="b" id="tb-b" class="sk"></button>
     <button data-k="a" id="tb-a" class="sk"></button>
@@ -58,7 +59,7 @@
     <button class="btn" id="b-create">🧙 Meu personagem</button>
     <button class="btn" id="b-controls">⌨ Controles</button>
     <button class="btn small" id="b-sound">🔊 Som: ligado</button>
-    <p class="hint">Setas/WASD mover · S/↓ agachar · Espaço pular · J / K habilidades (ou mouse) · Q esquiva/escudo · E especial · Esc pausa · Controle (gamepad) também funciona</p>
+    <p class="hint">Setas/WASD mover · S/↓ agachar · Espaço pular · J / K habilidades (ou mouse) · Q esquiva/escudo · E especial · G troca o elemento (mago) · Esc pausa · Controle (gamepad) também funciona</p>
     <p class="ver" id="ver"></p>
   </div>
 </section>
@@ -75,10 +76,16 @@
 
 <!-- Seleção de fase -->
 <section id="s-levels" class="screen">
-  <div class="panel">
-    <h2>Escolha a fase</h2>
-    <div id="lv-list"></div>
+  <!-- mapa do mundo: o herói anda pela trilha até a fase escolhida (js/mapa.js) -->
+  <div class="panel map">
+    <h2>Mapa do mundo</h2>
+    <div id="map-scroll"><div id="map-inner"><canvas id="map-cv" width="1820" height="216"></canvas></div></div>
+    <div id="map-info">
+      <div class="mi-t"><b id="map-name"></b><small id="map-sub"></small></div>
+      <button class="btn big" id="b-map-play">▶ Jogar</button>
+    </div>
     <div class="row"><button class="btn small" id="b-lv-back">← Voltar</button><button class="btn small" id="b-lv-up">🧙 Meu personagem</button></div>
+    <p class="hint">Clique num ponto (ou use as setas) para o herói ir até a fase. Clique de novo, Enter ou Jogar para começar.</p>
   </div>
 </section>
 
@@ -248,6 +255,7 @@
     <p class="hint" id="pause-mp">Multiplayer: o jogo continua rodando para os outros!</p>
     <button class="btn big" id="b-resume">▶ Continuar</button>
     <button class="btn" id="b-restart">↺ Reiniciar fase</button>
+    <button class="btn small" id="b-elem">🔥 Magia: Fogo</button>
     <button class="btn small" id="b-wardrobe">👕 Trocar roupa</button>
     <button class="btn small" id="b-controls2">⌨ Controles</button>
     <button class="btn small" id="b-cam">📷 Câmera: Normal</button>
@@ -262,6 +270,8 @@
 <script src="js/sprites.js"></script>
 <script src="sprites/pack.js"></script>
 <script src="js/spritepack.js"></script>
+<script src="sprites_rig/pecas.js"></script>
+<script src="js/rig.js"></script>
 <script src="js/enemies.js"></script>
 <script src="js/world.js"></script>
 <script src="js/worlds.js"></script>
@@ -271,6 +281,7 @@
 <script src="js/fauna.js"></script>
 <script src="js/net.js"></script>
 <script src="js/local.js"></script>
+<script src="js/mapa.js"></script>
 <script src="js/ui.js"></script>
 </body>
 </html>

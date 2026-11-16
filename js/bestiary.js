@@ -16,15 +16,15 @@ Object.assign(ENEMIES, {
 Object.assign(BOSS_INFO, {
   yeti: { name: 'YETI ANCIAO', ban: 'Yeti Ancião', title: 'o Yeti Ancião', tip: 'Pule a lança baixa, abaixe-se da alta. Quando ele rugir ou cravar a lança, acerte a boca!',
     core: e => e.st === 'roar' || e.st === 'stuck' ? { x: cxOf(e) - 6 + e.dir * 2, y: e.y - 2, w: 14, h: 14 } : null, coreCol: () => '#9fe8ff' },
-  slimeking: { name: 'REI GOSMA', ban: 'Rei Gosma', title: 'o Rei Gosma', tip: 'A coroa é o ponto fraco. Cuidado com os filhotes!',
+  slimeking: { name: 'REI GOSMA', ban: 'Rei Gosma', title: 'o Rei Gosma', song: 'rockSlime', tip: 'A coroa é o ponto fraco. Cuidado com os filhotes!',
     core: e => ({ x: cxOf(e) - 8, y: e.y + e.h - 46, w: 14, h: 12 }), coreCol: () => '#ffe27a' },
-  scorpking: { name: 'ESCORPIAO IMPERADOR', ban: 'Escorpião Imperador', title: 'o Escorpião Imperador', tip: 'Faça-o bater na parede e ataque a cabeça!',
+  scorpking: { name: 'ESCORPIAO IMPERADOR', ban: 'Escorpião Imperador', title: 'o Escorpião Imperador', song: 'metalScorp', tip: 'Faça-o bater na parede e ataque a cabeça!',
     core: e => e.st === 'stun' ? { x: e.dir > 0 ? e.x + e.w - 18 : e.x, y: e.y - 4, w: 18, h: e.h + 4 } : null, coreCol: () => '#ffffff' },
-  magdragon: { name: 'DRAGAO DE MAGMA', ban: 'Dragão de Magma', title: 'o Dragão de Magma', tip: 'Abaixe-se do sopro e acerte o peito em brasa!',
+  magdragon: { name: 'DRAGAO DE MAGMA', ban: 'Dragão de Magma', title: 'o Dragão de Magma', song: 'metalDragon', tip: 'Abaixe-se do sopro e acerte o peito em brasa!',
     core: e => e.st === 'breath' ? { x: cxOf(e) + e.dir * 9 - 8, y: e.y + 6, w: 16, h: 16 } : null, coreCol: () => '#ffb347' },
-  vampire: { name: 'CONDE SANGUINARIO', ban: 'Conde Sanguinário', title: 'o Conde Sanguinário', tip: 'Ataque quando ele abrir a capa!', song: 'vampire',
+  vampire: { name: 'CONDE SANGUINARIO', ban: 'Conde Sanguinário', title: 'o Conde Sanguinário', tip: 'Ataque quando ele abrir a capa!', song: 'epicVampire',
     core: e => e.st === 'cast' ? { x: cxOf(e) - 7, y: e.y + 6, w: 14, h: 14 } : null, coreCol: () => '#ff3a4a' },
-  titan: { name: 'TITA DA TEMPESTADE', ban: 'Titã da Tempestade', title: 'o Titã da Tempestade', tip: 'Fuja dos raios! O núcleo brilha quando ele chama a tempestade.', song: 'final',
+  titan: { name: 'TITA DA TEMPESTADE', ban: 'Titã da Tempestade', title: 'o Titã da Tempestade', tip: 'Fuja dos raios! O núcleo brilha quando ele chama a tempestade.', song: 'epicFinal',
     core: e => e.st === 'storm' ? { x: cxOf(e) - 9, y: e.y + 10, w: 18, h: 18 } : null, coreCol: () => '#9fe8ff' },
 });
 

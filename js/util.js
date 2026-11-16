@@ -35,7 +35,7 @@ let KEYMODE = false;
 // Protótipo do rig de recortes (js/rig.js): heróis montados com peças desenhadas uma vez. Para ver: ?rig na URL.
 let RIG = typeof location !== 'undefined' && /[?&]rig/.test(location.search);
 // Versão do jogo (aparece no menu inicial). Ao publicar, suba junto com o CACHE do sw.js.
-const VERSAO = 22;
+const VERSAO = 23;
 // amt < 0 escurece, amt > 0 clareia (-1..1)
 function shade(hex, amt) {
   if (KEYMODE) { const k = keyOf(hex); if (k) return keyHex(k.h, amt < 0 ? k.v * (1 + amt) : k.v + (1 - k.v) * amt); }
@@ -197,7 +197,19 @@ function drawTextO(g, str, x, y, col = '#fff', s = 1, edge = '#1b1423') {
 
 // ---------- Áudio (sintetizado, sem arquivos) ----------
 const SONGS = {
-  menu:   { bpm: 96,  root: 220, lead: [0, -1, 4, -1, 7, -1, 4, -1, 5, -1, 9, -1, 7, -1, 4, -1], bass: [0, -1, -1, -1, 5, -1, -1, -1] },
+  // Tema de abertura heroico (Sol maior): fanfarra de 8 compassos, I–V–vi–IV / I–bVII–IV–V.
+  // chords = [fundamental, terça] por compasso; bassPat = baixo relativo ao acorde (null = pausa).
+  menu: {
+    bpm: 120, root: 196, noOct: true, crash: true,
+    lead: [
+      12, -1, 12, 16, 19, -1, -1, -1,    19, -1, 17, 16, 14, -1, 11, -1,
+      16, -1, 16, 19, 21, -1, 19, 16,    17, -1, 16, 14, 12, -1, 14, -1,
+      12, -1, 12, 16, 19, -1, 24, -1,    22, -1, 21, 19, 17, -1, -1, -1,
+      17, -1, 21, -1, 24, -1, 21, 17,    19, 21, 23, -1, 18, -1, 14, 11,
+    ],
+    chords: [[0, 4], [7, 4], [9, 3], [5, 4], [0, 4], [10, 4], [5, 4], [7, 4]],
+    bassPat: [0, null, 0, 7, 12, null, 7, null],
+  },
   forest: { bpm: 132, root: 196, lead: [0, 4, 7, 12, 7, 4, 7, -1, 9, 7, 4, 0, 2, 4, -1, -1], bass: [0, -1, 7, -1, 5, -1, 7, -1] },
   cave:   { bpm: 100, root: 165, lead: [0, 3, 7, 3, 10, 7, 3, -1, 12, 10, 7, 3, 5, 3, -1, -1], bass: [0, -1, 0, -1, -2, -1, -4, -1] },
   castle: { bpm: 116, root: 147, lead: [0, 1, 5, 1, 7, 5, 1, -1, 8, 7, 5, 1, 3, 1, -1, -1], bass: [0, 0, -1, 0, -4, -4, -2, -1] },
@@ -223,6 +235,7 @@ const Snd = (() => {
       } catch (e) { ctx = null; }
     }
     if (ctx && ctx.state === 'suspended') ctx.resume();
+    if (ctx && typeof Epic !== 'undefined') Epic.prepare(ctx.sampleRate);   // samples das músicas de chefe
     if (ctx && want && !timer) music(want);
   }
   function tone(f, d, type = 'square', vol = 0.4, slide = 0, delay = 0) {
@@ -295,29 +308,52 @@ const Snd = (() => {
     hiss:  () => { noise(0.3, 0.22); tone(2200, 0.12, 'sine', 0.06, -400); },
     clang: () => { tone(1250, 0.2, 'square', 0.2, -500); tone(1870, 0.25, 'triangle', 0.18, -800); noise(0.1, 0.3); },
   };
-  function stop() { if (timer) { clearInterval(timer); timer = null; } }
+  let epic = null;                                              // música orquestral dos chefes (js/epic.js)
+  function stop() {
+    if (timer) { clearInterval(timer); timer = null; }
+    if (epic) { epic.stop(); epic = null; }
+  }
   function music(name) {
     want = name;
     stop();
+    if (ctx && name && typeof EPIC_SONGS !== 'undefined' && EPIC_SONGS[name]) {
+      epic = Epic.start(ctx, master, EPIC_SONGS[name]);
+      timer = setInterval(() => {}, 1e9);                      // marca "tocando" para o init() não reiniciar
+      return;
+    }
     if (!ctx || !name || !SONGS[name]) return;
     song = SONGS[name]; step = 0;
     const note = n => song.root * Math.pow(2, n / 12);
     timer = setInterval(() => {
       if (muted || !ctx) return;
-      const l = song.lead[step % 16], b = song.bass[step % 8], bar = Math.floor(step / 16);
-      const oct = bar % 4 === 3 ? 2 : 1;                       // a cada 4 compassos a melodia sobe uma oitava
+      const l = song.lead[step % song.lead.length], bar = Math.floor(step / 16);
+      const ch = song.chords && song.chords[(step / 8 | 0) % song.chords.length];
+      const bp = ch && song.bassPat[step % 8];
+      const cr = ch && (ch[0] > 6 ? ch[0] - 12 : ch[0]);        // baixo sempre na região grave
+      const b = ch ? (bp == null ? -1 : cr + bp) : song.bass[step % 8];
+      const oct = !song.noOct && bar % 4 === 3 ? 2 : 1;        // a cada 4 compassos a melodia sobe uma oitava
       if (l >= 0 || l < -1) {
-        tone(note(l) * oct, 0.16, 'square', 0.06);
-        tone(note(l) * oct * 1.004, 0.2, 'triangle', 0.05);   // dobra levemente desafinada (corpo)
+        // nas músicas com acordes, notas seguidas de pausa soam sustentadas (fanfarra)
+        let hold = 1;
+        if (ch) while (hold < 4 && song.lead[(step + hold) % song.lead.length] === -1) hold++;
+        const d = 30 / song.bpm * hold;
+        tone(note(l) * oct, ch ? Math.max(0.16, d) : 0.16, 'square', 0.06);
+        tone(note(l) * oct * 1.004, ch ? Math.max(0.2, d + 0.05) : 0.2, 'triangle', 0.05);   // dobra levemente desafinada (corpo)
         if (step % 2 === 0) tone(note(l) * oct, 0.14, 'square', 0.025, 0, 0.19);   // eco
       }
       if (b >= 0 || b < -1) tone(note(b) / 2, 0.22, 'triangle', 0.16);
-      if (step % 8 === 0) { const r = song.bass[(step / 8 | 0) % 8]; if (r >= 0 || r < -1) { tone(note(r) / 2, 1.0, 'sine', 0.05); tone(note(r + 7) / 2, 1.0, 'sine', 0.035); tone(note(r + 3) / 2, 1.0, 'sine', 0.03); } }
+      if (step % 8 === 0) {
+        if (ch) { const r = cr + 12, sus = 240 / song.bpm; tone(note(r) / 2, sus, 'sine', 0.05); tone(note(r + 7) / 2, sus, 'sine', 0.035); tone(note(r + ch[1]) / 2, sus, 'sine', 0.035); }
+        else { const r = song.bass[(step / 8 | 0) % 8]; if (r >= 0 || r < -1) { tone(note(r) / 2, 1.0, 'sine', 0.05); tone(note(r + 7) / 2, 1.0, 'sine', 0.035); tone(note(r + 3) / 2, 1.0, 'sine', 0.03); } }
+      }
       // percussão: bumbo, caixa e chimbal
-      if (name !== 'menu') {
-        if (step % 4 === 0) tone(110, 0.12, 'sine', 0.22, -70);
-        if (step % 8 === 4) noise(0.1, 0.12);
-        if (step % 2 === 1) noise(0.03, 0.04);
+      if (step % 4 === 0) tone(110, 0.12, 'sine', 0.22, -70);
+      if (step % 8 === 4) noise(0.1, 0.12);
+      if (step % 2 === 1) noise(0.03, 0.04);
+      if (song.crash) {
+        const loop = song.lead.length, pos = step % loop;
+        if (pos === 0) noise(0.9, 0.09);                                        // prato no começo de cada volta
+        if (pos >= loop - 4 && pos !== loop - 4) noise(0.06, 0.1);              // virada de caixa no fim da frase
       }
       step++;
     }, 30000 / song.bpm);

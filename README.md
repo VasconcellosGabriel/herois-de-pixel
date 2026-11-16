@@ -130,6 +130,7 @@ No celular: abrir o link → menu do navegador → "Adicionar à tela inicial".
 
 ## Estrutura
 - `js/util.js`: constantes, contorno automático dos sprites, fonte de pixels, áudio sintetizado, entrada (teclado, mouse, toque; cada controle separado em `Pads`)
+- `js/epic.js`: músicas dos chefes, sintetizadas: ópera épica (coral, soprano, cordas, metais, tímpanos) e rock/metal (guitarra distorcida, baixo, bateria). Notas repetidas e acordes do coral são pré-gravados em buffers (sampler) para pesar pouco no celular. `Epic.render(nome, segundos)` gera a música fora de tempo real (testes)
 - `js/sprites.js`: motor de pixels com sombreamento automático (`PX`) e personagem desenhado por **esqueleto** (cinemática inversa) a 2x de resolução, em estilo chibi 3/4 (`skeletonFor` = poses, `drawChar` = desenho de cada camada), ícones
 - `js/enemies.js`: sprites e animações dos inimigos do mundo 1 e do Rei Golem
 - `js/world.js`: tiles e cenário em alta resolução (terreno com ruído, bordas/cantos, árvores, cristais, tochas), fundos em camadas (parallax, nuvens), decoração, luzes

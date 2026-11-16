@@ -67,7 +67,7 @@ const ENEMIES = {
 };
 // Chefes: nome (barra de vida e avisos), dica no começo da luta, música e ponto fraco (opcional: crítico garantido)
 const BOSS_INFO = {
-  golem: { name: 'REI GOLEM', title: 'o Rei Golem', tip: 'Mire no núcleo brilhante: golpes críticos!', song: 'boss',
+  golem: { name: 'REI GOLEM', title: 'o Rei Golem', tip: 'Mire no núcleo brilhante: golpes críticos!', song: 'metalGolem',
     core: e => ({ x: cxOf(e) - 8, y: e.y + 9 + (e.st === 'charge' ? 5 : 0), w: 16, h: 18 }), coreCol: e => e.st === 'stun' ? '#ffffff' : '#ff9d2e' },
 };
 const weakRect = e => { const b = e.boss && BOSS_INFO[e.type]; return b && b.core ? b.core(e) : null; };
@@ -1061,7 +1061,7 @@ function updatePlayer(w, dt, p, ctl) {
   }
   if (w.lv.bossGate && !w.bossActive && cxOf(p) > w.lv.bossGate) {
     const bi = (w.boss && BOSS_INFO[w.boss.type]) || BOSS_INFO.golem;
-    w.bossActive = true; w.cine = 2.4; announce(bi.ban || bi.name, bi.tip, 2800); music(bi.song || 'boss'); feel(w, null, 0, 0.4); sfx('boom');
+    w.bossActive = true; w.cine = 2.4; announce(bi.ban || bi.name, bi.tip, 2800); music(bi.song || 'epic'); feel(w, null, 0, 0.4); sfx('boom');
   }
 }
 // Ímã: moedas próximas voam até o herói. Devolve true quando a moeda encosta nele.

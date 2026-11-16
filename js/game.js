@@ -810,7 +810,7 @@ function flameTick(w, p) {
   const rect = flameRect(w.lv, p);
   for (const e of w.enemies) if (!e.dead && e.active && overlap(rect, e))
     damageEnemy(w, e, 1.4, { by: p, dir: p.flameDir, status: 'burn', chance: 0.35, kb: 0.25, rect, quiet: true, special: true, noCrit: true });
-  for (const q of w.eproj) if (q.type !== 'wave' && !q.big && !q.harmless && overlap(rect, q)) { q.life = 0; burst(w, cxOf(q), cyOf(q), '#ffb347', 4, 50, 0.25); }
+  for (const q of w.eproj) if (cancelable(q) && overlap(rect, q)) { q.life = 0; q.gone = true; burst(w, cxOf(q), cyOf(q), '#ffb347', 4, 50, 0.25); }
   breakTilesIn(w, rect, 1, p);
 }
 
@@ -1303,11 +1303,13 @@ function updateProj(w, dt) {
       else { q.life = 0; burst(w, q.x, q.y, q.el ? q.el.col : '#ddd', 5, 50, 0.3); }
       continue;
     }
-    // magia e flecha anulam o disparo inimigo que acertarem (a área é um pouco maior: projéteis rápidos não passam "por dentro")
-    if (q.type === 'spell' || q.type === 'arrow') {
+    // magia, flecha e sopro de fogo anulam o disparo inimigo que acertarem (a área é um pouco maior: projéteis rápidos
+    // não passam "por dentro"). O fogo queima o projétil e continua; magia e flecha param nele (salvo flecha que atravessa).
+    if (q.type === 'spell' || q.type === 'arrow' || q.type === 'flame') {
       const r = { x: q.x - 3, y: q.y - 3, w: q.w + 6, h: q.h + 6 };
       for (const o of w.eproj) if (cancelable(o) && overlap(r, o)) {
         cancelEProj(w, o);
+        if (q.type === 'flame') continue;
         if (q.pierce > 0) q.pierce--; else { q.life = 0; if (q.type === 'spell') burst(w, cxOf(q), cyOf(q), q.el.col, 6, 70, 0.3); }
         break;
       }

@@ -19,9 +19,9 @@ const LEVELS = [
   { id: 'neve2', world: 2, name: 'Primeira Neve', theme: 'snow', len: 140, seed: 502, hpK: 1.2,
     enemies: ['wolf', 'wolf', 'hawk', 'slime'], density: 0.65, gaps: 0.2, stones: 0.16, spikes: 0.1, plats: 0.22 },
   { id: 'neve3', world: 2, name: 'Lago Congelado', theme: 'ice', len: 145, seed: 503, hpK: 1.25,
-    enemies: ['wolf', 'wolf', 'hawk', 'slime', 'skeleton'], density: 0.7, gaps: 0.18, stones: 0.14, spikes: 0.14, plats: 0.22 },
+    enemies: ['slime', 'snowyeti', 'hawk', 'snowyeti', 'wolf'], density: 0.7, gaps: 0.18, stones: 0.14, spikes: 0.14, plats: 0.22 },
   { id: 'neve4', world: 2, name: 'Caverna de Gelo Eterno', theme: 'icecave', len: 150, seed: 504, hpK: 1.3,
-    enemies: ['bat', 'spider', 'slime', 'skeleton', 'bat'], density: 0.7, gaps: 0.26, stones: 0.18, spikes: 0.1, plats: 0.2 },
+    enemies: ['bat', 'spider', 'snowyeti', 'skeleton', 'bat'], density: 0.7, gaps: 0.26, stones: 0.18, spikes: 0.1, plats: 0.2 },
   { id: 'yeti', world: 2, name: 'Trono do Yeti Ancião', theme: 'icecave', len: 36, seed: 505, boss: 'yeti' },
   // ---- Mundo 3: Pântano Gosmento ----
   { id: 'pantano1', world: 3, name: 'Degelo do Brejo', theme: 'thaw', len: 140, seed: 604, hpK: 1.35,

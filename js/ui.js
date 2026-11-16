@@ -206,12 +206,26 @@ function updateTouchHud(w) {
   if (!document.body.classList.contains('touch') || !w || !w.p) return;
   const p = w.p, L = TouchHud.last;
   ['a', 'b', 'c'].forEach((k, i) => {
-    const h = Math.round(clamp(p.cd[k] / p.cdMax[i], 0, 1) * 100), low = !!(p.cls.mana && p.mana < p.cost[i]);
+    const h = Math.round(clamp(p.cd[k] / p.cdMax[i], 0, 1) * 100), low = !!(p.cls.mana ? p.mana < p.cost[i] : p.maxArrows && i < 2 && p.arrows < 1);
     if (L[k] !== h) { L[k] = h; const el = $('#tb-' + k + ' .cd'); if (el) el.style.height = h + '%'; }
     if (L[k + 'l'] !== low) { L[k + 'l'] = low; $('#tb-' + k).classList.toggle('low', low); }
   });
   const sp = Math.round(clamp((p.sp || 0) / SPECIAL_MAX, 0, 1) * 100);
-  if (L.sp !== sp) { L.sp = sp; $('#tb-sp b').style.height = sp + '%'; $('#tb-sp').classList.toggle('ready', sp >= 100); }
+  if (L.sp !== sp) { L.sp = sp; $('#tb-sp b').style.height = sp + '%'; $('#tb-sp').classList.toggle('ready', sp >= 100); $('#sp-fire').hidden = sp < 100; }
+  // especial pronto: anel de fogo em pixels em volta do botão (mais alto em cima, como chama de verdade)
+  const ft = sp >= 100 ? fireT(w.t) : -1;
+  if (ft >= 0 && L.ft !== ft) {
+    L.ft = ft;
+    const c = $('#sp-fire'), g = c.getContext('2d'), R = 9.7;
+    g.clearRect(0, 0, c.width, c.height);
+    for (let y = 0; y < c.height; y++) for (let x = 0; x < c.width; x++) {
+      const dx = x + 0.5 - 17, dy = y + 0.5 - 21, d = Math.hypot(dx, dy);
+      if (d < R - 1) continue;
+      const up = Math.max(0, -dy / d), v = fnoise(x * 0.42, y * 0.36 + ft) * 1.3 - (d - R) / (2.6 + 9 * up * up);
+      if (v < 0.14) continue;
+      g.fillStyle = SP_FIRE[v > 0.66 ? 3 : v > 0.46 ? 2 : v > 0.28 ? 1 : 0]; g.fillRect(x, y, 1, 1);
+    }
+  }
 }
 
 // ---------- Menus com o controle (gamepad) ----------

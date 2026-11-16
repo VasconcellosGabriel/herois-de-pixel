@@ -57,12 +57,12 @@ O anfitrião roda a simulação (inimigos, golpes, dano); os convidados recebem 
 No celular cada dedo é tratado à parte (dá para andar, pular e atacar ao mesmo tempo) e cada botão tem uma área de toque maior que o desenho.
 
 ## Classes
-- **Guerreiro** (6 ♥): J espada (combo de 3: corte, corte de volta e estocada com avanço; alcance maior, rebate projéteis) · K lança arremessável (atravessa inimigos) · L escudo (segure: defende pela frente e pelas costas; só passa o que vem de cima ou de baixo)
+- **Guerreiro** (6 ♥): J espada (combo de 3: corte, corte de volta e estocada com avanço; alcance maior; 50% de chance de desviar cada projétil que cortar) · K lança arremessável (atravessa inimigos) · L escudo (segure: defende pela frente e pelas costas; só passa o que vem de cima ou de baixo)
 - **Mago** (4 ♥, mana): J magia elemental (10 mana; dano 3 fogo / 2 gelo / 2 veneno) · K raio (40 mana, 10 de dano, atordoa) · L cura (35 mana, +2 ♥ e +1 ♥ nos aliados por perto).
   A mana recarrega devagar (4,5/s) e só depois de ~1 s sem gastar.
   O **elemento** (Fogo → Gelo → Veneno) troca a qualquer momento da fase: tecla G, LT no controle, botão ↻ no celular ou o botão *Magia* da pausa.
   Vale para a magia e para o ataque especial, e a escolha fica guardada no herói (também dá para mudar em *Aparência → Equipamento*).
-- **Arqueiro** (4 ♥, foco em mobilidade): J flecha mirada (2 de dano; quanto mais longe o alvo, maior a chance de crítico e o crítico chega a ×3) · K tiro triplo (3 flechas que atravessam o primeiro alvo) · L rolamento invulnerável. Passivo: **pulo duplo** (cambalhota).
+- **Arqueiro** (4 ♥, foco em mobilidade; **aljava de 6 flechas** que recarrega sozinha depois de meio segundo sem atirar: a flecha gasta 1, o tiro triplo gasta 3): J flecha mirada (2 de dano; quanto mais longe o alvo, maior a chance de crítico e o crítico chega a ×3) · K tiro triplo (3 flechas que atravessam o primeiro alvo) · L rolamento invulnerável. Passivo: **pulo duplo** (cambalhota).
 - **Dragônico** (6 ♥): J garras (combo de 3, a última é mais forte) · K sopro de fogo (jato de chamas que queima) · L mergulho (despenca e explode ao pousar). Passivo: pulo duplo com batida de asas e **planar** segurando o pulo.
 
 ## Mundos e chefes
@@ -90,7 +90,7 @@ Ao voltar de uma fase vencida, o herói sai dela e caminha sozinho até a fase r
 ## Inimigos
 Cada fase tem inimigos que combinam com o lugar (morcegos só em cavernas e castelos, demônios na forja etc.).
 - **Reino Verde**: slime, **falcão raivoso** (circula no alto e mergulha em você), **planta carnívora**, morcego, **aranha** (fica pendurada no fio e cai quando você passa embaixo), esqueleto, **fantasma** (atravessa paredes), cavaleiro, **guarda da peste**
-- **Picos Gelados**: **lobo** (corre atrás, agacha rosnando e dá o bote), falcão das neves, morcego e aranha de gelo, esqueleto congelado
+- **Picos Gelados**: **lobo** (corre atrás, agacha rosnando e dá o bote), falcão das neves, morcego e aranha de gelo, **yeti das neves** (um pouco maior que o herói: ao ver você, ruge, corre na sua direção e dá uma patada), esqueleto congelado (só dentro da caverna)
 - **Pântano Gosmento**: **sapo venenoso** (pula e estica a língua), **slime gigante** (dentes, caveira dentro; ao morrer vira dois slimes), fogo-fátuo
 - **Deserto Escaldante**: **escorpião** (crava o ferrão de cima: agachar não adianta), **naja** (empina e dá o bote; de longe cospe veneno), **múmia** (agarra com os braços esticados), falcão do deserto
 - **Montanha de Fogo**: **diabrete** (voa à distância e atira bolas de fogo), **cão infernal**, **ferreiro demônio** (fornalha acesa no peito e chaminé nas costas: bate o martelo em brasa no chão soltando uma onda de choque e, de longe, arremessa um lingote quente com a tenaz), cavaleiro demoníaco
@@ -103,6 +103,7 @@ Cada fase tem inimigos que combinam com o lugar (morcegos só em cavernas e cast
 - **Críticos**: todo ataque pode ser crítico (dano ×2; Arqueiro 15%, Dragônico 12%). No **Rei Golem**, acertar o **núcleo brilhante** no peito é sempre crítico, e ele fica exposto (dano ×3) quando bate na parede e fica atordoado.
 - **Vidas** (estilo Sonic): você começa com 3 vidas. Zerar os corações **ou cair num abismo** custa 1 vida; sem vidas, é *game over* e a fase recomeça (de volta a 3 vidas). A cada 50 moedas, +1 vida — e as **vidas extras passam para a próxima fase**.
 - **Ataque especial**: a barra dourada enche derrotando inimigos (e batendo no chefe). Cheia, cada classe solta o seu: Fúria giratória (Guerreiro), Tempestade arcana (Mago), Chuva de flechas (Arqueiro), **Lança-chamas** contínuo para um lado (Dragônico). A barra **passa para a próxima fase**.
+- **Anular disparos**: magias do Mago e flechas do Arqueiro destroem os projéteis inimigos que acertarem (veneno, ossos, bolas de fogo, pedras...). A espada do Guerreiro e as garras do Dragônico desviam só às vezes (50%). Golpes grandes de chefe (lanças, ondas, bolas de neve gigantes, raios) não dá para anular.
 - **Agachar**: corpo mais baixo, projéteis altos passam por cima. Agachado dá para andar (mais devagar) e pular sem se levantar.
 - **Caixas, barris e vasos**: sólidos e quebráveis; dão moedas e às vezes poções de mana ou corações.
 - **Segredos**: toda fase tem um morro com **túnel escondido** — quebre a parede rachada para entrar e a do outro lado para sair (moedas + baú). Há também baús em plataformas altas.

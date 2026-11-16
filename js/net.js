@@ -7,7 +7,7 @@
 // (sem reenvio e fora de ordem) para as fotos e posições: um pacote perdido no Wi-Fi não segura os seguintes.
 // O servidor público e gratuito do PeerJS só apresenta os aparelhos um ao outro; depois a conexão é direta
 // (ou passa por um "relay" TURN gratuito do PeerJS quando a rede não permite a ligação direta).
-const PROTO = 9, MAX_PLAYERS = 4, SNAP_EVERY = 2, FAST_ID = 100;
+const PROTO = 10, MAX_PLAYERS = 4, SNAP_EVERY = 2, FAST_ID = 100;
 const ID_PREFIX = 'heroisdepixel-v1-', CODE_CHARS = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789', CODE_LEN = 5;
 const PEERJS_URLS = ['https://cdnjs.cloudflare.com/ajax/libs/peerjs/1.5.4/peerjs.min.js', 'https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js'];
 
@@ -27,7 +27,7 @@ const ICE = { iceServers: [
 // ---------- Campos sincronizados (as "fotos" do mundo são listas de números na ordem abaixo) ----------
 const PF = ['x', 'y', 'vx', 'vy', 'face', 'hp', 'maxHp', 'mana', 'manaDelay', 'act', 'actT', 'actDur', 'atkIdx', 'aimDeg', 'aimFace',
   'hurtT', 'inv', 'dash', 'dashKind', 'flipT', 'landT', 'cd.a', 'cd.b', 'cd.c', 'ground', 'dead', 'deadT', 'out', 'block', 'glide', 'diving',
-  'maxMana', 'sp', 'xpGot', 'h', 'crouch', 'flamer', 'flameDir', 'ep', 'diveWait', 'elem'];
+  'maxMana', 'sp', 'xpGot', 'h', 'crouch', 'flamer', 'flameDir', 'ep', 'diveWait', 'elem', 'arrows'];
 // campos do corpo que o convidado prevê no próprio herói (não vêm do anfitrião enquanto ele anda livre)
 const OWN_BODY = new Set(['x', 'y', 'vx', 'vy', 'face', 'ground', 'h', 'crouch', 'glide', 'landT', 'flipT', 'block']);
 const EF = ['x', 'y', 'vx', 'vy', 'dir', 'hp', 'flash', 'sq', 'hurt', 'slow', 'stun', 'st', 't', 'throwT', 'ground', 'sts.burn', 'sts.poison', 'sts.freeze'];

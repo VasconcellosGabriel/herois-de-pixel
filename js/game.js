@@ -12,6 +12,8 @@ const ELEMENTS = [
 ];
 const COST = { mago: [10, 40, 35], guerreiro: [0, 0, 0], arqueiro: [0, 0, 0], dragonico: [0, 0, 0] };
 const HEAL_SELF = 2, HEAL_ALLY = 1;                  // cura do mago: corações para si e para aliados por perto
+// Aljava do arqueiro: cada flecha gasta uma; recarrega sozinha depois de um instante sem atirar (o especial não gasta)
+const QUIVER = 6, ARROW_DELAY = 0.5, ARROW_REGEN = 0.4;
 const CDMAX = { guerreiro: [0.34, 1.0, 0.1], mago: [0.4, 1.1, 2.0], arqueiro: [0.3, 0.9, 0.8], dragonico: [0.28, 1.2, 1.6] };
 
 const CLASSES = {
@@ -19,7 +21,7 @@ const CLASSES = {
     id: 'guerreiro', name: 'Guerreiro', icon: '⚔️', hp: 6, mana: 0, crit: 0.1,
     desc: 'Resistente e versátil. Luta de perto ou de longe.',
     skills: [
-      { key: 'J', name: 'Espada', desc: 'Combo de 3 golpes: corte, corte de volta e estocada com avanço. Também rebate projéteis.', icon: '⚔️' },
+      { key: 'J', name: 'Espada', desc: 'Combo de 3 golpes: corte, corte de volta e estocada com avanço. Às vezes (50%) desvia projéteis.', icon: '⚔️' },
       { key: 'K', name: 'Lança', desc: 'Arremessa a lança: médio/longo alcance, atravessa inimigos.', icon: '🔱' },
       { key: 'L', name: 'Escudo', desc: 'Segure para bloquear dano pela frente e pelas costas (só passa o que vem de cima ou de baixo).', icon: '🛡️' },
     ],
@@ -35,10 +37,10 @@ const CLASSES = {
   },
   arqueiro: {
     id: 'arqueiro', name: 'Arqueiro', icon: '🏹', hp: 4, mana: 0, crit: 0.15,
-    desc: 'Mobilidade total: pulo duplo e rolamento. Mira livre com mouse, controle ou joystick.',
+    desc: 'Mobilidade total: pulo duplo e rolamento. Mira livre com mouse, controle ou joystick. Aljava de 6 flechas que recarrega sozinha.',
     skills: [
-      { key: 'J', name: 'Flecha', desc: 'Tiro rápido na direção que você mira. De longe, o crítico é mais forte.', icon: '🏹' },
-      { key: 'K', name: 'Tiro triplo', desc: 'Três flechas que atravessam o primeiro alvo.', icon: '🎯' },
+      { key: 'J', name: 'Flecha', desc: 'Tiro rápido na direção que você mira. De longe, o crítico é mais forte. Gasta 1 flecha da aljava.', icon: '🏹' },
+      { key: 'K', name: 'Tiro triplo', desc: 'Três flechas que atravessam o primeiro alvo. Gasta 3 flechas da aljava (ou as que restarem).', icon: '🎯' },
       { key: 'L', name: 'Rolamento', desc: 'Investida rápida e invulnerável.', icon: '💨' },
     ],
   },
@@ -378,6 +380,7 @@ function addPlayer(w, r) {
     id: r.id, ch, cls, spr: buildPlayerSprites(ch), inp: makeCtl(), dev: r.dev || null, chKey: JSON.stringify(ch),
     x: w.respawn.x - 5 + i * 10, y: w.respawn.y - 20, w: 10, h: 20, vx: 0, vy: 0, face: 1,
     ground: false, coyote: 0, jbuf: 0, hp: maxHp, maxHp, mana: maxMana, maxMana, manaDelay: 0,
+    arrows: cls.id === 'arqueiro' ? QUIVER : 0, maxArrows: cls.id === 'arqueiro' ? QUIVER : 0, arrowDelay: 0, arrowT: ARROW_REGEN,
     cd: { a: 0, b: 0, c: 0 }, act: null, actT: 0, actDur: 0, inv: 0, hurtT: 0, block: false, dash: 0, dashSpd: 0, dashKind: null, dashHit: null,
     melee: null, anim: 0, dead: false, deadT: 0, out: false, drop: 0, landT: 0, flipT: 0, jumps: 0, glide: false, diving: false, diveWait: false, combo: 0, comboT: 0, atkIdx: 0, dustT: 0,
     elem: clamp(ch.elem | 0, 0, ELEMENTS.length - 1),      // elemento da magia do mago (troca durante a fase: cycleElem)
@@ -561,7 +564,7 @@ function respawn(w, p, keepHp, noHeal) {
   const mate = w.local && w.players.find(q => q !== p && !q.dead && !q.out && q.ground);
   if (mate) { p.x = mate.x; p.y = mate.y + mate.h - p.h; }
   if (!keepHp) {
-    p.hp = p.maxHp; p.mana = p.maxMana;
+    p.hp = p.maxHp; p.mana = p.maxMana; p.arrows = p.maxArrows;
     // o chefe recupera um pouco de vida a cada vida perdida
     const b = w.boss;
     if (b && w.bossActive && !b.dead && !noHeal) {
@@ -583,6 +586,11 @@ function respawn(w, p, keepHp, noHeal) {
 const DJUMP = { dragonico: '#ffd27a', arqueiro: '#cfe8ff' };
 // Agachar: o corpo fica mais baixo (projéteis altos passam por cima). force = levanta mesmo sem espaço.
 const CROUCH_H = 13, STAND_H = 20;
+// Cancelar disparos inimigos: magia e flecha sempre anulam o projétil que acertarem; golpe corpo a corpo só às vezes.
+// Não dá para anular os golpes grandes dos chefes (big), as ondas no chão nem os avisos (harmless).
+const PARRY_CHANCE = 0.5;
+const cancelable = q => !q.big && !q.harmless && q.type !== 'wave' && q.life > 0;
+function cancelEProj(w, q) { q.life = 0; q.gone = true; burst(w, cxOf(q), cyOf(q), '#fff', 5, 60, 0.25); sfx('block'); }
 function crouchDown(p) { if (p.crouch) return; p.crouch = true; p.y += STAND_H - CROUCH_H; p.h = CROUCH_H; }
 function standUp(p, force, lv) {
   if (!p.crouch) return true;
@@ -592,6 +600,8 @@ function standUp(p, force, lv) {
   return true;
 }
 function act(p, name, dur) { p.act = name; p.actT = dur; p.actDur = dur; }
+// tira n flechas da aljava (devolve quantas saíram de verdade) e adia a recarga
+function useArrows(p, n) { n = Math.min(n, Math.floor(p.arrows)); p.arrows -= n; p.arrowDelay = ARROW_DELAY; p.arrowT = ARROW_REGEN; return n; }
 function shoot(w, p, o) {
   w.proj.push({ w: 8, h: 4, g: 0, life: 1.4, pierce: 0, hit: new Set(), dmg: 1, status: null, chance: 1, by: p, ox: o.x, oy: o.y, ...o });
 }
@@ -650,6 +660,8 @@ function skillA(w, p) {
     const mx = cxOf(p) + ff * 9, my = p.y + 10;
     shoot(w, p, { type: 'spell', el, eli, x: mx - 3, y: my - 3, w: 7, h: 7, vx: Math.cos(ang) * ff * 190, vy: Math.sin(ang) * 190, dmg: el.dmg, status: el.status, chance: el.chance, life: 1.6, sk: 0 });
   } else if (id === 'arqueiro') {
+    if (p.arrows < 1) { sfx('no'); p.cd.a = 0.3; return; }
+    useArrows(p, 1);
     p.face = p.aimFace; setCd(p, 'a', 0.3); act(p, 'aim', 0.22); p.shotAim = true; sfx('arrow');
     const a = p.aimDeg * Math.PI / 180, dx = Math.cos(a) * p.face, dy = Math.sin(a), h = handPos(p, p.face);
     shoot(w, p, { type: 'arrow', x: h.x + dx * 10 - 3, y: h.y + dy * 10 - 2, w: 6, h: 4, vx: dx * 340, vy: dy * 340, g: 36, dmg: 2, sk: 0, far: true });
@@ -699,9 +711,11 @@ function skillB(w, p) {
     feel(w, p, 0.07, 0.12);
     burst(w, x1, y, '#fff7a0', 8, 100, 0.3, 0);
   } else if (id === 'arqueiro') {
+    if (p.arrows < 1) { sfx('no'); p.cd.b = 0.3; return; }
+    const n = useArrows(p, 3);                                      // com a aljava quase vazia saem só as que restam
     p.face = p.aimFace; setCd(p, 'b', 0.9); act(p, 'aim', 0.26); p.shotAim = true; sfx('arrow');
     const hh = handPos(p, p.face);
-    for (const off of [-7, 0, 7]) {
+    for (const off of n === 3 ? [-7, 0, 7] : n === 2 ? [-4, 4] : [0]) {
       const a = (p.aimDeg + off) * Math.PI / 180, dx = Math.cos(a) * p.face, dy = Math.sin(a);
       shoot(w, p, { type: 'arrow', x: hh.x + dx * 10 - 3, y: hh.y + dy * 10 - 2, w: 6, h: 4, vx: dx * 340, vy: dy * 340, g: 30, dmg: 1.5, pierce: 1, life: 1.6, sk: 1, far: true });
     }
@@ -975,6 +989,10 @@ function updatePlayer(w, dt, p, ctl) {
     if (p.manaDelay > 0) p.manaDelay -= dt;
     else p.mana = Math.min(p.maxMana, p.mana + MANA_REGEN * dt);
   }
+  if (p.arrows < p.maxArrows) {
+    if (p.arrowDelay > 0) p.arrowDelay -= dt;
+    else { p.arrowT -= dt; if (p.arrowT <= 0) { p.arrows++; p.arrowT = ARROW_REGEN; } }
+  }
   if (ctl) updateAim(w, p, dt);
 
   // lança-chamas do dragônico: direção travada, anda devagar
@@ -1004,7 +1022,9 @@ function updatePlayer(w, dt, p, ctl) {
         damageEnemy(w, e, p.melee.dmg, { by: p, dir: p.face, rect: m, sk: p.melee.sk, kb: p.melee.kb });
       }
       if (!p.melee.tiles) { p.melee.tiles = true; breakTilesIn(w, m, p.melee.dmg * p.dmgK, p); }   // caixas e paredes falsas
-      for (const q of w.eproj) if (q.type !== 'wave' && !q.big && !q.harmless && overlap(m, q)) { q.life = 0; burst(w, q.x, q.y, '#fff', 4, 50, 0.2); sfx('block'); }
+      // cada projétil tem uma chance só por golpe (não fica sorteando de novo a cada quadro)
+      const tried = p.melee.tried || (p.melee.tried = new Set());
+      for (const q of w.eproj) if (cancelable(q) && !tried.has(q) && overlap(m, q)) { tried.add(q); if (Math.random() < PARRY_CHANCE) cancelEProj(w, q); }
       if (p.melee.t <= 0) p.melee = null;
     }
   }
@@ -1283,6 +1303,16 @@ function updateProj(w, dt) {
       else { q.life = 0; burst(w, q.x, q.y, q.el ? q.el.col : '#ddd', 5, 50, 0.3); }
       continue;
     }
+    // magia e flecha anulam o disparo inimigo que acertarem (a área é um pouco maior: projéteis rápidos não passam "por dentro")
+    if (q.type === 'spell' || q.type === 'arrow') {
+      const r = { x: q.x - 3, y: q.y - 3, w: q.w + 6, h: q.h + 6 };
+      for (const o of w.eproj) if (cancelable(o) && overlap(r, o)) {
+        cancelEProj(w, o);
+        if (q.pierce > 0) q.pierce--; else { q.life = 0; if (q.type === 'spell') burst(w, cxOf(q), cyOf(q), q.el.col, 6, 70, 0.3); }
+        break;
+      }
+      if (q.life <= 0) continue;
+    }
     for (const e of w.enemies) {
       if (e.dead || !e.active || q.hit.has(e) || !overlap(q, e)) continue;
       q.hit.add(e);
@@ -1297,6 +1327,7 @@ function updateProj(w, dt) {
 
   // home: teleguiado (graus/s) · harmless + then: aviso que vira outro golpe · pass: atravessa paredes · big: não some ao acertar
   for (const q of w.eproj) {
+    if (q.gone) continue;                                  // anulado por um herói: some sem efeito de impacto
     q.life -= dt;
     if (q.home && w.state === 'play') {
       const p = nearestPlayer(w, q), cur = Math.atan2(q.vy, q.vx), sp = Math.hypot(q.vx, q.vy) || 60;
@@ -1654,10 +1685,67 @@ function playerImage(p) {
 }
 
 const enemyYOff = e => e.type === 'bat' ? 5 : e.type === 'ghost' ? 9 : ENEMY_YOFF[e.type] || 0;
+// ---------- Fogo em pixels: avisa que o especial está pronto (barra, herói e botão do celular) ----------
+function fnoise(x, y) {
+  const xi = Math.floor(x), yi = Math.floor(y), fx = x - xi, fy = y - yi;
+  const a = hash2(xi, yi, 77), b = hash2(xi + 1, yi, 77), c = hash2(xi, yi + 1, 77), d = hash2(xi + 1, yi + 1, 77);
+  const u = fx * fx * (3 - 2 * fx), v = fy * fy * (3 - 2 * fy);
+  return a + (b - a) * u + (c - a) * v + (a - b - c + d) * u * v;
+}
+const SP_FIRE = ['#b8301a', '#ff7f1f', '#ffc24a', '#fff3a8'];
+const fireT = t => Math.floor(t * 14) * 0.2;         // anda em passos: chama "quadro a quadro", como pixel art
+// Labaredas subindo de uma linha de base (x..x+wd, de y para cima, até ht pixels). shape(i) = altura relativa da coluna
+// fy = "esticada" das línguas de fogo (menor = mais compridas); boost = base mais cheia
+function pixelFire(g, x, y, wd, ht, t, seed = 0, shape = null, fy = 0.36, boost = 0) {
+  const tt = fireT(t);
+  for (let i = 0; i < wd; i++) {
+    const hk = ht * (shape ? shape(i) : 1);
+    if (hk <= 0.5) continue;
+    for (let j = 0; j < ht; j++) {
+      const v = fnoise((i + seed) * 0.42, j * fy - tt) * 1.3 - j / hk + boost * (1 - j / hk);
+      if (v < 0.14) { if (j > hk) break; continue; }
+      g.fillStyle = SP_FIRE[v > 0.66 ? 3 : v > 0.46 ? 2 : v > 0.28 ? 1 : 0]; g.fillRect(x + i, y - 1 - j, 1, 1);
+    }
+  }
+}
+// tecla (ou botão do controle) do especial para o jogador q; '' = não mostrar (toque / companheiro online)
+function spLabel(w, q) {
+  if (w.local) { const d = String(q.dev); return d === 'touch' ? '' : d.startsWith('p') ? padName(PadCfg.map.special[0]) : keyLabel('special'); }
+  if (q !== w.p || document.body.classList.contains('touch')) return '';
+  return Input.padOn ? padName(PadCfg.map.special[0]) : keyLabel('special');
+}
+// tecla desenhada como um botãozinho dourado que pula
+function drawKeyCap(g, t, x, y, wt) {
+  const tw = textW(t), bob = Math.floor(wt * 5) % 2;
+  x = Math.round(x); y = Math.round(y) - bob;
+  g.fillStyle = '#1b1423'; g.fillRect(x - 1, y - 1, tw + 5, 10);
+  g.fillStyle = '#a8641a'; g.fillRect(x, y + 7, tw + 3, 1 + bob);
+  g.fillStyle = bob ? '#fff2a0' : '#ffd23f'; g.fillRect(x, y, tw + 3, 7);
+  g.fillStyle = '#fffbe0'; g.fillRect(x, y, tw + 3, 1);
+  drawText(g, t, x + 2, y + 1, '#3a1c08');
+  return tw + 5;
+}
+// aura de fogo atrás do herói + a tecla em cima da cabeça de tempos em tempos
+function drawSpAura(g, w, p, cx, cy, tag) {
+  if (p.sp < SPECIAL_MAX || p.dead) { p.spAt = 0; return; }
+  if (!p.spAt) p.spAt = w.t;
+  const x = Math.round(cxOf(p) - cx), y = Math.round(p.y + p.h - cy), wd = 30, hw = wd / 2;
+  g.globalCompositeOperation = 'lighter'; drawGlow(g, x, y - 12, 28, '#ff9a2a', 0.38 + Math.sin(w.t * 7) * 0.1); g.globalCompositeOperation = 'source-over';
+  g.globalAlpha = 1;
+  pixelFire(g, x - hw, y + 2, wd, 44, w.t, (p.id | 0) * 31, i => 1 - Math.pow(Math.abs(i + 0.5 - hw) / hw, 2) * 0.85, 0.2, 0.3);
+}
+function drawSpPrompt(g, w, p, cx, cy, tag) {
+  if (!p.spAt || p.dead) return;
+  pixelFire(g, Math.round(cxOf(p) - cx) - 10, Math.round(p.y + p.h - cy) + 2, 20, 6, w.t, (p.id | 0) * 31 + 50, i => 0.5 + fnoise(i * 0.6, fireT(w.t)) * 0.5);   // chamas baixas na frente dos pés
+  const ph = (w.t - p.spAt) % 6, t = ph > 1 && ph < 3.6 ? spLabel(w, p) : '';
+  if (t) drawKeyCap(g, t, cxOf(p) - cx - (textW(t) + 3) / 2, p.y - (tag ? 25 : 15) - cy, w.t);
+}
+
 // Desenha um herói; tag = mostra o nome em cima (companheiros no multiplayer)
 function drawPlayer(g, w, p, cx, cy, tag) {
   if (p.out || (p.inv > 0 && !p.dead && Math.floor(w.t * 20) % 2)) return;
   const img = playerImage(p);
+  drawSpAura(g, w, p, cx, cy, tag);
   if (p.dash > 0 || p.flipT > 0) { // rastro de imagens
     for (let i = 3; i >= 1; i--) { g.globalAlpha = 0.14 * (4 - i); drawSprite(g, p.dashKind === 'shadow' ? tintOf(img, '#6a4fa0') : img, cxOf(p) - p.face * i * (p.dash > 0 ? 7 : 0), p.y + p.h + 2 - (p.dash > 0 ? 0 : -i * 3), p.face < 0, cx, cy); }
     g.globalAlpha = 1;
@@ -1670,6 +1758,7 @@ function drawPlayer(g, w, p, cx, cy, tag) {
     const t = typeof tag === 'string' ? tag : tagName(p.ch.name), col = typeof tag === 'string' ? LOCAL_COLS[w.players.indexOf(p) % 4] : p.ch.accent || '#fff';
     g.globalAlpha = 0.85; drawTextO(g, t, Math.round(cxOf(p) - cx - textW(t) / 2), Math.round(p.y - 13 - cy), col); g.globalAlpha = 1;
   }
+  drawSpPrompt(g, w, p, cx, cy, tag);
 }
 // nome sem acentos e curto, para a fonte de pixels
 const tagName = s => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase().slice(0, 8);
@@ -2100,16 +2189,50 @@ function drawHud(g, w) {
     for (const m of [p.cost[1], p.cost[2]]) { g.fillStyle = 'rgba(14,10,20,.8)'; g.fillRect(hx + Math.round(bw * m / p.maxMana), y, 1, 5); }
     if (p.manaDelay > 0) { g.fillStyle = 'rgba(255,255,255,.12)'; g.fillRect(hx, y, Math.round(bw * fr), 5); }
     y += 8;
+  } else if (p.maxArrows) {       // aljava do arqueiro: uma flechinha por flecha disponível
+    g.fillStyle = '#0e0a14'; g.fillRect(hx - 1, y - 1, bw + 2, 7);
+    for (let i = 0; i < p.maxArrows; i++) {
+      const x = hx + i * 9, on = i < p.arrows;
+      g.fillStyle = on ? '#2a2238' : '#1a1424'; g.fillRect(x, y, 7, 5);
+      g.fillStyle = on ? '#c89858' : '#3a2e44'; g.fillRect(x, y + 2, 5, 1);                          // haste
+      g.fillStyle = on ? '#e8f4ff' : '#4a3e58'; g.fillRect(x + 5, y + 1, 1, 3); g.fillRect(x + 6, y + 2, 1, 1);   // ponta
+      g.fillStyle = on ? '#e04a3a' : '#3a2e44'; g.fillRect(x, y + 1, 1, 1); g.fillRect(x, y + 3, 1, 1);           // penas
+    }
+    y += 8;
   }
   // barra do ataque especial
-  const sfr = clamp((p.sp || 0) / SPECIAL_MAX, 0, 1), full = sfr >= 1, blink = full && Math.floor(w.t * 6) % 2;
-  g.fillStyle = '#0e0a14'; g.fillRect(hx - 1, y - 1, bw + 2, 6);
-  g.fillStyle = '#4a3a1a'; g.fillRect(hx, y, bw, 4);
-  g.fillStyle = full ? (blink ? '#fff2a0' : '#ffd23f') : '#e0a020'; g.fillRect(hx, y, Math.round(bw * sfr), 4);
-  g.fillStyle = 'rgba(255,255,255,.35)'; g.fillRect(hx, y, Math.round(bw * sfr), 1);
+  // (pegando fogo quando está cheia: é o aviso para o jogador não esquecer de usar)
+  y += 3;                                                   // folga em cima para as labaredas
+  const sfr = clamp((p.sp || 0) / SPECIAL_MAX, 0, 1), full = sfr >= 1, fw = Math.round(bw * sfr), bh = 5;
   if (full) {
-    g.globalCompositeOperation = 'lighter'; drawGlow(g, hx + bw / 2, y + 2, 26, '#ffd23f', 0.25 + (blink ? 0.15 : 0)); g.globalAlpha = 1; g.globalCompositeOperation = 'source-over';
-    if (!document.body.classList.contains('touch')) drawTextO(g, (usePad ? padName(PadCfg.map.special[0]) : keyLabel('special')) + '!', hx + bw + 4, y - 1, '#ffd23f');
+    g.globalCompositeOperation = 'lighter'; drawGlow(g, hx + bw / 2, y + 2, 30, '#ff9a2a', 0.34 + Math.sin(w.t * 7) * 0.1); g.globalAlpha = 1; g.globalCompositeOperation = 'source-over';
+    // labaredas em volta: em cima da barra inteira e mais altas nas pontas
+    pixelFire(g, hx - 3, y, bw + 6, 9, w.t, 0, i => { const d = Math.min(i, bw + 5 - i); return d < 3 ? 0.5 + d * 0.15 : 0.6 + fnoise(i * 0.3, fireT(w.t) * 0.5) * 0.4; });
+  }
+  g.fillStyle = '#0e0a14'; g.fillRect(hx - 1, y - 1, bw + 2, bh + 2);
+  g.fillStyle = '#4a3a1a'; g.fillRect(hx, y, bw, bh);
+  g.fillStyle = full ? '#ffd23f' : '#e0a020'; g.fillRect(hx, y, fw, bh);
+  g.fillStyle = full ? '#fff9d0' : 'rgba(255,255,255,.35)'; g.fillRect(hx, y, fw, 1);
+  g.fillStyle = full ? '#ff9a2a' : '#b87410'; g.fillRect(hx, y + bh - 1, fw, 1);
+  if (full) {
+    // moldura em brasa, brilho que corre pela barra e fagulhas subindo
+    const tt = fireT(w.t);
+    for (let i = -1; i <= bw; i++) {
+      g.fillStyle = SP_FIRE[1 + Math.floor(fnoise(i * 0.5 + tt * 2, 3) * 2.99)]; g.fillRect(hx + i, y + bh, 1, 1);
+      if (i < 0 || i === bw) g.fillRect(hx + i, y - 1, 1, bh + 2);
+    }
+    const sx = Math.floor((w.t * 46) % (bw + 30)) - 8;
+    g.fillStyle = 'rgba(255,255,255,.75)';
+    for (let k = 1; k < bh - 1; k++) { const a = Math.max(0, sx - k), b = Math.min(bw, sx - k + 5); if (b > a) g.fillRect(hx + a, y + k, b - a, 1); }
+    for (let k = 0; k < 5; k++) {
+      const ph = (w.t * 0.9 + k * 0.37) % 1, ex = hx + Math.floor(hash2(k, Math.floor(w.t * 0.9 + k * 0.37), 5) * bw);
+      g.fillStyle = ph < 0.5 ? '#fff3a8' : '#ff7f1f'; g.fillRect(ex + Math.round(Math.sin(ph * 9 + k) * 1.5), y - 3 - Math.round(ph * 9), 1, 1);
+    }
+    const lb = spLabel(w, p);
+    if (lb) drawKeyCap(g, lb, hx + bw + 6, y - 2, w.t);
+  } else if (sfr >= 0.5) {
+    // quase lá: uma chaminha na ponta do preenchimento, crescendo conforme enche
+    pixelFire(g, hx + fw - 3, y, 5, Math.round(2 + (sfr - 0.5) * 8), w.t, 9, i => 1 - Math.abs(i - 2) * 0.3);
   }
   // habilidades (no celular elas aparecem nos próprios botões da tela)
   if (!document.body.classList.contains('touch')) {
@@ -2117,7 +2240,7 @@ function drawHud(g, w) {
     ['a', 'b', 'c'].forEach((k, i) => {
       const x = 4 + i * 17;
       drawPlate(g, x, sy, 14, 14);
-      const lowMana = p.cls.mana && p.mana < p.cost[i];
+      const lowMana = p.cls.mana ? p.mana < p.cost[i] : p.maxArrows && i < 2 && p.arrows < 1;   // sem mana / sem flechas
       g.fillStyle = lowMana ? '#7a2a3a' : '#5a4a80'; g.fillRect(x, sy, 14, 14);
       g.fillStyle = lowMana ? '#a03a4c' : '#7a68a8'; g.fillRect(x, sy, 14, 1);
       const frac = clamp(p.cd[k] / p.cdMax[i], 0, 1);

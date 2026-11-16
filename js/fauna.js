@@ -1,5 +1,5 @@
 'use strict';
-// ---------- Fauna dos mundos: lobo, cobra, slime gigante, múmia, ferreiro demônio, aranha ----------
+// ---------- Fauna dos mundos: lobo, cobra, slime gigante, múmia, ferreiro demônio, aranha, yeti das neves ----------
 // + "skins": o mesmo inimigo muda de cor conforme o mundo (falcão branco na neve, cavaleiro dourado no céu...)
 Object.assign(ENEMIES, {
   wolf:     { w: 20, h: 13, hp: 4,  speed: 30, stomp: true,  coin: 2, xp: 6 },
@@ -8,6 +8,7 @@ Object.assign(ENEMIES, {
   mummy:    { w: 12, h: 22, hp: 6,  speed: 14, stomp: true,  coin: 3, xp: 8 },
   smith:    { w: 20, h: 30, hp: 10, speed: 18, stomp: false, coin: 5, xp: 14 },
   spider:   { w: 14, h: 10, hp: 3,  speed: 40, stomp: true,  coin: 2, xp: 5, fly: true },
+  snowyeti: { w: 14, h: 27, hp: 7,  speed: 20, stomp: false, coin: 3, xp: 9 },
 });
 FLYERS.add('spider');                         // nasce pendurada no fio
 
@@ -298,6 +299,58 @@ function spiderSprite(pose, f, pal) {     // hang | walk (2) | leap
   return outline(g.toCanvas(), INK);
 }
 
+// ---------- Yeti das neves (filhote do Yeti Ancião: um pouco maior que o herói, sem lança) ----------
+// pose: walk (4) | run (4, braços esticados para agarrar) | roar (viu o herói) | wind (pata no alto) | swipe (patada)
+function snowyetiSprite(pose, f) {
+  const g = new PX(100, 84), cx = 42, feet = 80;
+  const F = ['#8a9ab8', '#b8c8e0', '#e4ecf8', '#ffffff'], skin = '#5a7ab8', skinL = '#9ab8e0', skinD = '#2a4a8a';
+  const C = sh(0, F[2], F[0], 2), CS = sh(0, skinL, skinD, 1);
+  const run = pose === 'run', mov = run || pose === 'walk', ph = f / 4 * Math.PI * 2, s = mov ? Math.sin(ph) : 0;
+  const lean = run ? 5 : pose === 'swipe' ? 7 : pose === 'wind' ? -3 : pose === 'roar' ? -2 : 0;
+  const bob = mov ? Math.round(Math.abs(Math.cos(ph)) * 2) : 0, ty = 40 + bob - (pose === 'roar' ? 2 : 0), bx = cx + lean;
+  const arm = (x0, y0, x1, y1, col) => { g.cap(x0, y0, x1, y1, 10, col, C); g.ell(x1, y1 + 1, 5.5, 5, skin, CS); };
+  const L = bx - 12, R = bx + 12, sy = ty + 5;
+  // braço de longe (atrás do corpo)
+  if (pose === 'roar') arm(L, sy, bx - 24, ty - 12, F[1]);
+  else if (run) arm(L, sy, bx + 21, ty + 9 - Math.round(s * 2), F[1]);
+  else if (pose === 'wind') arm(L, sy, bx - 7, ty - 27, F[1]);                 // pata no alto, por trás da cabeça
+  else if (pose === 'swipe') arm(L, sy, bx - 17, ty + 20, F[1]);
+  else arm(L, sy, bx - 16 - Math.round(s * 3), ty + 23, F[1]);
+  // pernas curtas e pés azuis
+  for (const side of [-1, 1]) {
+    const st = Math.round(s * side * (run ? 8 : 4)), lift = mov ? Math.round(Math.max(0, Math.cos(ph) * side) * (run ? 4 : 2)) : 0;
+    const fx = cx + side * 7 + st + (pose === 'swipe' ? side * 3 : 0), fy = feet - 3 - lift;
+    g.cap(bx + side * 6, 60 + bob, fx, fy - 3, 11, F[1], C);
+    g.ell(fx + 2, fy, 7.5, 3.2, skin, CS);
+  }
+  // tronco peludo
+  g.ell(bx, ty + 11, 16, 17, F[1], sh(0, F[3], F[0], 3));
+  g.ell(bx + 3, ty + 14, 8, 10, F[2], { flat: true });
+  for (let i = 0; i < 4; i++) g.poly([[bx - 14 + i * 8, ty + 25], [bx - 11 + i * 8, ty + 30], [bx - 8 + i * 8, ty + 25]], F[1], { flat: true });
+  // cabeça: chifrinhos, rosto azul, cenho bravo
+  const hx = bx + 3 + (run || pose === 'swipe' ? 2 : 0), hy = ty - 11;
+  g.ell(hx, hy, 12, 11, F[1], sh(0, F[3], F[0], 2));
+  for (const sd of [-1, 1]) g.poly([[hx + sd * 7, hy - 6], [hx + sd * 14, hy - 15], [hx + sd * 11, hy - 16], [hx + sd * 3, hy - 9]], '#e8dcc0', sh(0, '#ffffff', '#9a8a6a', 1));
+  g.ell(hx + 3, hy + 2, 8, 7, skin, CS);
+  const ec = pose === 'walk' ? '#ffec4a' : '#ff5a3a';
+  g.rect(hx - 1, hy - 1, 3, 2, ec); g.rect(hx + 5, hy - 1, 3, 2, ec);
+  g.line(hx - 3, hy - 4, hx + 2, hy - 2, '#1b1423'); g.line(hx + 10, hy - 4, hx + 5, hy - 2, '#1b1423');
+  if (pose === 'walk') { g.rect(hx, hy + 5, 7, 1, '#1b2a4a'); g.px(hx, hy + 4, '#ffffff'); g.px(hx + 6, hy + 4, '#ffffff'); }
+  else {                                                                     // boca aberta com presas
+    g.ell(hx + 3, hy + 6, 5, pose === 'roar' ? 4 : 3, '#3a0a1a', { flat: true });
+    for (const dx of [0, 5]) g.poly([[hx + dx, hy + 3], [hx + dx + 1, hy + 6], [hx + dx + 2, hy + 3]], '#ffffff', { flat: true });
+  }
+  // braço de perto (na frente do corpo)
+  if (pose === 'roar') arm(R, sy, bx + 24, ty - 12, F[2]);
+  else if (run) arm(R, sy, bx + 24, ty + 17 + Math.round(s * 2), F[2]);
+  else if (pose === 'wind') arm(R, sy, bx + 19, ty + 16, F[2]);
+  else if (pose === 'swipe') {
+    arm(R, sy, bx + 27, ty + 16, F[2]);
+    for (let i = 0; i < 3; i++) g.line(bx + 20 + i * 4, ty - 6 + i * 2, bx + 31 + i * 2, ty + 8 + i * 3, i === 1 ? '#ffffff' : '#bfe8ff');   // rastro das garras
+  } else arm(R, sy, bx + 16 + Math.round(s * 3), ty + 22, F[2]);
+  return outline(g.toCanvas(), INK);
+}
+
 // ---------- imagens ----------
 ENEMY_IMG.wolf = (e, lv) => {
   const k = WOLF_SKIN[lv && lv.theme] || 'gray', p = e.st === 'wind' ? 'wind' : e.st === 'leap' && !e.ground ? 'leap' : 'run';
@@ -315,7 +368,11 @@ ENEMY_IMG.spider = (e, lv) => {
   const k = SPIDER_PAL[lv && lv.theme] ? lv.theme : 'cave', p = e.st === 'hang' ? 'hang' : e.st === 'leap' || e.st === 'drop' ? 'leap' : 'walk', f = p === 'walk' ? fr(e, 8, 2) : 0;
   return spr2('spd' + k + p + f, () => spiderSprite(p, f, SPIDER_PAL[k]));
 };
-Object.assign(ENEMY_YOFF, { wolf: 1, snake: 1, bigslime: 2, mummy: 2, smith: 1, spider: 3 });
+ENEMY_IMG.snowyeti = e => {
+  const p = ['roar', 'wind', 'swipe', 'run'].includes(e.st) ? e.st : 'walk', f = (p === 'run' || p === 'walk') && Math.abs(e.vx) > 1 ? fr(e, p === 'run' ? 11 : 5, 4) : 0;
+  return spr2('syeti' + p + f, () => snowyetiSprite(p, f));
+};
+Object.assign(ENEMY_YOFF, { wolf: 1, snake: 1, bigslime: 2, mummy: 2, smith: 1, spider: 3, snowyeti: 2 });
 // fio da aranha pendurada
 ENEMY_PRE.spider = (g, e, cx, cy) => { if (e.st !== 'hang') return; g.globalAlpha = 0.55; g.fillStyle = '#e8e8ff'; g.fillRect(Math.round(cxOf(e) - cx), 0, 1, Math.max(0, Math.round(e.y + 2 - cy))); g.globalAlpha = 1; };
 
@@ -343,7 +400,7 @@ Object.assign(E_AI, {
     if (e.st === 'wind') {
       e.vx = 0; e.stT -= dt;
       if (e.stT <= 0) {
-        if (e.pick === 'spit') { e.st = 'spit'; e.stT = 0.4; lob(w, cxOf(e) + e.dir * 12, e.y - 10, cxOf(p), p.y + p.h - 3, 0.7, 380, { type: 'venom', w: 6, h: 6 }); sfx('hiss'); }
+        if (e.pick === 'spit') { e.st = 'spit'; e.stT = 0.4; lob(w, cxOf(e) + e.dir * 12, e.y - 10, cxOf(p), p.y + p.h - 3, 0.95 + Math.abs(cxOf(p) - cxOf(e)) / 320, 260, { type: 'venom', w: 6, h: 6 }); sfx('hiss'); }
         else { e.st = 'strike'; e.stT = 0.25; sfx('slash'); }
       }
     } else if (e.st === 'strike') { e.vx = e.dir * 40; e.stT -= dt; e.atk = { x: e.dir > 0 ? e.x + e.w - 2 : e.x - 22, y: e.y - 6, w: 24, h: 13 }; if (e.stT <= 0) { e.st = 'rest'; e.stT = 0.6; e.atk = null; } }
@@ -352,7 +409,7 @@ Object.assign(E_AI, {
       walk(w, e, e.speed, 130);
       if (e.cd <= 0 && dy < 40) {
         if (adx < 46) { e.st = 'wind'; e.pick = 'strike'; e.stT = 0.4; e.dir = dx > 0 ? 1 : -1; e.cd = 1.6; sfx('hiss'); }
-        else if (adx < 150 && Math.sign(dx) === e.dir) { e.st = 'wind'; e.pick = 'spit'; e.stT = 0.45; e.cd = 2.8; }
+        else if (adx < 150 && Math.sign(dx) === e.dir) { e.st = 'wind'; e.pick = 'spit'; e.stT = 0.6; e.cd = 3.4; sfx('hiss'); }
       }
     }
   },
@@ -404,6 +461,32 @@ Object.assign(E_AI, {
       walk(w, e, e.speed, 140); e.cd -= dt;
       if (e.cd <= 0 && Math.abs(dx) < 80 && Math.abs(p.y - e.y) < 40) { e.st = 'wind'; e.stT = 0.7; e.cd = 2.8; e.dir = dx > 0 ? 1 : -1; sfx('growl'); }
       else if (e.cd <= 0 && Math.abs(dx) < 170 && Math.abs(p.y - e.y) < 70) { e.st = 'toss'; e.stT = 0.55; e.cd = 3.2; e.dir = dx > 0 ? 1 : -1; }
+    }
+  },
+  // Yeti das neves: vigia devagar; ao ver o herói ruge e dispara na direção dele; de perto, dá uma patada.
+  // Só desiste se o herói ficar bem longe (ou fora de alcance, lá no alto).
+  snowyeti(w, e, dt) {
+    if (e.hurt > 0) { e.vx *= 0.9; e.atk = null; e.st = 'run'; return; }       // apanhou: já sabe onde o herói está
+    const p = e.tgt, dx = cxOf(p) - cxOf(e), adx = Math.abs(dx), dy = Math.abs(p.y + p.h - e.y - e.h), sl = e.slow > 0 ? 0.5 : 1;
+    e.cd -= dt;
+    if (e.st === 'roar') { e.vx = 0; e.stT -= dt; if (e.stT <= 0) e.st = 'run'; }
+    else if (e.st === 'wind') { e.vx = approach(e.vx, 0, 600 * dt); e.stT -= dt; if (e.stT <= 0) { e.st = 'swipe'; e.stT = 0.25; e.vx = e.dir * 70 * sl; sfx('slash'); } }
+    else if (e.st === 'swipe') {
+      e.vx = approach(e.vx, 0, 300 * dt); e.stT -= dt;
+      e.atk = { x: e.dir > 0 ? e.x + e.w - 2 : e.x - 18, y: e.y + 2, w: 20, h: 20 };
+      if (e.stT <= 0) { e.st = 'rest'; e.stT = 0.55; e.atk = null; }
+    } else if (e.st === 'rest') { e.vx = approach(e.vx, 0, 600 * dt); e.stT -= dt; if (e.stT <= 0) e.st = 'run'; }
+    else if (e.st === 'run') {
+      if (adx > 230 || dy > 80 || p.dead) { e.st = null; return; }
+      if (adx > 5) e.dir = dx > 0 ? 1 : -1;
+      e.vx = e.ground && (e.wall || ledgeAhead(w, e)) ? 0 : e.dir * 92 * sl;     // não se joga no buraco: fica esperando na beirada
+      if (e.cd <= 0 && adx < 30 && dy < 30) { e.st = 'wind'; e.stT = 0.32; e.cd = 1.2; }
+    } else {
+      walk(w, e, e.speed);
+      if (adx < 165 && dy < 44 && !p.dead) {
+        e.st = 'roar'; e.stT = 0.45; e.dir = dx > 0 ? 1 : -1; e.vx = 0; sfx('growl');
+        floatText(w, cxOf(e), e.y - 8, '!', '#ffe94d', true);
+      }
     }
   },
   // Aranha: pendurada no fio; cai quando o herói passa por baixo e depois persegue dando saltos

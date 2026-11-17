@@ -1727,18 +1727,19 @@ function drawKeyCap(g, t, x, y, wt) {
   drawText(g, t, x + 2, y + 1, '#3a1c08');
   return tw + 5;
 }
-// aura de fogo atrás do herói + a tecla em cima da cabeça de tempos em tempos
-function drawSpAura(g, w, p, cx, cy, tag) {
+// especial pronto: contorno amarelo suave em volta da silhueta do herói (pulsa devagar) e um halo leve atrás
+// (desenhado antes do herói: só a borda de fora aparece) + a tecla em cima da cabeça de tempos em tempos
+function drawSpAura(g, w, p, cx, cy, img) {
   if (p.sp < SPECIAL_MAX || p.dead) { p.spAt = 0; return; }
   if (!p.spAt) p.spAt = w.t;
-  const x = Math.round(cxOf(p) - cx), y = Math.round(p.y + p.h - cy), wd = 30, hw = wd / 2;
-  g.globalCompositeOperation = 'lighter'; drawGlow(g, x, y - 12, 28, '#ff9a2a', 0.38 + Math.sin(w.t * 7) * 0.1); g.globalCompositeOperation = 'source-over';
+  const x = cxOf(p), y = p.y + p.h + 2, pulse = 0.5 + Math.sin(w.t * 3.5) * 0.5, glow = tintOf(img, '#ffd84a');
+  g.globalCompositeOperation = 'lighter'; drawGlow(g, Math.round(x - cx), Math.round(y - 13 - cy), 20, '#ffd84a', 0.14 + pulse * 0.08); g.globalCompositeOperation = 'source-over';
+  g.globalAlpha = 0.4 + pulse * 0.2;
+  for (const [dx, dy] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) drawSprite(g, glow, x + dx * 0.5, y + dy * 0.5, p.face < 0, cx, cy);   // 1 px da arte em volta
   g.globalAlpha = 1;
-  pixelFire(g, x - hw, y + 2, wd, 44, w.t, (p.id | 0) * 31, i => 1 - Math.pow(Math.abs(i + 0.5 - hw) / hw, 2) * 0.85, 0.2, 0.3);
 }
 function drawSpPrompt(g, w, p, cx, cy, tag) {
   if (!p.spAt || p.dead) return;
-  pixelFire(g, Math.round(cxOf(p) - cx) - 10, Math.round(p.y + p.h - cy) + 2, 20, 6, w.t, (p.id | 0) * 31 + 50, i => 0.5 + fnoise(i * 0.6, fireT(w.t)) * 0.5);   // chamas baixas na frente dos pés
   const ph = (w.t - p.spAt) % 6, t = ph > 1 && ph < 3.6 ? spLabel(w, p) : '';
   if (t) drawKeyCap(g, t, cxOf(p) - cx - (textW(t) + 3) / 2, p.y - (tag ? 25 : 15) - cy, w.t);
 }
@@ -1747,7 +1748,7 @@ function drawSpPrompt(g, w, p, cx, cy, tag) {
 function drawPlayer(g, w, p, cx, cy, tag) {
   if (p.out || (p.inv > 0 && !p.dead && Math.floor(w.t * 20) % 2)) return;
   const img = playerImage(p);
-  drawSpAura(g, w, p, cx, cy, tag);
+  drawSpAura(g, w, p, cx, cy, img);
   if (p.dash > 0 || p.flipT > 0) { // rastro de imagens
     for (let i = 3; i >= 1; i--) { g.globalAlpha = 0.14 * (4 - i); drawSprite(g, p.dashKind === 'shadow' ? tintOf(img, '#6a4fa0') : img, cxOf(p) - p.face * i * (p.dash > 0 ? 7 : 0), p.y + p.h + 2 - (p.dash > 0 ? 0 : -i * 3), p.face < 0, cx, cy); }
     g.globalAlpha = 1;

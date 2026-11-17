@@ -557,19 +557,29 @@ Object.assign(E_AI, {
       case 'spit': e.vx = 0; if (e.stT <= 0) { e.st = 'idle'; e.stT = 1; } break;
     }
   },
-  // Escorpião Imperador: investida (bate na parede e fica tonto), rajada de ferrões e mergulho na areia
+  // Escorpião Imperador: investida (bate na parede e fica tonto), chama a ninhada (filhotes saem da areia) e mergulho na areia
   scorpking(w, e, dt) {
     const A = arenaOf(w), p = e.tgt, pc = cxOf(p), ec = cxOf(e), rage = rageOf(e);
     e.stT -= dt; e.invul = e.st === 'burrow';
     switch (e.st) {
-      case 'idle': e.vx = 0; e.dir = pc > ec ? 1 : -1; if (e.stT <= 0) { pickAtk(e, ['charge', 'volley', 'burrow']); e.st = 'tele'; e.stT = 0.6; } break;
+      case 'idle': e.vx = 0; e.dir = pc > ec ? 1 : -1; if (e.stT <= 0) {
+        // com a arena já cheia de filhotes ele não chama mais (no máximo 4; 5 na fúria)
+        const kids = w.enemies.filter(k => k.minion && !k.dead).length;
+        pickAtk(e, kids < (rage ? 5 : 4) ? ['charge', 'brood', 'burrow'] : ['charge', 'burrow']); e.st = 'tele'; e.stT = 0.6;
+      } break;
       case 'tele':
         e.vx = 0; if (e.stT > 0) break;
         if (e.pick === 'charge') { e.st = 'charge'; e.stT = 2.4; e.dir = pc > ec ? 1 : -1; sfx('dash'); }
-        else if (e.pick === 'volley') {
-          e.st = 'sting'; e.stT = 0.8; const n = rage ? 5 : 3;
-          for (let i = 0; i < n; i++) lob(w, ec - e.dir * 4, e.y - 14, pc + (i - (n - 1) / 2) * 26, A.gy - 4, 0.75, 380, { type: 'sting', w: 6, h: 6 });
-          sfx('spear');
+        else if (e.pick === 'brood') {
+          // ergue o ferrão e bate na areia: escorpiões menores saem do chão dos dois lados dele e pulam na direção do herói
+          e.st = 'sting'; e.stT = 0.9; const n = rage ? 3 : 2;
+          for (let i = 0; i < n; i++) {
+            const side = i % 2 ? -1 : 1, x = clamp(ec + side * (34 + (i >> 1) * 18), A.x0 + 12, A.x1 - 12);
+            const k = spawnEnemy(w, 'scorpion', x, A.gy);
+            k.dir = pc > x ? 1 : -1; k.vy = -190; k.vx = k.dir * 50; k.cd = 0.8;
+            burst(w, x, A.gy, '#e0b070', 12, 90, 0.5);
+          }
+          feel(w, null, 0, 0.25); sfx('boom');
         } else { e.st = 'burrow'; e.stT = rage ? 1.6 : 2.0; e.dustT = 0; sfx('dash'); burst(w, ec, e.y + e.h, '#e0b070', 20, 90, 0.6); }
         break;
       case 'charge':

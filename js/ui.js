@@ -29,43 +29,22 @@ const PAL = {
   metal: ['#cfd8e3', '#ffd23f', '#b87333', '#9aa5b1', '#6b4423', '#8a5a2b', '#e8e0c8', '#7bd3ff'],
   accent: ['#ffd23f', '#ff4d6d', '#4aa3ff', '#7bff9a', '#c77dff', '#ff8a1f', '#ffffff', '#2ee6d6'],
 };
-const TABS = [
-  { id: 'classe', label: 'Classe', fields: [
-    { type: 'class' },
-    { k: 'elem', type: 'choice', label: 'Elemento inicial da magia (dá para trocar durante a fase)', opts: ELEMENTS.map(e => e.icon + ' ' + e.name), when: c => c.cls === 'mago' },
-  ] },
-  { id: 'corpo', label: 'Corpo', fields: [
-    { k: 'body', label: 'Corpo', type: 'choice', opts: OPTS.bodies },
-    { k: 'height', label: 'Altura', type: 'choice', opts: OPTS.heights },
-    { k: 'build', label: 'Porte', type: 'choice', opts: OPTS.builds },
-    { k: 'skin', label: 'Pele', type: 'color', pal: 'skin' },
-    { k: 'face', label: 'Rosto (cicatrizes, barba, pintura)', type: 'choice', opts: OPTS.faces },
-    { k: 'accent', label: 'Cor da pintura (a mesma da joia / magia)', type: 'color', pal: 'accent', when: c => c.face === 7 || c.face === 8 },
-    { k: 'eyes', label: 'Cor dos olhos', type: 'color', pal: 'eyes' },
-  ] },
-  { id: 'cabelo', label: 'Cabelo', fields: [
-    { k: 'hair', label: 'Estilo', type: 'choice', opts: OPTS.hairs },
-    { k: 'hairColor', label: 'Cor do cabelo', type: 'color', pal: 'hair' },
-  ] },
-  { id: 'roupa', label: 'Roupa', fields: [
-    { k: 'outfit', label: 'Estilo', type: 'choice', opts: OPTS.outfits },
-    { k: 'primary', label: 'Cor principal', type: 'color', pal: 'cloth' },
-    { k: 'secondary', label: 'Cor secundária', type: 'color', pal: 'cloth' },
-  ] },
-  { id: 'extras', label: 'Extras', fields: [
-    { k: 'head', label: 'Chapéu / elmo', type: 'choice', opts: OPTS.heads },
-    { k: 'headColor', label: 'Cor do chapéu', type: 'color', pal: 'cloth', when: c => c.head > 0 },
-    { k: 'cape', label: 'Capa', type: 'choice', opts: OPTS.capes },
-    { k: 'capeColor', label: 'Cor da capa e do lenço', type: 'color', pal: 'cloth', when: c => c.cape > 0 || c.cls === 'guerreiro' },
-    { k: 'acc', label: 'Acessório', type: 'choice', opts: OPTS.accs },
-    { k: 'accColor', label: 'Cor do acessório', type: 'color', pal: 'cloth', when: c => c.acc > 0 },
-  ] },
-  { id: 'equip', label: 'Equipamento', fields: [
-    { k: 'weaponColor', label: 'Cor da arma', type: 'color', pal: 'metal' },
-    { k: 'accent', label: 'Cor da joia / magia', type: 'color', pal: 'accent' },
-    // herói já criado: o elemento inicial muda aqui (durante a fase, troca-se com a tecla/botão de elemento ou na pausa)
-    { k: 'elem', type: 'choice', label: 'Elemento da magia (dá para trocar durante a fase)', opts: ELEMENTS.map(e => e.icon + ' ' + e.name), when: c => c.cls === 'mago' && Creator.mode === 'edit' && !Creator.wardrobe },
-  ] },
+// Linhas da aparência no criador: "◀ Cabelo / Espetado ▶" + as cores daquele item (a paleta abre num balão ao clicar).
+// colors: [chave, paleta, nome, quando aparece]. Cor que não se aplica fica como espaço vazio, para as colunas não pularem.
+const LOOK = [
+  { k: 'body', label: 'Corpo', opts: OPTS.bodies },
+  { k: 'height', label: 'Altura', opts: OPTS.heights },
+  { k: 'build', label: 'Porte', opts: OPTS.builds },
+  { label: 'Pele e olhos', colors: [['skin', 'skin', 'Cor da pele'], ['eyes', 'eyes', 'Cor dos olhos']] },
+  { k: 'face', label: 'Rosto', opts: OPTS.faces },
+  { k: 'hair', label: 'Cabelo', opts: OPTS.hairs, colors: [['hairColor', 'hair', 'Cor do cabelo']] },
+  { k: 'outfit', label: 'Roupa', opts: OPTS.outfits, colors: [['primary', 'cloth', 'Cor principal da roupa'], ['secondary', 'cloth', 'Cor secundária da roupa']] },
+  { k: 'head', label: 'Chapéu', opts: OPTS.heads, colors: [['headColor', 'cloth', 'Cor do chapéu', c => c.head > 0]] },
+  { k: 'cape', label: 'Capa', opts: OPTS.capes, colors: [['capeColor', 'cloth', 'Cor da capa e do lenço', c => c.cape > 0 || c.cls === 'guerreiro']] },
+  { k: 'acc', label: 'Acessório', opts: OPTS.accs, colors: [['accColor', 'cloth', 'Cor do acessório', c => c.acc > 0]] },
+  { label: 'Arma e magia', colors: [['weaponColor', 'metal', 'Cor da arma'], ['accent', 'accent', 'Cor da joia, da magia e da pintura de guerra']] },
+  // elemento inicial do mago (durante a fase troca-se com a tecla/botão de elemento ou na pausa)
+  { k: 'elem', label: 'Elemento', opts: ELEMENTS.map(e => e.icon + ' ' + e.name), when: c => c.cls === 'mago' && !Creator.wardrobe },
 ];
 const POSE_LIST = {
   guerreiro: [['Parado', 'idle'], ['Correr', 'run'], ['Espada', 'atk'], ['Lança', 'cast'], ['Escudo', 'block']],
@@ -245,13 +224,13 @@ function padMenu(m) {
     $$('.padfocus').forEach(el => el.classList.remove('padfocus'));
     nx.classList.add('padfocus'); nx.focus({ preventScroll: true }); nx.scrollIntoView({ block: 'nearest' });
   } else if (m.ok && cur >= 0) items[cur].click();
-  else if (m.back) { const b = $('[id$="-back"], #b-resume, #b-mp-leave, #b-win-menu', scr); if (b && b.offsetParent !== null) b.click(); }
+  else if (m.back) { if (closeSwatchPop(Creator.popAnchor)) return; const b = $('[id$="-back"], #b-resume, #b-mp-leave, #b-win-menu', scr); if (b && b.offsetParent !== null) b.click(); }
 }
 Input.onPadMenu = padMenu;
 
 // ---------- Criador de personagem ----------
 // mode: 'new' = criando um herói novo · 'edit' = mudando a aparência de um herói salvo (a classe fica)
-const Creator = { ch: null, tab: 'classe', pose: 0, spr: null, t: 0, from: 'title', wardrobe: false, mode: 'new' };
+const Creator = { ch: null, pose: 0, preset: -1, spr: null, t: 0, from: 'title', wardrobe: false, mode: 'new' };
 // classe e elemento travados: trocando de roupa na pausa ou editando um herói que já tem evolução
 const crLocked = () => Creator.wardrobe || Creator.mode === 'edit';
 
@@ -260,9 +239,9 @@ function openWardrobe() {
   const w = Game.world; if (!w) return;
   Creator.from = 'pause'; Creator.wardrobe = true;
   Creator.ch = { ...DEFAULT_CHAR, ...w.p.ch };
-  Creator.tab = 'roupa'; Creator.pose = 0;
+  Creator.pose = 0; Creator.preset = -1;
   $('#cr-name').value = Creator.ch.name;
-  renderTabs(); renderPanel(); renderPoses(); renderPresets(); rebuildPreview();
+  renderCreator();
   show('creator');                                  // o jogo continua pausado (no multiplayer, rodando)
 }
 function applyWardrobe() {
@@ -280,98 +259,134 @@ function openCreator(mode = 'new', from = 'play') {
   // heróis salvos antes da cor do acessório existir: começa com a cor que já aparecia
   const oldAcc = sv.acc === 5 ? sv.secondary : sv.acc === 3 ? sv.accent : sv.acc === 1 ? '#14101a' : sv.acc === 2 ? '#16121c' : undefined;
   Creator.ch = { ...DEFAULT_CHAR, ...(sv.accColor || !oldAcc ? {} : { accColor: oldAcc }), ...sv };
-  Creator.tab = mode === 'edit' ? 'corpo' : 'classe'; Creator.pose = 0;
+  Creator.pose = 0; Creator.preset = -1;
   $('#cr-name').value = mode === 'edit' ? Creator.ch.name : '';
-  renderTabs(); renderPanel(); renderPoses(); renderPresets(); rebuildPreview();
+  renderCreator();
   Snd.music('menu');
   show('creator');
 }
 function rebuildPreview() { Creator.spr = buildPlayerSprites(Creator.ch); }
-function renderTabs() {
-  const el = $('#cr-tabs'); el.innerHTML = '';
-  TABS.forEach(t => {
-    if (crLocked() && t.id === 'classe') return;
-    const b = document.createElement('button');
-    b.className = 'tab' + (t.id === Creator.tab ? ' on' : ''); b.textContent = t.label;
-    b.onclick = () => { Creator.tab = t.id; Snd.sfx('click'); renderTabs(); renderPanel(); };
+function renderCreator() {
+  closeSwatchPop();
+  $('#cr-title').textContent = Creator.wardrobe ? 'Trocar de roupa' : Creator.mode === 'edit' ? 'Editar herói' : 'Novo herói';
+  renderClasses(); renderPanel(); renderPoses(); renderPresets(); rebuildPreview();
+}
+// seletor "◀ rótulo / valor ▶": dir = -1 ou +1. label vazio = só o valor
+function stepper(label, value, onStep, title = '') {
+  const box = document.createElement('div'); box.className = 'stp';
+  const mk = (cls, dir, tip) => {
+    const b = document.createElement('button'); b.className = 'ar ' + cls; b.title = tip; b.setAttribute('aria-label', tip);
+    b.onclick = () => { Snd.sfx('click'); onStep(dir); };
+    return b;
+  };
+  const mid = document.createElement('span'); mid.className = 'stp-v'; if (title) mid.title = title;
+  mid.innerHTML = (label ? `<small>${label}</small>` : '') + `<b>${value}</b>`;
+  box.append(mk('l', -1, 'Anterior'), mid, mk('r', 1, 'Próximo'));
+  return box;
+}
+const wrapIdx = (i, n) => (i + n) % n;
+// classe: só os 4 retratos e, embaixo, o resumo da escolhida (no lugar de 4 cartões cheios de texto)
+const _clsFaces = {};
+function renderClasses() {
+  const sec = $('#cr-class-sec'), ch = Creator.ch;
+  sec.hidden = crLocked();
+  if (sec.hidden) return;
+  const el = $('#cr-classes'); el.innerHTML = '';
+  for (const id in CLASSES) {
+    const c = CLASSES[id], b = document.createElement('button'), fk = id + (ch.body | 0);
+    b.className = 'cr-cls' + (ch.cls === id ? ' on' : ''); b.title = c.desc;
+    const img = new Image(); img.alt = '';
+    img.src = _clsFaces[fk] || (_clsFaces[fk] = buildPlayerSprites({ ...DEFAULT_CHAR, ...lookOf(id, ch.body | 0) }).face().toDataURL());
+    const nm = document.createElement('span'); nm.textContent = c.name;
+    b.append(img, nm);
+    // trocar de classe veste o herói com o visual de referência dela (dá para mudar tudo na aparência)
+    b.onclick = () => {
+      if (ch.cls === id) return;
+      Object.assign(ch, lookOf(id, ch.body | 0), { name: ch.name, elem: ch.elem, height: ch.height, build: ch.build, face: ch.face });
+      Snd.sfx('click'); changed(true);
+    };
     el.appendChild(b);
-  });
+  }
+  const c = CLASSES[ch.cls];
+  $('#cr-cinfo').innerHTML = `<p>${c.desc}</p><p class="cr-stats"><span class="hp">${'♥'.repeat(c.hp)}</span>${c.mana ? '<span class="mp">mana</span>' : ''}</p>` +
+    `<ul>${c.skills.map(s => `<li title="${s.desc.replace(/"/g, '&quot;')}"><b>${s.key}</b> ${s.name}</li>`).join('')}</ul>`;
 }
 function renderPoses() {
-  const el = $('#pv-pose'); el.innerHTML = '';
-  const list = POSE_LIST[Creator.ch.cls];
+  const el = $('#pv-pose'), list = POSE_LIST[Creator.ch.cls];
   if (Creator.pose >= list.length) Creator.pose = 0;
-  list.forEach((p, i) => {
-    const b = document.createElement('button');
-    b.className = 'chip' + (i === Creator.pose ? ' on' : ''); b.textContent = p[0];
-    b.onclick = () => { Creator.pose = i; renderPoses(); };
-    el.appendChild(b);
-  });
+  el.innerHTML = '';
+  el.appendChild(stepper('', list[Creator.pose][0], d => { Creator.pose = wrapIdx(Creator.pose + d, list.length); renderPoses(); }, 'Pose da prévia'));
 }
+// personagens prontos: as setas passam por eles e já vestem o herói
 function renderPresets() {
-  const el = $('#presets'); el.innerHTML = '';
-  PRESETS.forEach(p => {
-    const b = document.createElement('button');
-    b.className = 'chip'; b.textContent = p.name; b.title = 'Usar personagem pronto';
-    b.onclick = () => { Creator.ch = crLocked() ? { ...p, cls: Creator.ch.cls, elem: Creator.ch.elem } : { ...p }; $('#cr-name').value = p.name; changed(true); };
-    el.appendChild(b);
-  });
+  const el = $('#presets'), i = Creator.preset | 0;
+  el.innerHTML = '';
+  el.appendChild(stepper('Prontos', i < 0 ? '—' : PRESETS[i].name, d => {
+    const n = Creator.preset = wrapIdx((Creator.preset < 0 ? (d > 0 ? -1 : 0) : Creator.preset) + d, PRESETS.length), p = PRESETS[n];
+    Creator.ch = crLocked() ? { ...p, cls: Creator.ch.cls, elem: Creator.ch.elem } : { ...p };
+    $('#cr-name').value = p.name; changed(true); renderPresets();
+  }, 'Usar um personagem pronto'));
 }
 function changed(full) {
   rebuildPreview();
-  if (full) { renderPanel(); renderPoses(); }
+  if (full) { renderClasses(); renderPanel(); renderPoses(); }
 }
 function renderPanel() {
-  const el = $('#cr-panel'), tab = TABS.find(t => t.id === Creator.tab), ch = Creator.ch;
+  const el = $('#cr-panel'), ch = Creator.ch;
   el.innerHTML = '';
-  for (const f of tab.fields) {
+  for (const f of LOOK) {
     if (f.when && !f.when(ch)) continue;
-    const box = document.createElement('div'); box.className = 'fld';
-    if (f.type === 'class') {
-      const grid = document.createElement('div'); grid.className = 'cls';
-      for (const id in CLASSES) {
-        const c = CLASSES[id], b = document.createElement('button');
-        b.className = 'card' + (ch.cls === id ? ' on' : '');
-        const hp = '❤'.repeat(c.hp) + (c.mana ? ' · mana' : '');
-        b.innerHTML = `<h3>${c.icon} ${c.name}</h3><p>${c.desc}<br>${hp}</p><ul>${c.skills.map(s => `<li><b>${s.key}</b> ${s.name}<span>${s.desc}</span></li>`).join('')}</ul>`;
-        // trocar de classe veste o herói com o visual de referência dela (dá para mudar tudo nas outras abas)
-        b.onclick = () => { Object.assign(ch, lookOf(id, ch.body | 0), { name: ch.name, elem: ch.elem, height: ch.height, build: ch.build, face: ch.face }); Snd.sfx('click'); changed(true); };
-        grid.appendChild(b);
-      }
-      box.appendChild(grid);
-    } else if (f.type === 'choice') {
-      box.innerHTML = `<label>${f.label}</label>`;
-      const chips = document.createElement('div'); chips.className = 'chips';
-      f.opts.forEach((o, i) => {
-        const b = document.createElement('button');
-        b.className = 'chip' + (ch[f.k] === i ? ' on' : ''); b.textContent = o;
-        b.onclick = () => { ch[f.k] = i; Snd.sfx('click'); changed(true); };
-        chips.appendChild(b);
-      });
-      box.appendChild(chips);
-    } else {
-      box.innerHTML = `<label>${f.label}</label>`;
-      const sw = document.createElement('div'); sw.className = 'sw';
-      const cur = String(ch[f.k] || '#ffffff').toLowerCase(), inPal = PAL[f.pal].includes(cur);
-      // quadrado vazio no fim: abre o seletor para escolher exatamente a cor deste item
-      const custom = document.createElement('label'); custom.className = 'custom' + (inPal ? '' : ' on'); custom.title = 'Escolher qualquer cor';
-      custom.innerHTML = '+<i></i>';
-      const input = document.createElement('input'); input.type = 'color'; input.value = cur;
-      const mark = $('i', custom); mark.style.background = cur;
-      custom.appendChild(input);
-      const btns = [];
-      PAL[f.pal].forEach(c => {
-        const b = document.createElement('button');
-        b.style.background = c; b.className = cur === c ? 'on' : ''; b.title = c;
-        b.onclick = () => { ch[f.k] = c; input.value = c; btns.forEach(x => x.classList.toggle('on', x === b)); custom.classList.remove('on'); changed(false); };
-        btns.push(b); sw.appendChild(b);
-      });
-      input.oninput = () => { ch[f.k] = input.value; mark.style.background = input.value; btns.forEach(x => x.classList.remove('on')); custom.classList.add('on'); changed(false); };
-      sw.appendChild(custom); box.appendChild(sw);
+    const row = document.createElement('div'); row.className = 'cr-row';
+    if (f.opts) row.appendChild(stepper(f.label, f.opts[ch[f.k] | 0], d => { ch[f.k] = wrapIdx((ch[f.k] | 0) + d, f.opts.length); changed(true); }));
+    else { const lb = document.createElement('span'); lb.className = 'cr-lb'; lb.textContent = f.label; row.appendChild(lb); }
+    const cols = document.createElement('div'); cols.className = 'cr-cols';
+    for (const [k, pal, name, when] of f.colors || []) {
+      const b = document.createElement('button'); b.className = 'cr-sw';
+      if (when && !when(ch)) { b.disabled = true; b.classList.add('off'); }
+      else { b.style.background = ch[k] || '#ffffff'; b.title = name; b.setAttribute('aria-label', name); b.onclick = () => { Snd.sfx('click'); openSwatchPop(b, k, pal, name); }; }
+      cols.appendChild(b);
     }
-    el.appendChild(box);
+    row.appendChild(cols);
+    el.appendChild(row);
   }
 }
+// balão com a paleta de um item (fecha ao escolher, ao clicar fora ou com Esc / B do controle)
+function openSwatchPop(anchor, k, pal, name) {
+  const pop = $('#cr-pop'), ch = Creator.ch, cur = String(ch[k] || '#ffffff').toLowerCase();
+  if (!pop.hidden && pop.dataset.k === k) { closeSwatchPop(); return; }
+  pop.dataset.k = k; pop.innerHTML = `<p>${name}</p>`; Creator.popAnchor = anchor;
+  const grid = document.createElement('div'); grid.className = 'cr-pal';
+  const pick = c => { ch[k] = c; anchor.style.background = c; changed(false); };
+  for (const c of PAL[pal]) {
+    const b = document.createElement('button'); b.style.background = c; b.title = c; b.className = c === cur ? 'on' : '';
+    b.onclick = () => { Snd.sfx('click'); pick(c); closeSwatchPop(anchor); };
+    grid.appendChild(b);
+  }
+  // "+": qualquer cor (seletor do sistema)
+  const custom = document.createElement('label'); custom.className = 'custom' + (PAL[pal].includes(cur) ? '' : ' on'); custom.title = 'Escolher qualquer cor';
+  custom.textContent = '+';
+  const input = document.createElement('input'); input.type = 'color'; input.value = cur;
+  input.oninput = () => { pick(input.value); custom.classList.add('on'); $$('button', grid).forEach(x => x.classList.remove('on')); };
+  custom.appendChild(input); grid.appendChild(custom);
+  pop.appendChild(grid);
+  pop.hidden = false;
+  // posiciona embaixo do quadradinho (ou em cima, se não couber), dentro do painel
+  const box = $('.creator').getBoundingClientRect(), a = anchor.getBoundingClientRect(), pw = pop.offsetWidth, ph = pop.offsetHeight;
+  let x = a.left + a.width / 2 - pw / 2 - box.left, y = a.bottom + 6 - box.top;
+  if (y + ph > box.height - 4) y = a.top - ph - 6 - box.top;
+  pop.style.left = Math.round(clamp(x, 4, box.width - pw - 4)) + 'px'; pop.style.top = Math.round(Math.max(4, y)) + 'px';
+  const on = $('button.on', grid) || $('button', grid);
+  if (on && $('.padfocus')) { $$('.padfocus').forEach(el => el.classList.remove('padfocus')); on.classList.add('padfocus'); on.focus({ preventScroll: true }); }
+}
+function closeSwatchPop(back) {
+  const pop = $('#cr-pop');
+  if (!pop || pop.hidden) return false;
+  pop.hidden = true; pop.dataset.k = '';
+  if (back && $('.padfocus')) { $$('.padfocus').forEach(el => el.classList.remove('padfocus')); back.classList.add('padfocus'); back.focus({ preventScroll: true }); }
+  return true;
+}
+document.addEventListener('pointerdown', e => { if (!e.target.closest('#cr-pop, .cr-sw')) closeSwatchPop(); });
+addEventListener('keydown', e => { if (e.code === 'Escape' && closeSwatchPop()) e.stopPropagation(); }, true);
 function randomChar() {
   const pick = a => a[(Math.random() * a.length) | 0], ri = n => (Math.random() * n) | 0;
   const c = Creator.ch;
@@ -381,6 +396,7 @@ function randomChar() {
     head: Math.random() < 0.5 ? 0 : 1 + ri(OPTS.heads.length - 1), headColor: pick(PAL.cloth), cape: ri(3), capeColor: pick(PAL.cloth),
     acc: Math.random() < 0.5 ? 0 : 1 + ri(OPTS.accs.length - 1), accColor: pick(PAL.cloth), weaponColor: pick(PAL.metal), accent: pick(PAL.accent),
   });
+  Creator.preset = -1; renderPresets(); closeSwatchPop();
   changed(true);
 }
 function drawPreview(t) {

@@ -104,7 +104,7 @@ function every(ms, fn) { Net.timers.push(setInterval(fn, ms)); }
 function cleanChar(ch) {
   const c = { ...DEFAULT_CHAR }, src = ch && typeof ch === 'object' ? ch : {};
   const nOpts = { elem: ELEMENTS.length };
-  for (const t of TABS) for (const f of t.fields) if (f.type === 'choice') nOpts[f.k] = f.opts.length;
+  for (const f of LOOK) if (f.opts) nOpts[f.k] = f.opts.length;
   for (const k in c) {
     const v = src[k];
     if (k === 'name') c.name = String(v || 'Herói').slice(0, 14);

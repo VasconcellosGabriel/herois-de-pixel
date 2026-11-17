@@ -93,23 +93,32 @@
 <!-- Criador de personagem -->
 <section id="s-creator" class="screen">
   <div class="creator">
+    <div class="cr-ribbon" id="cr-title">Novo herói</div>
     <div class="cr-left">
-      <canvas id="pv" width="96" height="96"></canvas>
-      <div class="chips" id="pv-pose"></div>
+      <div class="cr-frame"><canvas id="pv" width="96" height="96"></canvas></div>
+      <div class="cr-step" id="pv-pose"></div>
       <input id="cr-name" maxlength="14" placeholder="Nome do herói" autocomplete="off">
-      <div class="row">
-        <button class="btn small" id="b-random">🎲 Aleatório</button>
+      <div class="cr-quick">
+        <button class="cr-dice" id="b-random" title="Aparência aleatória">🎲</button>
+        <div class="cr-step" id="presets"></div>
       </div>
-      <div class="presets" id="presets"></div>
     </div>
     <div class="cr-right">
-      <div class="tabs" id="cr-tabs"></div>
-      <div class="cr-panel" id="cr-panel"></div>
+      <div class="cr-sec" id="cr-class-sec">
+        <h3 class="cr-h">Classe</h3>
+        <div class="cr-classes" id="cr-classes"></div>
+        <div class="cr-cinfo" id="cr-cinfo"></div>
+      </div>
+      <div class="cr-sec cr-grow">
+        <h3 class="cr-h">Aparência</h3>
+        <div class="cr-look" id="cr-panel"></div>
+      </div>
       <div class="row end">
         <button class="btn small" id="b-cr-back">← Voltar</button>
         <button class="btn" id="b-cr-done">✔ Pronto!</button>
       </div>
     </div>
+    <div class="cr-pop" id="cr-pop" hidden></div>
   </div>
 </section>
 

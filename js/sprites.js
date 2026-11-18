@@ -341,7 +341,7 @@ const TORSO_H = 15, LEG_HS = [15, 17, 19], ARM_LEN = 8, TORSO_W = [12, 14, 16];
 const HAIR_LAYERS = new Set(['cabelo_tras', 'cabelo_frente']);
 // chapéus que escondem o cabelo: 1 = só o que fica acima da aba · 2 = também o volume atrás da cabeça (elmo, capuz)
 const HAT_COVERS = { 1: 1, 2: 2, 7: 2 };
-const POSES = { idle: 5, run: 8, jump: 3, land: 1, crouch: 5, atk: 4, cast: 3, block: 1, hurt: 1, dash: 1, roll: 4, flip: 4, glide: 2, aim: 12 };
+const POSES = { idle: 5, run: 8, jump: 3, land: 1, crouch: 5, atk: 4, cast: 3, block: 1, hurt: 1, dash: 1, roll: 4, flip: 4, glide: 2, flap: 4, aim: 12, lift: 4 };
 const AIM_STEPS = 12;
 const aimDeg = i => -90 + i * 15;                       // quadro de mira -> ângulo (graus, 0 = frente, negativo = cima)
 const aimIdx = deg => clamp(Math.round((deg + 90) / 15), 0, AIM_STEPS - 1);
@@ -395,11 +395,15 @@ function skeletonFor(pose, f, cls, ang) {
       if (war) { S.armF = f === 2 ? [-6, -3] : [-6, 8]; S.wAng = f === 2 ? -140 : -78; S.armB = [5, 8]; }
       else if (mage) { S.armF = [11, 8 - f]; S.wAng = 142; }
       else if (arc) { S.armB = [6, 9]; S.aim = { dx: 0.9, dy: 0.44 }; }
-      S.wing = f === 2 ? 1 : 0;
+      S.wing = f === 2 ? 1 : drg && f === 0 ? 4 : 0;                     // dragônico subindo: asas recém-batidas para baixo
       break;
     }
-    case 'glide':
-      S.legF = [-9, 4]; S.legB = [-6, 7]; S.armF = [-8, 8]; S.armB = [9, 5]; S.lean = 3; S.flow = 4; S.wing = f ? 3 : 2; S.bendMax = 5; break;
+    case 'glide':   // planando: asas esticadas e paradas (o quadro 1 só sobe o corpo 1 px, como se flutuasse no ar)
+      S.legF = [-9, 4]; S.legB = [-6, 7]; S.armF = [-8, 8]; S.armB = [9, 5]; S.lean = 3; S.flow = f ? 3.5 : 4; S.bob = f ? -1 : 0; S.wing = 3; S.bendMax = 5; break;
+    case 'flap':    // pulo duplo do dragônico: ergue as asas e bate com força para baixo
+      S.flow = 4; S.bendMax = 5; S.lean = 1;
+      S.legF = [-5, f >= 2 ? 3 : 6]; S.legB = [5, f >= 2 ? 5 : 8]; S.armF = [-7, f >= 2 ? 9 : 4]; S.armB = [8, f >= 2 ? 8 : 2];
+      S.bob = [0, -1, -2, -2][f]; S.wing = [2, 3, 4, 4][f]; break;
     case 'land':
       guard(); S.sq = 4; S.legF = [-6, 0]; S.legB = [6, 0]; S.lean = 2; S.bendMax = 5;
       if (!war && !mage) S.armF = [-8, 9];
@@ -461,6 +465,13 @@ function skeletonFor(pose, f, cls, ang) {
       S.hdy = dy > 0.5 ? 1 : dy < -0.7 ? -1 : 0; S.flow = 1;
       break;
     }
+    case 'lift': { // academia da tela de evolução: sentado no banco, rosca com halteres (0 embaixo · 1 subindo · 2 em cima · 3 descendo)
+      const up = [0, 0.5, 1, 0.5][f];
+      S.sit = 10; S.wShow = false; S.shield = 0; S.bendMax = 7; S.legF = [9, 0]; S.legB = [12, 0];
+      S.armF = [Math.round(3 + up * 3), Math.round(12 - up * 13)]; S.armB = [Math.round(5 + up * 3), Math.round(12 - up * 13)];
+      S.mouth = f === 2 ? 2 : 0; S.eyes = f === 2 ? 1 : 0; S.bob = f === 2 ? 1 : 0;
+      break;
+    }
     case 'tuck': // bola de rolamento / pulo duplo
       S.bob = 8; S.hdy = 5; S.lean = -2; S.legF = [3, 12]; S.legB = [7, 12]; S.armF = [9, 9]; S.armB = [3, 10]; S.wShow = false; S.flow = 0; S.bendMax = 6; break;
   }
@@ -470,6 +481,7 @@ function skeletonFor(pose, f, cls, ang) {
 // Medidas do quadro: de onde saem cabeça, tronco e quadril (usado pelo desenho por código e pela montagem das folhas PNG)
 function heroFrame(ch, pose, f) {
   const S = skeletonFor(pose, f, ch.cls, pose === 'aim' ? aimDeg(f) : 0);
+  if (S.sit) S.sq = LEG_HS[ch.height | 0] - S.sit;                 // sentado: o quadril fica na altura do banco, qualquer que seja a perna
   const legH = LEG_HS[ch.height | 0], hipY = FEET - legH + S.sq, torsoTop = hipY - TORSO_H + S.bob;
   const bx = Math.round(CX + S.lean * 0.5), hx0 = Math.round(CX - 10 + S.lean), hy = Math.round(torsoTop - 18 + S.hdy);
   return { S, legH, hipY, torsoTop, bx, hx0, hy, hcx: hx0 + 11 };
@@ -575,11 +587,23 @@ function drawChar(ch, pose, f, o = {}) {
   if (drag) {
     const sp = S.wing | 0, wm = toneLo(acc, 0.1);
     // asa de morcego: braço da raiz até o punho (com garra) e três dedos que abrem a membrana em arcos
-    const wing = (rx, ry, k, dir, dim) => {
-      const open = [0, 0.45, 1, 1][sp], up = [0, 0.15, 1, 0.3][sp];
-      const W = [rx - (7 + open * 4) * k * dir, ry - (13 + up * 5) * k];
-      const F = [[W[0] - (13 + open * 5) * k * dir, W[1] + (8 - up * 7) * k], [W[0] - (10 + open * 5) * k * dir, W[1] + (21 - up * 6) * k], [W[0] - (2 + open * 4) * k * dir, W[1] + (27 - up * 4) * k]];
-      const base = [rx + 1 * dir, ry + 13 * k];
+    // formas (em relação à raiz, antes da escala): punho e as pontas dos três dedos
+    // e onde a membrana volta às costas (base; sem ela, desce até a cintura)
+    // 0 recolhida · 1 entreaberta · 2 erguida (início da batida) · 3 planando (grande, reta, na horizontal)
+    // 4 batida forte (jogada para baixo) · 5 asa de longe planando (aberta para o outro lado, também reta)
+    const WING_SHAPES = [
+      [[-7, -13], [[-20, -5], [-17, 8], [-9, 14]]],
+      [[-8.8, -13.75], [[-24, -6.8], [-21, 6.4], [-12.6, 12.6]]],
+      [[-9, -21], [[-19, -31], [-26, -20], [-20, -7]]],
+      [[-14, -6], [[-31, -8], [-29, 1], [-20, 7]], [-1, 10]],
+      [[-16, 0], [[-29, 9], [-25, 19], [-14, 19]]],
+      [[-13, -7], [[-30, -9], [-28, 0], [-19, 6]], [0, 9]],
+    ];
+    const wing = (rx, ry, k, dir, dim, shape = sp) => {
+      const [w0, fs, b0 = [1, 13]] = WING_SHAPES[shape];
+      const W = [rx + w0[0] * k * dir, ry + w0[1] * k];
+      const F = fs.map(([x, y]) => [rx + x * k * dir, ry + y * k]);
+      const base = [rx + b0[0] * k * dir, ry + b0[1] * k];
       const sc = (A, B, t) => [(A[0] + B[0]) / 2 + (W[0] - (A[0] + B[0]) / 2) * t, (A[1] + B[1]) / 2 + (W[1] - (A[1] + B[1]) / 2) * t];
       const col = dim ? toneLo(wm, 0.3) : wm;
       const WM = g.poly([[rx, ry], [W[0] + 2 * dir, W[1] + 1], [W[0] - dir, W[1] - 3], [W[0] - 3 * dir, W[1] + 1], F[0], sc(F[0], F[1], 0.4), F[1], sc(F[1], F[2], 0.4), F[2], sc(F[2], base, 0.3), base],
@@ -591,9 +615,10 @@ function drawChar(ch, pose, f, o = {}) {
       g.path([[rx, ry], W, F[0]], 2.2, dim ? toneLo(acc, 0.3) : toneHi(acc, 0.18), { depth: 1, round: 1.1 });
       g.px(W[0] - dir, W[1] - 3, bone); g.px(W[0] - dir, W[1] - 2, boneD);
     };
-    if (S.lean >= 3 || sp >= 2) wing(bx + 2, T + 1, 1.25, 1, true);      // em movimento: as duas asas para trás
+    if (sp === 3) wing(bx + 4, T + 3, 1.25, -1, true, 5);                 // planando: abertas para os dois lados, retas
+    else if (S.lean >= 3 || sp >= 2) wing(bx + 2, T + 1, 1.25, 1, true);  // em movimento: as duas asas para trás
     else wing(bx + 4, T + 4, 1.2, -1, true);                              // parado: a asa de longe aparece do outro lado
-    wing(bx - 3, T + 4, 1.45, 1, false);
+    wing(bx - 3, T + 4, sp === 3 ? 1.5 : 1.45, 1, false);
     // cauda fina com ponta de seta
     const ts = Math.round(Math.sin(f * 1.3 + (pose === 'run' ? f : 0)) * 1.5), tc = toneLo(acc, 0.3);
     const tx = bx - 19 - sway, ty = hipY + 5 + ts;

@@ -7,7 +7,7 @@
 // As folhas-base são geradas a partir do desenho por código: node tools/exportar-sprites.js
 
 // linhas da folha: [pose, quadros]. Cada célula tem 96x96 px; as colunas são os quadros da animação.
-const PACK_ROWS = [['idle', 5], ['run', 8], ['jump', 3], ['land', 1], ['crouch', 5], ['atk', 4], ['cast', 3], ['block', 1], ['hurt', 1], ['dash', 1], ['glide', 2], ['aim', 12], ['tuck', 1]];
+const PACK_ROWS = [['idle', 5], ['run', 8], ['jump', 3], ['land', 1], ['crouch', 5], ['atk', 4], ['cast', 3], ['block', 1], ['hurt', 1], ['dash', 1], ['glide', 2], ['aim', 12], ['tuck', 1], ['flap', 4]];
 const PACK_CELL = 96, PACK_COLS = 12;
 // ordem de empilhamento (de trás para a frente)
 const PACK_SLOTS = LAYER_ORDER;

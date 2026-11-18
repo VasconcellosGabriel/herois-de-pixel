@@ -1853,7 +1853,8 @@ function playerImage(p) {
   else if (p.dash > 0) { if (p.dashKind === 'roll') { pose = 'roll'; f = Math.floor(p.anim * 22) % 4; } else pose = 'dash'; }
   else if (p.diving) pose = 'dash';
   else if (p.flipT > 0 && p.cls.id === 'arqueiro') { pose = 'flip'; f = Math.floor((1 - p.flipT / 0.36) * 4) % 4; }
-  else if (p.glide || p.flipT > 0) { pose = 'glide'; f = Math.floor(p.anim * (p.glide ? 6 : 14)) % 2; }
+  else if (p.flipT > 0) { pose = 'flap'; f = Math.min(3, Math.floor((1 - p.flipT / 0.36) * 5)); }   // batida forte das asas
+  else if (p.glide) { pose = 'glide'; f = Math.floor(p.anim * 1.5) % 2; }                             // asas paradas, flutua devagar
   else if (p.block) pose = 'block';
   else if (p.act === 'aim') { pose = 'aim'; f = aimIdx(p.aimDeg); }
   else if (p.act === 'atk') {

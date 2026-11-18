@@ -16,7 +16,7 @@ const RIG_BODY = new Set(['tronco', 'capa', 'capa_fecho', 'cachecol', 'capuz_omb
 const RIG_VAR = { capa: 'flow', cabelo_tras: 'flow', cachecol: 'flow', asas: 'wing' };
 const rigLevel = (s, S0) => RIG_VAR[s] === 'wing' ? S0.wing | 0 : S0.flow < 1.5 ? 0 : S0.flow < 4 ? 1 : 2;
 // quadro usado para desenhar cada variação no molde
-const RIG_VAR_POSE = { flow: [['idle', 0], ['run', 0], ['jump', 2]], wing: [['idle', 0], ['jump', 2], ['glide', 0], ['glide', 1]] };
+const RIG_VAR_POSE = { flow: [['idle', 0], ['run', 0], ['jump', 2]], wing: [['idle', 0], ['jump', 2], ['flap', 0], ['glide', 0], ['flap', 2]] };
 
 const rigOn = () => RIG && !KEYMODE && typeof RIG_PECAS !== 'undefined';
 

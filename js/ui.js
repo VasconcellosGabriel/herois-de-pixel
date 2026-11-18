@@ -50,7 +50,7 @@ const POSE_LIST = {
   guerreiro: [['Parado', 'idle'], ['Correr', 'run'], ['Espada', 'atk'], ['Lança', 'cast'], ['Escudo', 'block']],
   mago: [['Parado', 'idle'], ['Correr', 'run'], ['Magia', 'cast'], ['Pulo', 'jump']],
   arqueiro: [['Parado', 'idle'], ['Correr', 'run'], ['Mirar', 'aim', 6], ['Mirar p/ cima', 'aim', 2], ['Rolar', 'roll']],
-  dragonico: [['Parado', 'idle'], ['Correr', 'run'], ['Garras', 'atk'], ['Sopro', 'cast'], ['Planar', 'glide'], ['Mergulho', 'dash']],
+  dragonico: [['Parado', 'idle'], ['Correr', 'run'], ['Garras', 'atk'], ['Sopro', 'cast'], ['Bater asas', 'flap'], ['Planar', 'glide'], ['Mergulho', 'dash']],
 };
 
 // ---------- Utilidades de UI ----------
@@ -412,7 +412,8 @@ function drawPreview(t) {
     else if (pose === 'cast') f = 1 + Math.floor(t * 3) % 2;
     else if (pose === 'jump') f = Math.floor(t * 2) % 3;
     else if (pose === 'roll' || pose === 'flip') f = Math.floor(t * 16) % 4;
-    else if (pose === 'glide') f = Math.floor(t * 6) % 2;
+    else if (pose === 'glide') f = Math.floor(t * 1.5) % 2;
+    else if (pose === 'flap') f = Math.min(3, Math.floor((t % 1.2) * 11));     // batida e uma pausa
   }
   g.drawImage(Creator.spr.get(pose, f % n), 0, 0);
 }
@@ -441,6 +442,7 @@ const Previews = [];                                   // retratos animados das 
 function drawPreviews(t) {
   for (const p of Previews) {
     if (p.cv.offsetParent === null) continue;
+    if (p.draw) { p.draw(p.cv, t); continue; }           // cena própria (ex.: o ferreiro da evolução)
     const g = p.cv.getContext('2d');
     g.clearRect(0, 0, p.cv.width, p.cv.height);
     g.drawImage(p.spr.get('idle', Math.floor(t * 3.5) % POSES.idle), 0, 0);
@@ -572,7 +574,9 @@ function openUpgrades(from) {
   // trocar de herói ou de visual só fora de uma partida em andamento
   const free = from !== 'win' && !Net.role && !Local.on;
   $('#b-up-heroes').style.display = $('#b-up-look').style.display = free ? '' : 'none';
-  Previews.length = 0; Previews.push({ cv: $('#up-pv'), spr: buildPlayerSprites({ ...DEFAULT_CHAR, ...Game.save.char }) });
+  const spr = buildPlayerSprites({ ...DEFAULT_CHAR, ...Game.save.char });
+  Previews.length = 0; Previews.push({ cv: $('#up-pv'), spr }, { cv: $('#up-gym'), draw: (cv, t) => drawGym(cv, t, spr) }, { cv: $('#up-smith'), draw: drawSmith });
+  Gym.spr = spr;
   renderUpgrades(); show('up'); drawPreviews(Game.t);
 }
 const pips = (n, max) => '<b>' + '■'.repeat(n) + '</b>' + '■'.repeat(Math.max(0, max - n));
@@ -589,7 +593,7 @@ function renderUpgrades() {
     row.innerHTML = `<span>${STAT_INFO[k][0]}<small>${noMana ? 'Só serve para quem usa mana' : STAT_INFO[k][1]}</small></span><span class="pips">${pips(v, max)}</span>`;
     const b = document.createElement('button'); b.className = 'btn small'; b.textContent = v >= max ? 'Máx.' : '+1';
     b.disabled = v >= max || !pr.pts || noMana;
-    b.onclick = () => { pr.st[k]++; pr.pts--; afterUpgrade('Atributo melhorado!'); };
+    b.onclick = () => { pr.st[k]++; pr.pts--; gymCheer(Gym.spr); afterUpgrade('Atributo melhorado!'); };
     row.appendChild(b); stats.appendChild(row);
   }
   const shop = $('#up-shop'); shop.innerHTML = '';
@@ -601,7 +605,7 @@ function renderUpgrades() {
     const b = document.createElement('button'); b.className = 'btn small';
     b.textContent = lvl >= max ? 'Máx.' : `🪙 ${cost}`;
     b.disabled = lvl >= max || coins < cost;
-    b.onclick = () => { Game.save.coins -= cost; pr.up[k]++; afterUpgrade('Melhoria comprada!'); };
+    b.onclick = () => { Game.save.coins -= cost; pr.up[k]++; smithCheer(); afterUpgrade('Melhoria comprada!'); };
     row.appendChild(b); shop.appendChild(row);
   }
 }

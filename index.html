@@ -224,13 +224,23 @@
     </div>
     <div class="up-cols">
       <div>
-        <h3 class="ctl-h">Atributos <small id="up-pts"></small></h3>
-        <p class="hint">Cada nível dá 1 ponto. Ganhe XP derrotando inimigos (guardado ao completar a fase).</p>
+        <div class="up-smith-head">
+          <div>
+            <h3 class="ctl-h">Atributos <small id="up-pts"></small></h3>
+            <p class="hint">Cada nível dá 1 ponto. Ganhe XP derrotando inimigos (guardado ao completar a fase).</p>
+          </div>
+          <canvas id="up-gym" class="up-scene" width="96" height="60" aria-label="Seu herói treinando com halteres na academia"></canvas>
+        </div>
         <div id="up-stats"></div>
       </div>
       <div>
-        <h3 class="ctl-h">Ferreiro <small id="up-coins"></small></h3>
-        <p class="hint">Gaste moedas para fortalecer o dano e as habilidades.</p>
+        <div class="up-smith-head">
+          <div>
+            <h3 class="ctl-h">Ferreiro <small id="up-coins"></small></h3>
+            <p class="hint">Gaste moedas para fortalecer o dano e as habilidades.</p>
+          </div>
+          <canvas id="up-smith" class="up-scene" width="64" height="40" aria-label="Ferreiro martelando uma espada na bigorna"></canvas>
+        </div>
         <div id="up-shop"></div>
       </div>
     </div>
@@ -293,6 +303,8 @@
 <script src="js/net.js"></script>
 <script src="js/local.js"></script>
 <script src="js/mapa.js"></script>
+<script src="js/ferreiro.js"></script>
+<script src="js/academia.js"></script>
 <script src="js/ui.js"></script>
 </body>
 </html>

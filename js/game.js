@@ -1093,11 +1093,12 @@ function ledgeAhead(w, e) {
   return !standPx(w.lv, ax, e.y + e.h + 3);
 }
 // ---------- Navegação ----------
-// Ágeis pulam degraus de até 2 blocos e buracos de até 4 blocos atrás do herói. Os pesados (esqueleto, múmia, ferreiro,
+// Ágeis pulam degraus de até 3 blocos e buracos de até 4 blocos atrás do herói; enxergam o herói lá no alto (morro) e
+// acham o caminho até ele (navPlan). Os pesados (esqueleto, múmia, ferreiro,
 // cavaleiro, guarda, cobra...) não pulam. Todos descem de um degrau ou atravessam a plataforma quando o herói está embaixo
 // (se houver chão seguro: nada de buraco sem fundo nem espinhos). Sem caminho, desistem um pouco em vez de ficar travados.
 const AGILE = new Set(['slime', 'bigslime', 'wolf', 'snowyeti', 'spider', 'scorpion']);
-const NAV_UP = 2, NAV_GAP = 4;
+const NAV_UP = 3, NAV_GAP = 4, SIGHT_UP = 9 * T, SIGHT_MEM = 4;
 const aheadX = e => e.dir > 0 ? e.x + e.w + 1 : e.x - 1;
 // altura (em blocos) da parede logo à frente dos pés; 99 = alta demais ou sem espaço em cima
 function wallAhead(w, e) {
@@ -1127,18 +1128,119 @@ function gapLanding(w, e) {
   }
   return null;
 }
+// linha de visão: nenhum bloco sólido entre os dois pontos
+function sightLine(lv, x0, y0, x1, y1) {
+  const n = Math.ceil(Math.hypot(x1 - x0, y1 - y0) / 6);
+  for (let i = 1; i < n; i++) if (solidPx(lv, x0 + (x1 - x0) * i / n, y0 + (y1 - y0) * i / n)) return false;
+  return true;
+}
+// Ágil vê o herói mesmo bem mais alto (até 9 blocos), se nada tapar a visão; depois de ver, lembra por alguns segundos
+function spots(w, e, range) {
+  const p = e.tgt, dx = Math.abs(cxOf(p) - cxOf(e)), dy = p.y + p.h - (e.y + e.h);
+  if (p.dead) return false;
+  if (dx < range && dy > -SIGHT_UP && dy < 110) {
+    // olha um pouco para cima; basta ver o corpo, a cabeça ou o "topo" do herói despontando na beirada do morro
+    const ex = cxOf(e), ey = e.y - 6, px = cxOf(p);
+    if ([cyOf(p), p.y + 2, p.y - 24].some(py => sightLine(w.lv, ex, ey, px, py))) e.seenUntil = e.t + SIGHT_MEM;
+  }
+  return (e.seenUntil || 0) > e.t && dx < range * 1.4;
+}
+// Caminho até o herói (busca em largura nos blocos, só os ágeis): andar, subir até NAV_UP, descer até 9 e pular buracos.
+// Devolve o primeiro passo: { dir, kind: 'walk' | 'up' | 'down' | 'gap' } ou null (já chegou ou não há caminho).
+function navPlan(w, e, p) {
+  const lv = w.lv, H = Math.ceil(e.h / T);
+  const free = (x, y) => !isSolid(tileAt(lv, x, y));
+  const stand = (x, y) => {
+    if (y < 0 || y >= lv.h - 1 || tileAt(lv, x, y) === 3) return false;
+    const t = tileAt(lv, x, y + 1); if (!isSolid(t) && t !== 2) return false;
+    for (let k = 0; k < H; k++) if (!free(x, y - k)) return false;
+    return true;
+  };
+  // espaço livre em cima de onde está para um pulo de u blocos (o corpo inteiro sobe, com folga)
+  const room = (x, y, u) => { for (let j = 1; j <= u + H; j++) if (!free(x, y - j)) return false; return true; };
+  let sx = Math.floor(cxOf(e) / T); const sy = Math.floor((e.y + e.h - 1) / T);
+  if (!stand(sx, sy)) sx = [Math.floor((e.x + 1) / T), Math.floor((e.x + e.w - 1) / T)].find(x => stand(x, sy));
+  if (sx === undefined) return null;
+  const gx = Math.floor(cxOf(p) / T);
+  let gy = Math.floor((p.y + p.h - 1) / T);
+  if (!p.ground) { const g = groundBelow(lv, cxOf(p), p.y + p.h, 12); if (g === null) return null; gy = g / T - 1; }
+  const goal = (x, y) => Math.abs(x - gx) <= 1 && y === gy;
+  if (goal(sx, sy)) return null;
+  const xa = Math.max(0, Math.min(sx, gx) - 20), xb = Math.min(lv.w - 1, Math.max(sx, gx) + 20);
+  const seen = new Set([sx * 1000 + sy]), q = [[sx, sy, null]];
+  for (let i = 0; i < q.length && i < 3000; i++) {
+    const [x, y, first] = q[i];
+    for (const d of [-1, 1]) {
+      const nx = x + d; if (nx < xa || nx > xb) continue;
+      const moves = [];
+      if (stand(nx, y)) moves.push([nx, y, 'walk']);
+      else if (!free(nx, y)) {
+        // parede: sobe se couber o pulo (espaço livre em cima de onde está)
+        for (let u = 1; u <= NAV_UP; u++) {
+          if (!room(x, y, u)) break;
+          if (stand(nx, y - u)) { moves.push([nx, y - u, 'up', u]); break; }
+        }
+      } else {
+        for (let u = 2; u <= NAV_UP; u++) {                                 // pula para uma plataforma mais alta ao lado
+          if (!room(x, y, u)) break;
+          if (stand(nx, y - u)) { moves.push([nx, y - u, 'up', u]); break; }
+        }
+        for (let yy = y + 1; yy < Math.min(lv.h, y + 10); yy++) {          // beirada: desce
+          if (stand(nx, yy)) { moves.push([nx, yy, 'down']); break; }
+          if (!free(nx, yy)) break;
+        }
+        for (let k = 2; k <= NAV_GAP + 1; k++) {                            // ou pula o buraco
+          const lx = x + d * k, ly = [y, y - 1, y + 1].find(yy => stand(lx, yy));
+          if (ly !== undefined) { moves.push([lx, ly, 'gap']); break; }
+          if (!free(lx, y) || !free(lx, y - 1)) break;
+        }
+      }
+      for (const [mx, my, kind, u] of moves) {
+        const key = mx * 1000 + my; if (seen.has(key)) continue; seen.add(key);
+        const f = first || { dir: d, kind, u, tx: mx, ty: my };
+        if (goal(mx, my)) return f;
+        q.push([mx, my, f]);
+      }
+    }
+  }
+  return null;
+}
+// Vai atrás do herói: os ágeis seguem o caminho planejado (recalculado a cada 0,35 s); os outros vão em linha reta
+function navChase(w, e, spd) {
+  const p = e.tgt, dx = cxOf(p) - cxOf(e);
+  let allowDrop = p.y + p.h - (e.y + e.h) > 6;
+  if (AGILE.has(e.type)) {
+    e.planT = (e.planT || 0) - STEP;
+    if (e.planT <= 0 && e.ground) { e.planT = 0.35; e.plan = navPlan(w, e, p); }
+    if (e.plan) {
+      e.dir = e.plan.dir; allowDrop = e.plan.kind === 'down';
+      // subir numa plataforma que não está colada (sem parede na frente): pula já
+      // (antes recua até o corpo sair de baixo da beirada; no ar sobe reto e só avança depois de passar da altura)
+      if (e.plan.kind === 'up' && e.ground && !e.hop && !wallAhead(w, e)) {
+        const pl = e.plan, under = e.dir > 0 ? e.x + e.w > pl.tx * T - 1 : e.x < (pl.tx + 1) * T + 1;
+        if (under) { e.vx = -e.dir * Math.max(spd * 0.6, 30); return true; }
+        navHop(e, -Math.sqrt(2 * GRAV * (pl.u * T + 12)), e.dir * Math.max(spd, 50), (pl.ty + 1) * T - 2); e.plan = null; e.planT = 0.2; return true;
+      }
+    }
+    else if (Math.abs(dx) > 4) e.dir = dx > 0 ? 1 : -1;
+  } else if (Math.abs(dx) > 4) e.dir = dx > 0 ? 1 : -1;
+  return navStep(w, e, spd, true, allowDrop);
+}
 // pulo de navegação: o impulso horizontal fica até pousar
-function navHop(e, vy, vx) { e.vy = vy; e.hop = vx; e.hopT = 0.12; e.ground = false; }
+function navHop(e, vy, vx, riseTo) { e.vy = vy; e.hop = vx; e.hopT = 0.12; e.ground = false; e.hopY = riseTo; }
+// impulso do pulo de navegação: com riseTo, só avança depois que os pés passam dessa altura (ou quando para de subir)
+const hopVx = e => e.hopY !== undefined && e.y + e.h > e.hopY && e.vy < 0 ? 0 : e.hop;
 // Anda na direção e.dir resolvendo paredes e beiradas. chasing: está indo atrás do herói. Devolve false se ficou sem caminho.
-function navStep(w, e, spd, chasing) {
+function navStep(w, e, spd, chasing, allowDrop) {
   if (e.drop > 0) e.drop -= STEP;
   if (e.hop) {
     e.hopT -= STEP;
-    if (e.ground && e.hopT <= 0) e.hop = 0; else { e.vx = e.hop; return true; }
+    if (e.ground && e.hopT <= 0) e.hop = 0; else { e.vx = hopVx(e); return true; }
   }
   if (!e.ground) { e.vx = e.dir * spd; return true; }
   const p = e.tgt, agile = AGILE.has(e.type), below = p.y + p.h - (e.y + e.h);
-  if (chasing && below > 10) {
+  if (allowDrop === undefined) allowDrop = below > 6;
+  if (chasing && below > 10 && allowDrop) {
     // em cima de uma plataforma fina com o herói logo embaixo: atravessa
     const under = tileAt(w.lv, Math.floor(cxOf(e) / T), Math.floor((e.y + e.h + 2) / T));
     if (under === 2 && Math.abs(cxOf(p) - cxOf(e)) < 40) { e.drop = 0.3; e.vx = e.dir * spd * 0.5; return true; }
@@ -1150,7 +1252,7 @@ function navStep(w, e, spd, chasing) {
   }
   if (ledgeAhead(w, e)) {
     const land = chasing ? safeLanding(w, aheadX(e) + e.dir * 4, e.y + e.h + 2) : null;
-    if (land !== null && below > 6) { e.vx = e.dir * spd; return true; }               // herói lá embaixo: desce
+    if (land !== null && allowDrop) { e.vx = e.dir * spd; return true; }               // herói lá embaixo: desce
     const gap = chasing && agile ? gapLanding(w, e) : null;
     if (gap) {
       const vy = -Math.sqrt(2 * GRAV * (Math.max(0, gap.up) * T + 18)), t = 2 * -vy / GRAV;
@@ -1166,11 +1268,11 @@ function walk(w, e, spd, chase) {
   if (e.giveUp > 0) e.giveUp -= STEP;
   let chasing = false;
   if (chase && !(e.giveUp > 0) && !p.dead) {
-    // alcance vertical: o herói pode estar mais embaixo (todos descem) ou um pouco acima (os ágeis sobem)
+    // alcance vertical: o herói pode estar mais embaixo (todos descem) ou um pouco acima; os ágeis enxergam bem mais alto
     const dx = cxOf(p) - cxOf(e), dy = p.y + p.h - (e.y + e.h);
-    if (Math.abs(dx) < chase && dy < 110 && dy > (AGILE.has(e.type) ? -60 : -40)) { if (Math.abs(dx) > 4) e.dir = dx > 0 ? 1 : -1; chasing = true; }
+    chasing = (Math.abs(dx) < chase && dy < 110 && dy > -40) || (AGILE.has(e.type) && spots(w, e, chase));
   }
-  if (navStep(w, e, spd * sl, chasing)) { e.blockT = 0; return; }
+  if (chasing ? navChase(w, e, spd * sl) : navStep(w, e, spd * sl, false)) { e.blockT = 0; return; }
   if (!chasing) { e.dir = -e.dir; return; }
   // sem caminho até o herói: espera um pouco e depois volta a patrulhar (não fica parado empurrando o bloco)
   e.blockT = (e.blockT || 0) + STEP;
@@ -1335,7 +1437,7 @@ function updateEnemies(w, dt) {
     const adt = e.boss ? dt * (1 + BOSS_PW_TEMPO * (w.bossPw || 0)) * (S.freeze > 0 ? 0.6 : 1) : dt;   // ritmo pela evolução; "gelado" age mais devagar
     if (still) { e.vx = 0; if (e.fly) e.vy = 0; }
     else E_AI[e.type](w, e, adt);
-    if (e.hop) { if (e.hurt > 0 || e.ground) e.hop = 0; else if (!still) e.vx = e.hop; }   // pulo de navegação: mantém o impulso até pousar
+    if (e.hop) { if (e.hurt > 0 || e.ground) e.hop = 0; else if (!still) e.vx = hopVx(e); }   // pulo de navegação: mantém o impulso até pousar
     if (e.boss && !e.dead) bossDrops(w, e);
     if (e.free || (e.fly && e.ghost)) { e.x += e.vx * dt; e.y += e.vy * dt; }
     else if (e.fly) {

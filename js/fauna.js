@@ -387,9 +387,9 @@ Object.assign(E_AI, {
     else if (e.st === 'rest') { e.vx = approach(e.vx, 0, 700 * dt); e.stT -= dt; if (e.stT <= 0) e.st = null; }
     else {
       if (e.hurt > 0) { e.vx *= 0.9; return; }
-      const hunt = adx < 170 && Math.abs(p.y - e.y) < 50;
+      const hunt = adx < 170 && (Math.abs(p.y - e.y) < 50 || spots(w, e, 170));     // vê o herói até lá no alto do morro
       walk(w, e, hunt ? 88 : e.speed, hunt ? 170 : 0);
-      if (hunt && e.ground && e.cd <= 0 && adx < 72) { e.st = 'wind'; e.stT = 0.4; e.dir = dx > 0 ? 1 : -1; e.cd = 2.2; sfx('growl'); }
+      if (hunt && e.ground && e.cd <= 0 && adx < 72 && Math.abs(p.y + p.h - e.y - e.h) < 24) { e.st = 'wind'; e.stT = 0.4; e.dir = dx > 0 ? 1 : -1; e.cd = 2.2; sfx('growl'); }
     }
   },
   // Cobra: rasteja; de perto empina e dá o bote; de longe cospe veneno em arco
@@ -477,13 +477,12 @@ Object.assign(E_AI, {
       if (e.stT <= 0) { e.st = 'rest'; e.stT = 0.55; e.atk = null; }
     } else if (e.st === 'rest') { e.vx = approach(e.vx, 0, 600 * dt); e.stT -= dt; if (e.stT <= 0) e.st = 'run'; }
     else if (e.st === 'run') {
-      if (adx > 230 || dy > 80 || p.dead) { e.st = null; return; }
-      if (adx > 5) e.dir = dx > 0 ? 1 : -1;
-      navStep(w, e, 92 * sl, true);                // pula degraus e buracos, desce atrás do herói; buraco sem fundo: espera na beirada
+      if (adx > 230 || (dy > 80 && !spots(w, e, 230)) || p.dead) { e.st = null; return; }
+      navChase(w, e, 92 * sl);                     // acha o caminho: sobe o morro, pula buracos, desce atrás do herói
       if (e.cd <= 0 && adx < 30 && dy < 30) { e.st = 'wind'; e.stT = 0.32; e.cd = 1.2; }
     } else {
       walk(w, e, e.speed);
-      if (adx < 165 && dy < 44 && !p.dead) {
+      if (adx < 165 && (dy < 44 || spots(w, e, 165)) && !p.dead) {
         e.st = 'roar'; e.stT = 0.45; e.dir = dx > 0 ? 1 : -1; e.vx = 0; sfx('growl');
         floatText(w, cxOf(e), e.y - 8, '!', '#ffe94d', true);
       }

@@ -111,6 +111,12 @@ function xpPreview(pr, extra) { const c = { lvl: pr.lvl, xp: pr.xp, pts: 0 }; ad
 // Evolução do herói deste aparelho (vai junto com o personagem para a sala no multiplayer)
 // sp = barra do especial guardada: passa de uma fase para a outra, como as vidas
 function myBuild() { const pr = progOf((Game.save.char || DEFAULT_CHAR).cls); return { st: { ...pr.st }, up: { ...pr.up }, sp: Game.save.sp | 0 }; }
+// Força do herói (0 a 1) pela evolução: melhorias compradas pesam mais (dano e habilidades), depois vida e os outros atributos.
+// Os chefes acompanham essa força (BOSS_PW_*), para a luta não virar passeio quando o herói está todo evoluído.
+function heroPower(b) {
+  const { st, up } = cleanBuild(b);
+  return clamp(up.dmg / UP_MAX.dmg * 0.35 + (up.a + up.b + up.c) / (UP_MAX.a * 3) * 0.3 + st.hp / STAT_MAX.hp * 0.2 + (st.spd + st.jump + st.mana) / 15 * 0.15, 0, 1);
+}
 function cleanBuild(b) {
   const o = { st: {}, up: {} }, src = b && typeof b === 'object' ? b : {};
   const num = (v, max) => Number.isInteger(v) && v >= 0 ? Math.min(v, max) : 0;
@@ -386,7 +392,7 @@ function addPlayer(w, r) {
     elem: clamp(ch.elem | 0, 0, ELEMENTS.length - 1),      // elemento da magia do mago (troca durante a fase: cycleElem)
     kaim: 0, aimDeg: 0, aimFace: 1, lastVy: 0, shotAim: false, sp, xpGot: 0, crouch: false, flamer: 0, flameDir: 1, flameTk: 0, ep: 0, rp: null, remote: false, stompT: 0,
     // evolução: atributos (XP) e melhorias (moedas)
-    spdK: 1 + st.spd * 0.06, jumpK: 1 + st.jump * 0.05, dmgK: 1 + up.dmg * 0.15,
+    spdK: 1 + st.spd * 0.06, jumpK: 1 + st.jump * 0.05, dmgK: 1 + up.dmg * 0.15, pw: heroPower(r.b),
     skLvl: skUp, skK: skUp.map(lvK), cdK: skUp.map(cdK), cost: COST[cls.id].map((c, k) => Math.round(c * cdK(skUp[k]))),
   };
   p.cdMax = CDMAX[cls.id].map((v, k) => v * p.cdK[k]);
@@ -409,12 +415,17 @@ function nearestPlayer(w, e) {
 // Multiplayer: cada jogador a mais deixa os inimigos (e o chefe) mais resistentes, para manter a dificuldade
 const HP_PER_PLAYER = 0.5;                            // 2 jogadores: ×1,5 · 3: ×2 · 4: ×2,5
 const enemyHpK = n => 1 + HP_PER_PLAYER * Math.max(0, n - 1);
+// Chefe x evolução (média da força dos heróis): herói no máximo = chefe com 2,2× a vida e ritmo 30% mais rápido
+// (espera menos entre os golpes e os avisos duram menos). Sem evolução fica igual a antes.
+const BOSS_PW_HP = 1.2, BOSS_PW_TEMPO = 0.3;
+const partyPower = w => w.players.length ? w.players.reduce((s, p) => s + (p.pw || 0), 0) / w.players.length : 0;
 // Recalcula a vida máxima de todos os inimigos para o número atual de heróis (alguém entrou ou saiu no meio da fase).
 // Quem já apanhou mantém a mesma fração de vida.
 function scaleEnemies(w) {
   const k = enemyHpK(w.players.length), hk = (w.def && w.def.hpK) || 1;   // hpK: fases dos mundos mais avançados
+  w.bossPw = partyPower(w);
   for (const e of w.enemies) {
-    const max = Math.max(1, Math.round(ENEMIES[e.type].hp * k * (e.boss ? 1 : hk)));
+    const max = Math.max(1, Math.round(ENEMIES[e.type].hp * k * (e.boss ? 1 + BOSS_PW_HP * w.bossPw : hk)));
     if (max === e.maxHp) continue;
     e.hp = e.hp / e.maxHp * max; e.maxHp = max;
   }
@@ -1081,18 +1092,89 @@ function ledgeAhead(w, e) {
   const ax = e.dir > 0 ? e.x + e.w + 3 : e.x - 3;
   return !standPx(w.lv, ax, e.y + e.h + 3);
 }
+// ---------- Navegação ----------
+// Ágeis pulam degraus de até 2 blocos e buracos de até 4 blocos atrás do herói. Os pesados (esqueleto, múmia, ferreiro,
+// cavaleiro, guarda, cobra...) não pulam. Todos descem de um degrau ou atravessam a plataforma quando o herói está embaixo
+// (se houver chão seguro: nada de buraco sem fundo nem espinhos). Sem caminho, desistem um pouco em vez de ficar travados.
+const AGILE = new Set(['slime', 'bigslime', 'wolf', 'snowyeti', 'spider', 'scorpion']);
+const NAV_UP = 2, NAV_GAP = 4;
+const aheadX = e => e.dir > 0 ? e.x + e.w + 1 : e.x - 1;
+// altura (em blocos) da parede logo à frente dos pés; 99 = alta demais ou sem espaço em cima
+function wallAhead(w, e) {
+  const lv = w.lv, tx = Math.floor(aheadX(e) / T), foot = Math.floor((e.y + e.h - 1) / T);
+  let n = 0;
+  while (isSolid(tileAt(lv, tx, foot - n))) if (++n > NAV_UP) return 99;
+  if (!n) return 0;
+  for (let k = 0, room = Math.ceil(e.h / T); k < room; k++) if (isSolid(tileAt(lv, tx, foot - n - k))) return 99;
+  return n;
+}
+// chão seguro depois da beirada (para descer): devolve a altura do pouso ou null
+function safeLanding(w, x, y) {
+  const g = groundBelow(w.lv, x, y, 9);
+  if (g === null) return null;
+  return tileAt(w.lv, Math.floor(x / T), g / T - 1) === 3 ? null : g;
+}
+// buraco à frente: procura chão do outro lado, na mesma altura ou até 1 bloco acima/abaixo
+function gapLanding(w, e) {
+  const lv = w.lv, foot = Math.floor((e.y + e.h + 2) / T);
+  for (let k = 1; k <= NAV_GAP; k++) {
+    const tx = Math.floor(aheadX(e) / T) + e.dir * k;
+    for (const ty of [foot, foot - 1, foot + 1]) {
+      const t = tileAt(lv, tx, ty);
+      if ((isSolid(t) || t === 2) && !isSolid(tileAt(lv, tx, ty - 1)) && !isSolid(tileAt(lv, tx, ty - 2)) && tileAt(lv, tx, ty - 1) !== 3)
+        return { x: (tx + 0.5) * T, up: foot - ty };
+    }
+  }
+  return null;
+}
+// pulo de navegação: o impulso horizontal fica até pousar
+function navHop(e, vy, vx) { e.vy = vy; e.hop = vx; e.hopT = 0.12; e.ground = false; }
+// Anda na direção e.dir resolvendo paredes e beiradas. chasing: está indo atrás do herói. Devolve false se ficou sem caminho.
+function navStep(w, e, spd, chasing) {
+  if (e.drop > 0) e.drop -= STEP;
+  if (e.hop) {
+    e.hopT -= STEP;
+    if (e.ground && e.hopT <= 0) e.hop = 0; else { e.vx = e.hop; return true; }
+  }
+  if (!e.ground) { e.vx = e.dir * spd; return true; }
+  const p = e.tgt, agile = AGILE.has(e.type), below = p.y + p.h - (e.y + e.h);
+  if (chasing && below > 10) {
+    // em cima de uma plataforma fina com o herói logo embaixo: atravessa
+    const under = tileAt(w.lv, Math.floor(cxOf(e) / T), Math.floor((e.y + e.h + 2) / T));
+    if (under === 2 && Math.abs(cxOf(p) - cxOf(e)) < 40) { e.drop = 0.3; e.vx = e.dir * spd * 0.5; return true; }
+  }
+  const wh = wallAhead(w, e);
+  if (wh) {
+    if (chasing && agile && wh <= NAV_UP) { navHop(e, -Math.sqrt(2 * GRAV * (wh * T + 10)), e.dir * Math.max(spd, 50)); return true; }
+    e.vx = 0; return false;
+  }
+  if (ledgeAhead(w, e)) {
+    const land = chasing ? safeLanding(w, aheadX(e) + e.dir * 4, e.y + e.h + 2) : null;
+    if (land !== null && below > 6) { e.vx = e.dir * spd; return true; }               // herói lá embaixo: desce
+    const gap = chasing && agile ? gapLanding(w, e) : null;
+    if (gap) {
+      const vy = -Math.sqrt(2 * GRAV * (Math.max(0, gap.up) * T + 18)), t = 2 * -vy / GRAV;
+      navHop(e, vy, clamp((gap.x - cxOf(e)) / t, -150, 150)); return true;
+    }
+    e.vx = 0; return false;
+  }
+  e.vx = e.dir * spd;
+  return true;
+}
 function walk(w, e, spd, chase) {
-  const p = e.tgt;
+  const p = e.tgt, sl = e.slow > 0 ? 0.5 : 1;
+  if (e.giveUp > 0) e.giveUp -= STEP;
   let chasing = false;
-  if (chase) {
-    const dx = cxOf(p) - cxOf(e);
-    if (Math.abs(dx) < chase && Math.abs(p.y - e.y) < 40) { e.dir = dx > 0 ? 1 : -1; chasing = true; }
+  if (chase && !(e.giveUp > 0) && !p.dead) {
+    // alcance vertical: o herói pode estar mais embaixo (todos descem) ou um pouco acima (os ágeis sobem)
+    const dx = cxOf(p) - cxOf(e), dy = p.y + p.h - (e.y + e.h);
+    if (Math.abs(dx) < chase && dy < 110 && dy > (AGILE.has(e.type) ? -60 : -40)) { if (Math.abs(dx) > 4) e.dir = dx > 0 ? 1 : -1; chasing = true; }
   }
-  if (e.ground && (e.wall || ledgeAhead(w, e))) {
-    if (chasing) { e.vx = 0; return; }
-    e.dir = -e.dir;
-  }
-  e.vx = e.dir * spd * (e.slow > 0 ? 0.5 : 1);
+  if (navStep(w, e, spd * sl, chasing)) { e.blockT = 0; return; }
+  if (!chasing) { e.dir = -e.dir; return; }
+  // sem caminho até o herói: espera um pouco e depois volta a patrulhar (não fica parado empurrando o bloco)
+  e.blockT = (e.blockT || 0) + STEP;
+  if (e.blockT > 1.2) { e.blockT = 0; e.giveUp = 2.5; e.dir = -e.dir; }
 }
 const eshoot = (w, o) => w.eproj.push({ w: 6, h: 6, vx: 0, vy: 0, g: 0, life: 3, dmg: 1, rot: 0, ...o });
 
@@ -1250,9 +1332,10 @@ function updateEnemies(w, dt) {
     if (S.freeze > 0) S.freeze -= dt;
     if (e.dead) continue;
     const still = frozen(e) || (e.stun > 0 && !e.boss);
-    const adt = e.boss && S.freeze > 0 ? dt * 0.6 : dt;      // chefe "gelado" age mais devagar
+    const adt = e.boss ? dt * (1 + BOSS_PW_TEMPO * (w.bossPw || 0)) * (S.freeze > 0 ? 0.6 : 1) : dt;   // ritmo pela evolução; "gelado" age mais devagar
     if (still) { e.vx = 0; if (e.fly) e.vy = 0; }
     else E_AI[e.type](w, e, adt);
+    if (e.hop) { if (e.hurt > 0 || e.ground) e.hop = 0; else if (!still) e.vx = e.hop; }   // pulo de navegação: mantém o impulso até pousar
     if (e.boss && !e.dead) bossDrops(w, e);
     if (e.free || (e.fly && e.ghost)) { e.x += e.vx * dt; e.y += e.vy * dt; }
     else if (e.fly) {

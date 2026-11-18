@@ -479,7 +479,7 @@ Object.assign(E_AI, {
     else if (e.st === 'run') {
       if (adx > 230 || dy > 80 || p.dead) { e.st = null; return; }
       if (adx > 5) e.dir = dx > 0 ? 1 : -1;
-      e.vx = e.ground && (e.wall || ledgeAhead(w, e)) ? 0 : e.dir * 92 * sl;     // não se joga no buraco: fica esperando na beirada
+      navStep(w, e, 92 * sl, true);                // pula degraus e buracos, desce atrás do herói; buraco sem fundo: espera na beirada
       if (e.cd <= 0 && adx < 30 && dy < 30) { e.st = 'wind'; e.stT = 0.32; e.cd = 1.2; }
     } else {
       walk(w, e, e.speed);

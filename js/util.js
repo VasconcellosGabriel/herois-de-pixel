@@ -35,7 +35,7 @@ let KEYMODE = false;
 // Protótipo do rig de recortes (js/rig.js): heróis montados com peças desenhadas uma vez. Para ver: ?rig na URL.
 let RIG = typeof location !== 'undefined' && /[?&]rig/.test(location.search);
 // Versão do jogo (aparece no menu inicial). Ao publicar, suba junto com o CACHE do sw.js.
-const VERSAO = 24;
+const VERSAO = 26;
 // amt < 0 escurece, amt > 0 clareia (-1..1)
 function shade(hex, amt) {
   if (KEYMODE) { const k = keyOf(hex); if (k) return keyHex(k.h, amt < 0 ? k.v * (1 + amt) : k.v + (1 - k.v) * amt); }

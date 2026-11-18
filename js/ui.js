@@ -102,7 +102,7 @@ function beginLevel(i) {
   goFullscreen();
 }
 // No celular: tela cheia e na horizontal (só funciona logo depois de um toque). A trava na horizontal só é aceita
-// depois que a tela cheia entrou. No iPhone o Safari não deixa; lá o palco escalado dos menus (uiScale) já resolve.
+// depois que a tela cheia entrou. No iPhone o Safari não tem tela cheia (ver o aviso de tela cheia, fsPrompt).
 function goFullscreen() {
   if (!document.body.classList.contains('touch')) return;
   const lock = () => { try { screen.orientation.lock('landscape').catch(() => {}); } catch (e) {} };
@@ -375,12 +375,10 @@ function openSwatchPop(anchor, k, pal, name) {
   pop.appendChild(grid);
   pop.hidden = false;
   // posiciona embaixo do quadradinho (ou em cima, se não couber), dentro do painel
-  // (as medidas da tela vêm escaladas pelo palco dos menus: dividir por UI.z volta para px de layout)
-  const z = UI.z, box = $('.creator').getBoundingClientRect(), a = anchor.getBoundingClientRect(), pw = pop.offsetWidth, ph = pop.offsetHeight;
-  const ax = (a.left - box.left) / z, at = (a.top - box.top) / z, ab = (a.bottom - box.top) / z, bw = box.width / z, bh = box.height / z;
-  let x = ax + a.width / z / 2 - pw / 2, y = ab + 6;
-  if (y + ph > bh - 4) y = at - ph - 6;
-  pop.style.left = Math.round(clamp(x, 4, bw - pw - 4)) + 'px'; pop.style.top = Math.round(Math.max(4, y)) + 'px';
+  const box = $('.creator').getBoundingClientRect(), a = anchor.getBoundingClientRect(), pw = pop.offsetWidth, ph = pop.offsetHeight;
+  let x = a.left + a.width / 2 - pw / 2 - box.left, y = a.bottom + 6 - box.top;
+  if (y + ph > box.height - 4) y = a.top - ph - 6 - box.top;
+  pop.style.left = Math.round(clamp(x, 4, box.width - pw - 4)) + 'px'; pop.style.top = Math.round(Math.max(4, y)) + 'px';
   const on = $('button.on', grid) || $('button', grid);
   if (on && $('.padfocus')) { $$('.padfocus').forEach(el => el.classList.remove('padfocus')); on.classList.add('padfocus'); on.focus({ preventScroll: true }); }
 }
@@ -826,7 +824,7 @@ $('#cr-name').addEventListener('input', () => { Creator.ch.name = $('#cr-name').
 addEventListener('keydown', e => {
   if (KEYMAP[e.code] === 'pause' && Game.mode === 'pause' && !Input.capture && e.target.tagName !== 'INPUT') resumeGame();
 });
-addEventListener('touchstart', () => document.body.classList.add('touch'), { once: true, passive: true });
+addEventListener('touchstart', () => { document.body.classList.add('touch'); fsPrompt(); }, { once: true, passive: true });
 document.addEventListener('visibilitychange', () => { if (document.hidden) pauseGame(); });
 
 // ---------- Tamanho da tela ----------
@@ -844,29 +842,23 @@ function resize() {
 addEventListener('resize', resize);
 addEventListener('orientationchange', resize);
 
-// ---------- Palco dos menus ----------
-// Os menus são montados num palco do tamanho de uma tela de PC (pelo menos UI_W x UI_H) e encolhidos por igual para
-// caber na janela: no celular deitado fica tudo igual ao computador, só menor, sem cortar nada. Em pé (retrato) não
-// encolhe: o CSS reorganiza os menus em coluna. UI.w/UI.h = tamanho do palco (em px de layout); UI.z = escala.
-const UI_W = 900, UI_H = 650;
-const UI = { z: 1, w: innerWidth, h: innerHeight };
-function uiScale() {
-  const vv = window.visualViewport, iw = innerWidth, ih = vv ? Math.min(innerHeight, vv.height) : innerHeight;
-  const z = iw > ih ? Math.min(1, iw / UI_W, ih / UI_H) : 1;
-  Object.assign(UI, { z, w: iw / z, h: ih / z });
-  const el = $('#ui'), st = document.documentElement.style;
-  el.style.width = UI.w + 'px'; el.style.height = UI.h + 'px';
-  st.setProperty('--uiz', z); st.setProperty('--uvw', UI.w / 100 + 'px'); st.setProperty('--uvh', UI.h / 100 + 'px');
-  if (typeof Mapa !== 'undefined' && Mapa.on) mapLayout();
+// ---------- Aviso de tela cheia (celular) ----------
+// O navegador só deixa entrar em tela cheia depois de um toque do jogador: um aviso cobre a tela pedindo esse toque.
+// Tocar em qualquer lugar entra em tela cheia (e trava na horizontal); "Agora não" some com o aviso até recarregar.
+// Se o jogador sair da tela cheia, o aviso volta. No iPhone (sem tela cheia no Safari) ele nunca aparece.
+const FsAsk = { skip: false };
+const fsOn = () => !!(document.fullscreenElement || document.webkitFullscreenElement);
+const fsCan = () => { const de = document.documentElement; return !!(de.requestFullscreen || de.webkitRequestFullscreen); };
+function fsPrompt() {
+  const el = $('#fs-ask');
+  el.hidden = FsAsk.skip || fsOn() || !fsCan() || !document.body.classList.contains('touch');
 }
-addEventListener('resize', uiScale);
-addEventListener('orientationchange', () => setTimeout(uiScale, 200));
-if (window.visualViewport) visualViewport.addEventListener('resize', uiScale);
-uiScale();
-
-// Celular: já no primeiro toque o jogo entra em tela cheia e trava na horizontal (some a barra do navegador e sobra
-// espaço, como no PC). Se o jogador sair da tela cheia, volta a pedir ao apertar Jogar ou começar uma fase.
-addEventListener('pointerup', e => { if (e.pointerType === 'touch') goFullscreen(); }, { once: true });
+$('#fs-ask').addEventListener('click', e => {
+  if (e.target.closest('#fs-no')) FsAsk.skip = true; else goFullscreen();
+  $('#fs-ask').hidden = true;
+});
+document.addEventListener('fullscreenchange', () => setTimeout(fsPrompt, 300));
+document.addEventListener('webkitfullscreenchange', () => setTimeout(fsPrompt, 300));
 
 // ---------- Mini-chat do multiplayer ----------
 // Canto superior direito: mensagens dos jogadores e avisos do jogo (vida perdida, especial...). Some sozinho depois de uns segundos.
@@ -978,7 +970,7 @@ function boot() {
   setCamera(Game.save.view | 0);
   setChatSize(Game.save.chatSize === undefined ? 1 : Game.save.chatSize);
   Snd.setMuted(!!Game.save.mute);
-  if ('ontouchstart' in window || matchMedia('(pointer: coarse)').matches) document.body.classList.add('touch');
+  if ('ontouchstart' in window || matchMedia('(pointer: coarse)').matches) { document.body.classList.add('touch'); fsPrompt(); }
   updateSoundLabels();
   $('#ver').textContent = 'versão ' + VERSAO;
   resize();

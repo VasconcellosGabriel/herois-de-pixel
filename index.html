@@ -23,7 +23,6 @@
 <div id="touch">
   <div class="pad pl">
     <button data-k="left">◀</button>
-    <button data-k="down" class="down"><span>▼</span><small>AGACHAR</small></button>
     <button data-k="right">▶</button>
   </div>
   <div class="pad pr">
@@ -33,6 +32,8 @@
     <button data-k="c" id="tb-c" class="sk"></button>
     <button data-k="b" id="tb-b" class="sk"></button>
     <button data-k="a" id="tb-a" class="sk"></button>
+    <!-- agachar fica acima do pulo: o polegar esquerdo anda e o direito segura o agachar (andar agachado) -->
+    <button data-k="down" class="down"><span>▼</span><small>AGACHAR</small></button>
     <button data-k="jump" class="jump">▲</button>
   </div>
   <button data-k="pause" class="pausebtn">❚❚</button>
@@ -48,9 +49,16 @@
   <button id="chat-btn" type="button" title="Chat (Enter)">💬</button>
 </div>
 <div id="rotate"><div>↻</div><p>Gire o aparelho para jogar na horizontal</p></div>
+<!-- Celular: pede um toque para entrar em tela cheia (js/ui.js, fsPrompt) -->
+<div id="fs-ask" hidden>
+  <div class="fs-box">
+    <div class="fs-ico">⛶</div>
+    <b>Toque na tela</b>
+    <p>para jogar em tela cheia</p>
+    <button class="btn small" id="fs-no">Agora não</button>
+  </div>
+</div>
 
-<!-- Palco dos menus: montado no tamanho de uma tela de PC e encolhido por igual para caber (ver uiScale em js/ui.js) -->
-<div id="ui">
 <!-- Título -->
 <section id="s-title" class="screen">
   <div class="panel center">
@@ -287,7 +295,6 @@
     <button class="btn small" id="b-quit">Sair para o menu</button>
   </div>
 </section>
-</div>
 
 <script src="js/util.js"></script>
 <script src="js/epic.js"></script>

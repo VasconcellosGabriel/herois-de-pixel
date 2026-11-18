@@ -211,7 +211,8 @@ function openMap() {
   if (same && next > Mapa.at && !sv.best[nodes[next].lv.id]) mapSelect(next);          // fase nova liberada: o herói já sai andando até ela
 }
 function mapLayout() {
-  const tight = innerHeight < 520, avail = innerHeight - (tight ? 132 : 230);
+  const vh = typeof UI !== 'undefined' ? UI.h : innerHeight;              // altura do palco dos menus (js/ui.js)
+  const tight = vh < 520, avail = vh - (tight ? 132 : 230);
   Mapa.scale = clamp(Math.floor(avail / MAPA.H), 1, 3);
   const cv = $('#map-cv'); cv.style.width = MAPA.W * Mapa.scale + 'px'; cv.style.height = MAPA.H * Mapa.scale + 'px';
   $('#map-inner').style.setProperty('--ms', Mapa.scale);

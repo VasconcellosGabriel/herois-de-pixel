@@ -9,14 +9,20 @@ const lerp = (a, b, t) => a + (b - a) * t;
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 
+// RNG_TAPE: grava os sorteios de qualquer rng e depois os repete na mesma ordem (ver wrap3 em world.js)
+let RNG_TAPE = null;
 function rng(seed) {
   let s = seed >>> 0;
   return () => {
+    const T = RNG_TAPE;
+    if (T && T.play && T.i < T.v.length) return T.v[T.i++];
     s = (s + 0x6D2B79F5) >>> 0;
     let t = s;
     t = Math.imul(t ^ (t >>> 15), t | 1);
     t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    const v = ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    if (T && !T.play) T.v.push(v);
+    return v;
   };
 }
 
@@ -35,7 +41,7 @@ let KEYMODE = false;
 // Protótipo do rig de recortes (js/rig.js): heróis montados com peças desenhadas uma vez. Para ver: ?rig na URL.
 let RIG = typeof location !== 'undefined' && /[?&]rig/.test(location.search);
 // Versão do jogo (aparece no menu inicial). Ao publicar, suba junto com o CACHE do sw.js.
-const VERSAO = '1.31';                 // padrão: 1.28, 1.29, 1.30... (sobe a cada versão publicada)
+const VERSAO = '1.31.1';                 // padrão: 1.28, 1.29, 1.30... (sobe a cada versão publicada)
 // amt < 0 escurece, amt > 0 clareia (-1..1)
 function shade(hex, amt) {
   if (KEYMODE) { const k = keyOf(hex); if (k) return keyHex(k.h, amt < 0 ? k.v * (1 + amt) : k.v + (1 - k.v) * amt); }

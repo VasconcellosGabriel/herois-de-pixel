@@ -2051,7 +2051,7 @@ function render(w) {
   const inView = (x, wd = 40) => x - cx > -wd && x - cx < W + wd;
   const decorFrame = (d) => d.spr[d.spr.length === 1 ? 0 : Math.floor(w.t * (d.fast ? 9 : d.slow ? 2.5 : 3) + d.x * 0.07) % d.spr.length];
   const drawDecor = layer => {
-    for (const d of w.decor.items) if (d.layer === layer && inView(d.x, 40)) {
+    for (const d of w.decor.items) if (d.layer === layer && inView(d.x, 50)) {
       const img = decorFrame(d);
       g.drawImage(img, Math.round((d.x - img.width / (2 * HR) - cx) * HR) / HR, Math.round((d.y - img.height / HR - cy) * HR) / HR, img.width / HR, img.height / HR);
     }

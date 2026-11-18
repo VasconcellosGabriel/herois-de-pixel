@@ -178,7 +178,7 @@ DECO_BUILD.desert = (D, sp) => {
     for (let y = 10; y < 54; y += 6) { g.px(14, y, '#e8f0c8'); g.px(26, y + 3, '#e8f0c8'); }
     if (!v) { g.ell(20, 6, 3, 2.5, '#ff6a9a', { hi: '#ffc0d8', lo: '#a02a5a', depth: 1 }); }
   }));
-  D.skull = sp(40, 22, g => { g.ell(20, 12, 9, 8, '#f0e8d0', { hi: '#ffffff', lo: '#a8a088', depth: 2 }); g.rect(15, 9, 3, 4, '#1b1423'); g.rect(22, 9, 3, 4, '#1b1423'); g.cap(12, 6, 2, 1, 2, '#f0e8d0', { flat: true }); g.cap(28, 6, 38, 1, 2, '#f0e8d0', { flat: true }); for (let x = 0; x < 40; x++) g.clear(x, 21); });
+  D.skull = sp(40, 22, g => { g.ell(20, 12, 9, 8, '#f0e8d0', { hi: '#ffffff', lo: '#a8a088', depth: 2 }); g.rect(15, 9, 3, 4, '#1b1423'); g.rect(22, 9, 3, 4, '#1b1423'); g.cap(12, 7, 3, 2.5, 2, '#f0e8d0', { flat: true }); g.cap(28, 7, 37, 2.5, 2, '#f0e8d0', { flat: true }); for (let x = 0; x < 40; x++) g.clear(x, 21); });
   D.pillar = sp(30, 62, g => { g.poly([[5, 14], [25, 14], [25, 58], [5, 58]], '#d8a868', { hi: '#f4d098', lo: '#8a6030', depth: 3 }); g.poly([[0, 56], [30, 56], [30, 62], [0, 62]], '#c89858', { hi: '#ecc088', lo: '#7a5028', depth: 2 }); g.poly([[3, 8], [27, 12], [27, 16], [3, 16]], '#c89858', { hi: '#ecc088', lo: '#7a5028', depth: 2 }); for (let y = 20; y < 56; y += 9) g.rect(5, y, 20, 1, '#a87840'); g.line(14, 18, 18, 34, '#7a5028'); });
   D.rock = sp(30, 18, g => { g.lit(15, 11, 13, 7, ['#8a5a30', '#b07a48', '#d4a068', '#f0c890'], 9, { edge: 0.25 }); for (let x = 0; x < 30; x++) for (let y = 16; y < 18; y++) g.clear(x, y); });
 };
@@ -190,7 +190,7 @@ DECOR_PLACE.desert = o => {
   else if (r > 0.8 && r2 < 0.3) add({ spr: [D.skull], x, y: y + 1, layer: 'mid' });
 };
 DECO_BUILD.sky = (D, sp, spN) => {
-  D.cloud = [0, 1].map(v => spN(48, 22, g => { for (const [x, y, rx, ry] of [[14, 14, 12, 7], [26, 11, 13, 9], [38, 14, 10, 7]]) g.lit(x + v * 2, y, rx, ry, ['#c8d8ee', '#e4ecf8', '#ffffff', '#ffffff'], 7 + x, { edge: 0.1 }); for (let x = 0; x < 48; x++) for (let y = 19; y < 22; y++) g.clear(x, y); }));
+  D.cloud = [0, 1].map(v => spN(54, 22, g => { for (const [x, y, rx, ry] of [[14, 14, 12, 7], [26, 11, 13, 9], [38, 14, 10, 7]]) g.lit(x + 2 + v * 2, y, rx, ry, ['#c8d8ee', '#e4ecf8', '#ffffff', '#ffffff'], 7 + x, { edge: 0.1 }); for (let x = 0; x < 54; x++) for (let y = 19; y < 22; y++) g.clear(x, y); }));
   D.column = sp(30, 64, g => { g.poly([[6, 8], [24, 8], [24, 58], [6, 58]], '#e8e8f4', { hi: '#ffffff', lo: '#9a9ab4', depth: 3 }); for (let x = 9; x < 24; x += 4) g.rect(x, 10, 1, 46, '#c4c4d8'); g.poly([[0, 0], [30, 0], [30, 8], [0, 8]], '#ecc860', { hi: '#fff4b0', lo: '#a8862a', depth: 2 }); g.poly([[0, 56], [30, 56], [30, 64], [0, 64]], '#ecc860', { hi: '#fff4b0', lo: '#a8862a', depth: 2 }); });
   D.orb = [0, 1].map(f => sp(24, 40, g => { g.poly([[6, 24], [18, 24], [20, 39], [4, 39]], '#e8e8f4', { hi: '#ffffff', lo: '#9a9ab4', depth: 2 }); g.ell(12, 13 - f, 8, 8, '#ffe27a', { hi: '#ffffff', lo: '#c8902a', depth: 3 }); }));
 };
@@ -265,9 +265,9 @@ BG_BUILD.snow = th => {
 BG_BUILD.icecave = th => {
   const b = bgBase(th), R = b.R;
   const far = b.mk2(), C5 = ['#06102a', '#0c1c40', '#14305e', '#20487e', '#3a6aa8'];
-  for (let x = 0; x < WW; x++) { const h = 30 + Math.sin(x * 0.02) * 18 + Math.sin(x * 0.06 + 1) * 8; far.rect(x, 0, 1, Math.round(h), C5[1]); }
+  for (let x = 0; x < WW; x++) { const h = 30 + Math.sin(x * WAVE(2)) * 18 + Math.sin(x * WAVE(6) + 1) * 8; far.rect(x, 0, 1, Math.round(h), C5[1]); }
   wrap3(o => { for (let x = 10; x < WW; x += 24 + ((R() * 30) | 0)) { const h = 30 + ((R() * 90) | 0); far.poly([[x + o - 7, 24], [x + o + 7, 24], [x + o, 24 + h]], C5[3], { hi: '#bfe8ff', lo: C5[1], depth: 2 }); } });
-  for (let x = 0; x < WW; x++) { const h = 226 + Math.sin(x * 0.015 + 2) * 22 + Math.sin(x * 0.05) * 10; far.rect(x, Math.round(h), 1, WH, C5[2]); }
+  for (let x = 0; x < WW; x++) { const h = 226 + Math.sin(x * WAVE(2) + 2) * 22 + Math.sin(x * WAVE(5)) * 10; far.rect(x, Math.round(h), 1, WH, C5[2]); }
   b.layers.push({ img: far.toCanvas(), par: 0.12 });
   const beams = b.mk2().toCanvas(), bg = beams.getContext('2d');
   bg.save(); bg.scale(HR, HR);
@@ -287,14 +287,15 @@ BG_BUILD.icecave = th => {
 };
 
 DECO_BUILD.autumn = (D, sp, spN, R) => {
-  D.tree = [0, 1, 2].map(v => sp(150, 210, g => {
-    const x0 = 75;
-    g.poly([[x0 - 14, 208], [x0 - 7, 170], [x0 - 6, 100], [x0 + 6, 100], [x0 + 7, 170], [x0 + 14, 208]], AUT_BARK[2], { hi: AUT_BARK[3], lo: AUT_BARK[0], depth: 3 });
-    g.poly([[x0 - 6, 140], [x0 - 26, 124], [x0 - 26, 132], [x0 - 5, 152]], AUT_BARK[2], { hi: AUT_BARK[3], lo: AUT_BARK[0], depth: 2 });
+  const P = 14;                                    // margem: a copa passava da borda do sprite e saía cortada reta
+  D.tree = [0, 1, 2].map(v => sp(150 + 2 * P, 210 + P, g => {
+    const x0 = 75 + P, Y = y => y + P;
+    g.poly([[x0 - 14, Y(208)], [x0 - 7, Y(170)], [x0 - 6, Y(100)], [x0 + 6, Y(100)], [x0 + 7, Y(170)], [x0 + 14, Y(208)]], AUT_BARK[2], { hi: AUT_BARK[3], lo: AUT_BARK[0], depth: 3 });
+    g.poly([[x0 - 6, Y(140)], [x0 - 26, Y(124)], [x0 - 26, Y(132)], [x0 - 5, Y(152)]], AUT_BARK[2], { hi: AUT_BARK[3], lo: AUT_BARK[0], depth: 2 });
     const L = AUT_LEAF[v];
-    for (const [x, y, rx, ry] of [[75, 66, 54, 46], [36, 96, 36, 32], [114, 96, 36, 32], [75, 112, 42, 30], [70, 36, 38, 30], [106, 56, 28, 24], [44, 60, 28, 24]]) g.lit(x, y, rx, ry, L, 41 + v * 9 + x, { edge: 0.22, speckle: 0.03 });
-    for (let i = 0; i < 26; i++) { const x = 18 + ((R() * 114) | 0), y = 16 + ((R() * 110) | 0); if (g.has(x, y)) { g.px(x, y, L[5]); g.px(x + 1, y, L[4]); } }
-    g.tint(0, 0, 150, 210, '#f0d8c0', 0.12);
+    for (const [x, y, rx, ry] of [[75, 66, 54, 46], [36, 96, 36, 32], [114, 96, 36, 32], [75, 112, 42, 30], [70, 36, 38, 30], [106, 56, 28, 24], [44, 60, 28, 24]]) g.lit(x + P, y + P, rx, ry, L, 41 + v * 9 + x, { edge: 0.22, speckle: 0.03 });
+    for (let i = 0; i < 26; i++) { const x = P + 18 + ((R() * 114) | 0), y = P + 16 + ((R() * 110) | 0); if (g.has(x, y)) { g.px(x, y, L[5]); g.px(x + 1, y, L[4]); } }
+    g.tint(0, 0, 150 + 2 * P, 210 + P, '#f0d8c0', 0.12);
   }));
   D.bush = [0, 1].map(v => sp(76, 44, g => { for (const [x, y, rx, ry] of [[38, 30, 28, 12], [22, 26, 16, 12], [54, 26, 16, 12], [38, 20, 18, 12]]) g.lit(x, y, rx, ry, AUT_LEAF[v * 2], 11 + v + x, { edge: 0.2 }); for (let x = 0; x < 76; x++) for (let y = 40; y < 44; y++) g.clear(x, y); }));
   D.pile = sp(40, 14, g => { for (let i = 0; i < 46; i++) { const x = 3 + ((R() * 34) | 0), y = 13 - ((R() * Math.max(1, 10 - Math.abs(x - 20) * 0.45)) | 0); g.rect(x, y, 2, 1, AUT_LEAF[(R() * 3) | 0][2 + ((R() * 4) | 0)]); } });
@@ -332,7 +333,7 @@ DECOR_PLACE.snow = o => {
   else if (r2 > 0.75) add({ spr: [D.drift], x: x + ((r * 6) | 0) - 3, y: y + 2, layer: 'front' });
 };
 DECO_BUILD.icecave = (D, sp) => {
-  const shard = cs => sp(48, 56, g => { for (const [dx, h, w] of [[22, 50, 11], [6, 28, 8], [34, 34, 9], [27, 18, 7]]) { g.poly([[dx - w, 55], [dx - w + 2, 55 - h + 8], [dx, 55 - h], [dx + w - 2, 55 - h + 8], [dx + w, 55]], cs[0], { hi: cs[1], lo: cs[2], depth: 3 }); g.line(dx - 2, 55 - h + 6, dx - 2, 50, '#ffffff'); } });
+  const shard = cs => sp(48, 56, g => { for (const [dx, h, w] of [[22, 50, 11], [9, 28, 8], [34, 34, 9], [27, 18, 7]]) { g.poly([[dx - w, 55], [dx - w + 2, 55 - h + 8], [dx, 55 - h], [dx + w - 2, 55 - h + 8], [dx + w, 55]], cs[0], { hi: cs[1], lo: cs[2], depth: 3 }); g.line(dx - 2, 55 - h + 6, dx - 2, 50, '#ffffff'); } });
   D.crystal = [['#8ad8ff', '#e8faff', '#2a78b0'], ['#b8e8ff', '#ffffff', '#4a90c8'], ['#7ab0ff', '#e0ecff', '#2a50a8']].map(cs => ({ img: shard(cs), glow: cs[0] }));
   D.stalag = [0, 1].map(v => sp(40, 52 + v * 16, g => { const h = 52 + v * 16; g.poly([[4, h - 1], [20, 1 + v * 2], [36, h - 1]], '#3e6698', { hi: '#bfe8ff', lo: '#14284a', depth: 3 }); g.line(20, 6, 14, h - 6, '#9ad0f4'); }));
   D.rocks = sp(40, 22, g => { g.lit(11, 14, 10, 7, ['#14284a', '#284872', '#4a78a8', '#9ad0f4'], 88, { edge: 0.24 }); g.lit(27, 13, 12, 8, ['#14284a', '#284872', '#4a78a8', '#9ad0f4'], 89, { edge: 0.24 }); for (let x = 0; x < 40; x++) for (let y = 19; y < 22; y++) g.clear(x, y); });
@@ -464,6 +465,7 @@ BG_BUILD.graveyard = th => {
   for (let i = 0; i < 80; i++) { const x = (R() * WW) | 0, y = (R() * 200) | 0; b.sg.fillStyle = R() < 0.2 ? '#ffffff' : '#9a8ac0'; b.sg.fillRect(x / HR, y / HR, 1, 1); }
   b.disc(84, 52, 40, '#f0ecff', 0.08); b.disc(84, 52, 26, '#f0ecff', 0.14); b.disc(84, 52, 18, '#f4f0ff', 1); b.disc(79, 48, 4, '#d0c8e8', 0.8); b.disc(90, 57, 3, '#d0c8e8', 0.7);
   const far = b.mk2(), F = ['#120a1c', '#1e1430', '#2c1e42'];
+  far.rect(0, 300, WW, WH - 300, F[1]);                                          // chão contínuo: fora da colina ficava um degrau
   wrap3(o => {                                                                   // o castelo do Conde no alto da colina
     const x = WW * 0.62 + o;
     for (let xx = -260; xx <= 260; xx++) { const h = 90 * Math.pow(Math.cos(xx / 260 * Math.PI / 2), 1.4); far.rect(x + xx, 300 - h, 1, h + 60, F[1]); }
@@ -525,7 +527,7 @@ DECOR_PLACE.thaw = o => {
 };
 DECO_BUILD.savanna = (D, sp, spN) => {
   DECO_BUILD.desert(D, sp);
-  D.acacia = [0, 1].map(v => sp(130, 100, g => acacia(g, 64, 99, 80 + v * 10, 46 + v * 8, DRY, 7 + v)));
+  D.acacia = [0, 1].map(v => sp(130, 112, g => acacia(g, 64, 111, 80 + v * 10, 46 + v * 8, DRY, 7 + v)));   // 112 de altura: a copa da maior saía cortada em cima
   D.grass = [0, 1].map(f => spN(26, 24, g => { for (let i = 0; i < 8; i++) { const x = 2 + i * 3, h = 10 + ((i * 5) % 11), sw = f ? (i % 2 ? 3 : 1) : (i % 2 ? 1 : 3); for (let yy = 0; yy < h; yy++) { const t = yy / h; g.px(x + Math.round(sw * t * t), 23 - yy, ['#8a6a20', '#b8902a', '#e0c050', '#fff0a0'][t > 0.8 ? 3 : t > 0.4 ? 2 : i % 2]); } } }));
   D.mound = sp(36, 46, g => { g.poly([[2, 45], [12, 8], [18, 1], [24, 10], [34, 45]], '#b0703a', { hi: '#d89a5a', lo: '#6a3a1a', depth: 3 }); g.poly([[20, 12], [28, 6], [27, 20]], '#b0703a', { hi: '#d89a5a', lo: '#6a3a1a', depth: 1 }); for (const [x, y2] of [[14, 20], [20, 30], [12, 36]]) g.rect(x, y2, 2, 2, '#4a2410'); });
 };
@@ -562,9 +564,10 @@ DECO_BUILD.graveyard = (D, sp) => {
     sp(24, 40, g => { g.poly([[9, 39], [9, 14], [2, 14], [2, 8], [9, 8], [9, 1], [15, 1], [15, 8], [22, 8], [22, 14], [15, 14], [15, 39]], '#5a5268', S); }),
     sp(30, 22, g => { g.poly([[2, 21], [4, 6], [26, 4], [28, 21]], '#4a4258', S); g.line(8, 10, 14, 16, '#2a2234'); g.line(14, 16, 12, 20, '#2a2234'); }),
   ];
-  D.tree = sp(80, 110, g => {
-    g.poly([[32, 109], [36, 40], [44, 40], [48, 109]], '#1e1624', { hi: '#3a2e44', lo: '#0a060e', depth: 3 });
-    for (const [x0, y0, x1, y1] of [[38, 60, 10, 40], [42, 52, 72, 34], [40, 42, 28, 6], [44, 70, 68, 62], [38, 80, 16, 70]]) { g.cap(x0, y0, x1, y1, 4, '#1e1624', { hi: '#3a2e44', lo: '#0a060e', depth: 1 }); g.cap(x1, y1, x1 + (x1 > 40 ? 6 : -6), y1 - 7, 2, '#1e1624', { flat: true }); }
+  D.tree = sp(88, 118, g => {                      // 4 px de margem dos lados e 8 em cima: as pontas dos galhos saíam cortadas
+    const X = x => x + 4, Y = y => y + 8;
+    g.poly([[X(32), Y(109)], [X(36), Y(40)], [X(44), Y(40)], [X(48), Y(109)]], '#1e1624', { hi: '#3a2e44', lo: '#0a060e', depth: 3 });
+    for (const [x0, y0, x1, y1] of [[38, 60, 10, 40], [42, 52, 72, 34], [40, 42, 28, 6], [44, 70, 68, 62], [38, 80, 16, 70]]) { g.cap(X(x0), Y(y0), X(x1), Y(y1), 4, '#1e1624', { hi: '#3a2e44', lo: '#0a060e', depth: 1 }); g.cap(X(x1), Y(y1), X(x1 + (x1 > 40 ? 6 : -6)), Y(y1 - 7), 2, '#1e1624', { flat: true }); }
   });
   D.fence = sp(48, 30, g => { for (let x = 3; x < 48; x += 8) { g.rect(x, 6, 3, 24, '#2a2630'); g.poly([[x - 1, 7], [x + 1.5, 0], [x + 4, 7]], '#3a3644', { flat: true }); } g.rect(0, 10, 48, 2, '#2a2630'); g.rect(0, 22, 48, 2, '#2a2630'); });
   D.lantern = [0, 1].map(f => sp(20, 50, g => { g.rect(9, 14, 3, 36, '#2a2630'); g.poly([[4, 4], [16, 4], [14, 16], [6, 16]], '#2a2630', { flat: true }); g.rect(7, 7, 6, 7, f ? '#ffe27a' : '#ffc84a'); g.rect(8, 8, 2, 3, '#fff6c8'); }));
@@ -640,7 +643,7 @@ BG_BUILD.slimewood = th => {
 };
 DECO_BUILD.slimewood = (D, sp, spN, R) => {
   DECO_BUILD.swamp(D, sp, spN);
-  D.gtree = [0, 1].map(v => sp(110, 130, g => gooTree(g, 55, 129, 110 + v * 16, rng(77 + v), ['#1a5212', '#2a761a', '#3e9e24', '#5ec632', '#8ae64e', '#c8ff8a'])));
+  D.gtree = [0, 1].map(v => sp(132, 146, g => gooTree(g, 66, 145, 110 + v * 16, rng(77 + v), ['#1a5212', '#2a761a', '#3e9e24', '#5ec632', '#8ae64e', '#c8ff8a'])));
   D.blob = [0, 1].map(f => spN(30, 16, g => {                                    // montinho de gosma borbulhando
     g.ell(15, 12, 13, 5 - f, GOO[2], { hi: GOO[4], lo: GOO[0], depth: 2 });
     g.ell(9 + f * 4, 8 - f, 3, 3, GOO[3], { hi: '#ffffff', lo: GOO[1], depth: 1 });

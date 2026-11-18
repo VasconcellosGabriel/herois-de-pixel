@@ -44,7 +44,16 @@ function skyOf(stops, bands = 22) {
   }
   return g;
 }
-const wrap3 = fn => { for (const o of [-WW, 0, WW]) fn(o); };
+// Desenha o mesmo conteúdo três vezes (à esquerda, no meio e à direita) para a camada emendar sem corte ao se repetir.
+// Os sorteios da primeira vez são repetidos nas outras: senão cada cópia sorteava árvores diferentes e, na emenda,
+// meia árvore encostava na metade de outra.
+const wrap3 = fn => {
+  const prev = RNG_TAPE, tape = RNG_TAPE = { v: [], i: 0, play: false };
+  try { fn(-WW); tape.play = true; for (const o of [0, WW]) { tape.i = 0; fn(o); } }
+  finally { RNG_TAPE = prev; }
+};
+// frequência de uma onda que dá n voltas exatas na largura da camada (a curva emenda sem degrau ao se repetir)
+const WAVE = n => n * 2 * Math.PI / WW;
 
 // ---------- tiles (32x32 de alta resolução) ----------
 function terrain(g, th, variant) {
@@ -355,10 +364,10 @@ function makeBg(name0) {
     layers.push({ img: f2.toCanvas(), par: 0.5 });
   } else if (name === 'cave') {
     const far = mk2(), C5 = ['#0c0a26', '#14113a', '#1d1850', '#2a2266', '#3a3088'];
-    for (let x = 0; x < WW; x++) { const h = 28 + Math.sin(x * 0.022) * 20 + Math.sin(x * 0.055 + 1) * 10; far.rect(x, 0, 1, Math.round(h), C5[1]); }
+    for (let x = 0; x < WW; x++) { const h = 28 + Math.sin(x * WAVE(2)) * 20 + Math.sin(x * WAVE(6) + 1) * 10; far.rect(x, 0, 1, Math.round(h), C5[1]); }
     wrap3(o => { for (let x = 12; x < WW; x += 32 + ((R() * 40) | 0)) { const h = 40 + ((R() * 90) | 0); far.poly([[x + o - 10, 22], [x + o + 10, 22], [x + o, 22 + h]], C5[2], { hi: C5[4], lo: C5[0], depth: 2 }); } });
     far.rect(0, 236, WW, WH, C5[2]);
-    for (let x = 0; x < WW; x++) { const h = 224 + Math.sin(x * 0.015 + 2) * 24 + Math.sin(x * 0.05) * 12; far.rect(x, Math.round(h), 1, WH, C5[2]); }
+    for (let x = 0; x < WW; x++) { const h = 224 + Math.sin(x * WAVE(2) + 2) * 24 + Math.sin(x * WAVE(5)) * 12; far.rect(x, Math.round(h), 1, WH, C5[2]); }
     layers.push({ img: far.toCanvas(), par: 0.12 });
     const beams = mk2().toCanvas(), bg = beams.getContext('2d');
     bg.save(); bg.scale(HR, HR);
@@ -496,23 +505,26 @@ function decoSprites(name0) {
       g.ell(10, 9, 2.2, 2, '#ffffff', { flat: true }); g.ell(19, 11, 1.8, 1.6, '#ffffff', { flat: true }); g.ell(16, 6, 1.6, 1.4, '#ffffff', { flat: true });
     });
     D.rock = sp(30, 20, g => { g.lit(15, 12, 13, 8, ['#3a3a4a', '#585a6e', '#80839a', '#b0b2c8'], 5, { edge: 0.25 }); for (let x = 0; x < 30; x++) for (let y = 17; y < 20; y++) g.clear(x, y); });
-    D.tree = [0, 1].map(v => sp(150, 210, g => {
+    // P = margem: as copas dos lados e de cima passavam da borda do sprite e saíam cortadas retas
+    const P = 12;
+    D.tree = [0, 1].map(v => sp(150 + 2 * P, 210 + P, g => {
       const trunk = (x0) => {
-        g.poly([[x0 - 14, 208], [x0 - 7, 170], [x0 - 6, 100], [x0 + 6, 100], [x0 + 7, 170], [x0 + 14, 208]], BARK[2], { hi: BARK[4], lo: BARK[0], depth: 3 });
-        for (let y = 100; y < 208; y += 1) for (let x = x0 - 14; x <= x0 + 14; x++) if (g.has(x, y) && pn(x * 1.5, y * 0.18, 2, 4096, 9) > 0.7) g.px(x, y, BARK[1]);
-        g.poly([[x0 - 14, 208], [x0 - 26, 210], [x0 - 12, 196]], BARK[2], { hi: BARK[3], lo: BARK[0], depth: 2 }); g.poly([[x0 + 14, 208], [x0 + 28, 210], [x0 + 12, 198]], BARK[2], { hi: BARK[3], lo: BARK[0], depth: 2 });
-        g.poly([[x0 - 6, 140], [x0 - 26, 124], [x0 - 26, 132], [x0 - 5, 152]], BARK[2], { hi: BARK[3], lo: BARK[0], depth: 2 });
+        const Y = y => y + P;
+        g.poly([[x0 - 14, Y(208)], [x0 - 7, Y(170)], [x0 - 6, Y(100)], [x0 + 6, Y(100)], [x0 + 7, Y(170)], [x0 + 14, Y(208)]], BARK[2], { hi: BARK[4], lo: BARK[0], depth: 3 });
+        for (let y = Y(100); y < Y(208); y += 1) for (let x = x0 - 14; x <= x0 + 14; x++) if (g.has(x, y) && pn(x * 1.5, y * 0.18, 2, 4096, 9) > 0.7) g.px(x, y, BARK[1]);
+        g.poly([[x0 - 14, Y(208)], [x0 - 26, Y(210)], [x0 - 12, Y(196)]], BARK[2], { hi: BARK[3], lo: BARK[0], depth: 2 }); g.poly([[x0 + 14, Y(208)], [x0 + 28, Y(210)], [x0 + 12, Y(198)]], BARK[2], { hi: BARK[3], lo: BARK[0], depth: 2 });
+        g.poly([[x0 - 6, Y(140)], [x0 - 26, Y(124)], [x0 - 26, Y(132)], [x0 - 5, Y(152)]], BARK[2], { hi: BARK[3], lo: BARK[0], depth: 2 });
       };
-      trunk(75);
-      for (const [x, y, rx, ry] of [[75, 66, 54, 46], [36, 96, 36, 32], [114, 96, 36, 32], [75, 112, 42, 30], [70, 36, 38, 30], [106, 56, 28, 24], [44, 60, 28, 24]]) g.lit(x, y, rx, ry, LEAF, 41 + v * 9 + x, { edge: 0.2, speckle: 0.025 });
-      for (let i = 0; i < 22; i++) { const x = 18 + ((R() * 114) | 0), y = 16 + ((R() * 110) | 0); if (g.has(x, y)) { g.px(x, y, LEAF[5]); g.px(x + 1, y, LEAF[4]); } }
-      if (v) for (const [x, y] of [[48, 56], [100, 70], [76, 104], [30, 98], [112, 106]]) g.ell(x, y, 3.4, 3.4, '#ff5a6a', { depth: 1, hi: '#ffc0c8', lo: '#9a2030' });
-      g.tint(0, 0, 150, 210, '#bfe3d8', 0.12);        // leve névoa: a árvore não disputa com o herói
+      trunk(75 + P);
+      for (const [x, y, rx, ry] of [[75, 66, 54, 46], [36, 96, 36, 32], [114, 96, 36, 32], [75, 112, 42, 30], [70, 36, 38, 30], [106, 56, 28, 24], [44, 60, 28, 24]]) g.lit(x + P, y + P, rx, ry, LEAF, 41 + v * 9 + x, { edge: 0.2, speckle: 0.025 });
+      for (let i = 0; i < 22; i++) { const x = P + 18 + ((R() * 114) | 0), y = P + 16 + ((R() * 110) | 0); if (g.has(x, y)) { g.px(x, y, LEAF[5]); g.px(x + 1, y, LEAF[4]); } }
+      if (v) for (const [x, y] of [[48, 56], [100, 70], [76, 104], [30, 98], [112, 106]]) g.ell(x + P, y + P, 3.4, 3.4, '#ff5a6a', { depth: 1, hi: '#ffc0c8', lo: '#9a2030' });
+      g.tint(0, 0, 150 + 2 * P, 210 + P, '#bfe3d8', 0.12);        // leve névoa: a árvore não disputa com o herói
     }));
     D.sign = sp(40, 46, g => { g.poly([[18, 20], [23, 20], [23, 45], [18, 45]], BARK[2], { hi: BARK[4], lo: BARK[0], depth: 1 }); g.poly([[2, 4], [37, 4], [39, 8], [39, 20], [2, 20]], BARK[3], { hi: '#c89a62', lo: BARK[1], depth: 2 }); g.rect(7, 10, 24, 2, BARK[1]); g.rect(7, 14, 16, 2, BARK[1]); });
   } else if (name === 'cave') {
     const crystal = (cs) => sp(48, 56, g => {
-      for (const [dx, h, w] of [[22, 50, 11], [6, 28, 8], [34, 34, 9], [27, 18, 7]]) {
+      for (const [dx, h, w] of [[22, 50, 11], [9, 28, 8], [34, 34, 9], [27, 18, 7]]) {
         g.poly([[dx - w, 55], [dx - w + 2, 55 - h + 8], [dx, 55 - h], [dx + w - 2, 55 - h + 8], [dx + w, 55]], cs[0], { hi: cs[1], lo: cs[2], depth: 3 });
         g.line(dx - 2, 55 - h + 6, dx - 2, 50, '#ffffff');
       }
@@ -530,18 +542,18 @@ function decoSprites(name0) {
       g.poly([[12, 26], [17, 26], [17, 61], [12, 61]], '#5a5a78', { hi: '#9a9ab8', lo: '#2a2a40', depth: 1 }); g.poly([[6, 54], [23, 54], [25, 63], [4, 63]], '#3a3a52', { hi: '#6a6a88', lo: '#1a1a28', depth: 1 });
       g.poly([[7, 14], [22, 14], [20, 28], [9, 28]], '#6a4a2a', { hi: '#a87a42', lo: '#2a1a0a', depth: 1 });
       const fl = [[0, 0], [1, -2], [-1, -1]][f];
-      g.poly([[8, 14], [10 + fl[0], 2 + fl[1]], [15, 2 + fl[1] * 2], [20 + fl[0], 2], [22, 14]], '#ff7a2a', { hi: '#ffb04a', lo: '#c23a1a', depth: 2 });
+      g.poly([[8, 14], [10 + fl[0], 4 + fl[1]], [15, 4 + fl[1] * 2], [20 + fl[0], 4], [22, 14]], '#ff7a2a', { hi: '#ffb04a', lo: '#c23a1a', depth: 2 });
       g.poly([[11, 14], [14 + fl[0], 5], [18, 14]], '#ffd27a', { flat: true }); g.poly([[13, 14], [15, 9], [17, 14]], '#fff6c8', { flat: true });
     }));
     D.column = sp(34, 58, g => { g.poly([[5, 6], [29, 6], [29, 54], [5, 54]], '#7a7a96', { hi: '#b4b4d0', lo: '#3a3a52', depth: 3 }); g.poly([[0, 0], [34, 0], [34, 8], [0, 8]], '#9898b4', { hi: '#d4d4ec', lo: '#4a4a62', depth: 2 }); g.poly([[0, 50], [34, 50], [34, 58], [0, 58]], '#9898b4', { hi: '#d4d4ec', lo: '#4a4a62', depth: 2 }); g.line(14, 14, 16, 30, '#3a3a52'); g.line(16, 30, 22, 34, '#3a3a52'); for (let x = 17; x < 34; x++) for (let y = 0; y < 14; y++) g.clear(x, y); });
     D.bones = sp(40, 18, g => { g.poly([[4, 10], [20, 8], [20, 14], [4, 15]], '#ece8d6', { hi: '#ffffff', lo: '#a8a28a', depth: 1 }); g.ell(26, 9, 8, 7, '#ece8d6', { hi: '#ffffff', lo: '#a8a28a', depth: 2 }); g.rect(22, 6, 3, 4, '#1b1423'); g.rect(28, 6, 3, 4, '#1b1423'); g.rect(24, 12, 5, 2, '#1b1423'); g.ell(4, 11, 3, 3, '#ece8d6', { depth: 1 }); });
-    D.flag = [0, 1].map(f => sp(40, 78, g => { g.poly([[4, 0], [8, 0], [8, 78], [4, 78]], '#7a7a96', { hi: '#b4b4d0', lo: '#3a3a52', depth: 1 }); g.ell(6, 3, 4, 4, '#ffcf6a', { hi: '#fff0a0', lo: '#b8862a', depth: 1 }); const pts = [[8, 8]]; for (let i = 0; i <= 8; i++) pts.push([8 + i * 3.6, 8 + Math.sin(i * 0.8 + f * 1.6) * 3]); for (let i = 8; i >= 0; i--) pts.push([8 + i * 3.6, 36 + Math.sin(i * 0.8 + f * 1.6) * 3 - (i > 6 ? (i - 6) * 3 : 0)]); g.poly(pts, '#8a1f36', { hi: '#d04a66', lo: '#4a0e1c', depth: 2 }); g.rect(16, 16 + f * 2, 8, 8, '#ffcf6a'); }));
+    D.flag = [0, 1].map(f => sp(40, 78, g => { g.poly([[4, 0], [8, 0], [8, 78], [4, 78]], '#7a7a96', { hi: '#b4b4d0', lo: '#3a3a52', depth: 1 }); g.ell(6, 4, 3.5, 3.5, '#ffcf6a', { hi: '#fff0a0', lo: '#b8862a', depth: 1 }); const pts = [[8, 8]]; for (let i = 0; i <= 8; i++) pts.push([8 + i * 3.6, 8 + Math.sin(i * 0.8 + f * 1.6) * 3]); for (let i = 8; i >= 0; i--) pts.push([8 + i * 3.6, 36 + Math.sin(i * 0.8 + f * 1.6) * 3 - (i > 6 ? (i - 6) * 3 : 0)]); g.poly(pts, '#8a1f36', { hi: '#d04a66', lo: '#4a0e1c', depth: 2 }); g.rect(16, 16 + f * 2, 8, 8, '#ffcf6a'); }));
   } else {
     D.torch = [0, 1, 2].map(f => sp(30, 64, g => {
       g.poly([[12, 26], [17, 26], [17, 61], [12, 61]], '#5a2a38', { hi: '#9a4a5c', lo: '#240c14', depth: 1 }); g.poly([[6, 54], [23, 54], [25, 63], [4, 63]], '#3a1822', { hi: '#6a2a3c', lo: '#14060c', depth: 1 });
       g.poly([[7, 14], [22, 14], [20, 28], [9, 28]], '#4a2a2a', { hi: '#7a4a4a', lo: '#1a0c0c', depth: 1 });
       const fl = [[0, 0], [1, -2], [-1, -1]][f];
-      g.poly([[8, 14], [10 + fl[0], 2 + fl[1]], [15, 2 + fl[1] * 2], [20 + fl[0], 2], [22, 14]], '#ff3a1a', { hi: '#ff8a2a', lo: '#a01a0a', depth: 2 });
+      g.poly([[8, 14], [10 + fl[0], 4 + fl[1]], [15, 4 + fl[1] * 2], [20 + fl[0], 4], [22, 14]], '#ff3a1a', { hi: '#ff8a2a', lo: '#a01a0a', depth: 2 });
       g.poly([[11, 14], [14 + fl[0], 5], [18, 14]], '#ffd27a', { flat: true }); g.poly([[13, 14], [15, 9], [17, 14]], '#fff6c8', { flat: true });
     }));
     D.shard = [0, 1].map(v => sp(36, 56 + v * 14, g => { const h = 56 + v * 14; g.poly([[4, h - 1], [18, 1], [32, h - 1]], '#2e1a26', { hi: '#6a4054', lo: '#0e060c', depth: 3 }); g.line(18, 6, 12, h - 8, '#ff5a2a'); g.line(19, 10, 14, h - 14, '#ffb04a'); }));

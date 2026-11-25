@@ -95,8 +95,8 @@ function goLevels() {
 function beginLevel(i) {
   if (Net.role === 'client') return;                 // no multiplayer quem escolhe a fase é o anfitrião
   if (!Game.save.char) { openHeroes('play'); return; }
-  // primeira fase de um mundo: a abertura da história (HQ) vem antes
-  if (hqBefore(i, () => startChosen(i))) { goFullscreen(); return; }
+  // primeira fase de um mundo: a abertura da história (HQ) vem antes. Suspensa até a 2.0 (js/hq.js fora do index)
+  if (typeof hqBefore === 'function' && hqBefore(i, () => startChosen(i))) { goFullscreen(); return; }
   startChosen(i);
 }
 function startChosen(i) {

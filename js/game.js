@@ -2650,5 +2650,5 @@ function levelResult(r) {
   Game.mode = 'menu'; Input.enabled = false; Input.clear();
   Snd.music('menu');
   // chefe vencido pela primeira vez: a cena da história (HQ) vem antes da tela de vitória
-  if (!hqAfter(r.idx, () => showWin(r))) showWin(r);
+  if (typeof hqAfter !== 'function' || !hqAfter(r.idx, () => showWin(r))) showWin(r);
 }

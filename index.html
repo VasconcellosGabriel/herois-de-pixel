@@ -119,7 +119,7 @@
     </div>
     <!-- cristais achados (só aparece depois do primeiro); com os 7, o portal da Dimensão Prisma surge no mapa: js/cristais.js -->
     <div id="map-cris" hidden><span id="map-cris-slots"></span><small id="map-cris-txt"></small></div>
-    <div class="row"><button class="btn small" id="b-lv-back">← Voltar</button><button class="btn small" id="b-lv-up">🧙 Meu personagem</button><button class="btn small" id="b-lv-hist">📖 História</button></div>
+    <div class="row"><button class="btn small" id="b-lv-back">← Voltar</button><button class="btn small" id="b-lv-up">🧙 Meu personagem</button></div>
     <p class="hint">Clique num ponto (ou use as setas) para o herói ir até a fase. Clique de novo, Enter ou Jogar para começar.</p>
   </div>
 </section>
@@ -327,19 +327,7 @@
   </div>
 </section>
 
-<!-- História em quadrinhos (js/hq.js, roteiro em js/historia.js) -->
-<section id="s-hq" class="screen">
-  <canvas id="hq-cv" width="960" height="540"></canvas>
-  <div class="hq-bar"><button class="btn small" id="b-hq-back">Pular ⏭</button><button class="btn small" id="b-hq-next">Continuar ▶</button></div>
-</section>
-<!-- Galeria da história -->
-<section id="s-hist" class="screen">
-  <div class="panel hist">
-    <h2>📖 História</h2>
-    <div id="hist-list"></div>
-    <div class="row"><button class="btn small" id="b-hist-back">← Voltar</button></div>
-  </div>
-</section>
+<!-- História em quadrinhos (js/hq.js + js/historia.js): suspensa até a 2.0 -->
 
 <!-- Pausa -->
 <section id="s-pause" class="screen">
@@ -380,8 +368,6 @@
 <script src="js/mapa.js"></script>
 <script src="js/ferreiro.js"></script>
 <script src="js/academia.js"></script>
-<script src="js/historia.js"></script>
-<script src="js/hq.js"></script>
 <script src="js/cristais.js"></script>
 <script src="js/ui.js"></script>
 </body>

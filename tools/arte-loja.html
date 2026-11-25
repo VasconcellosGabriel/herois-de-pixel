@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<!-- Gera ícones e artes das lojas com os desenhos do próprio jogo. Não abra direto: use `node tools/gerar-arte-loja.js`.
+     Aberto no navegador (com --allow-file-access-from-files) mostra uma prévia de tudo. -->
+<html lang="pt-BR"><head><meta charset="utf-8"><title>Arte das lojas</title>
+<style>
+  @font-face { font-family: 'Press Start 2P'; src: url('../fonts/PressStart2P-Regular.ttf'); }
+  body { margin: 0; background: #444; font: 12px sans-serif; color: #fff; }
+  #jogo { position: absolute; left: -4000px; width: 640px; height: 360px; border: 0; }
+  #prev { display: flex; flex-wrap: wrap; gap: 8px; padding: 8px; align-items: flex-start; }
+  #prev figure { margin: 0; } #prev img { display: block; max-width: 520px; max-height: 300px; image-rendering: pixelated; }
+</style></head>
+<body>
+<iframe id="jogo" src="../index.html"></iframe>
+<div id="prev"></div>
+<textarea id="out" hidden></textarea>
+<script>
+'use strict';
+const FUNDO = '#1b1423';
+const jogo = document.getElementById('jogo');
+let J;   // janela do jogo (funções e constantes globais do jogo)
+const G = nome => J.eval(nome);
+
+function tela(w, h) { const c = document.createElement('canvas'); c.width = w; c.height = h; return c; }
+// cena do jogo (céu, nuvens, montanhas, árvores e chão da floresta) em pixels do jogo: gw × gh, chão a `chao` px do fundo
+function cena(gw, gh, chao, camX = 30) {
+  const HR = G('HR'), T = G('T'), c = tela(gw * HR, gh * HR), g = c.getContext('2d');
+  g.imageSmoothingEnabled = false;
+  g.setTransform(HR, 0, 0, HR, 0, 0);
+  const BGW = G('BGW'), BGH = G('BGH'), bg = G('bgOf')('forest');
+  // fundo de 320×180 recortado: centraliza na horizontal e alinha o chão do fundo com o nosso chão
+  const gyJogo = BGH - 52, gy = gh - chao;
+  g.save(); g.translate(Math.round((gw - BGW) / 2), gy - gyJogo);
+  G('drawBg')(g, bg, camX, 0, 0);
+  g.restore();
+  if (gy - gyJogo > 0) { g.fillStyle = corDoTopo(bg.sky); g.fillRect(0, 0, gw, gy - gyJogo + 1); }
+  for (let i = -1; i < Math.ceil(gw / T) + 1; i++) {
+    const wx = i + 7, x = i * T, v = (G('hash2')(wx, 0) * 3) | 0;
+    g.drawImage(G('solidTile')('forest', 1, 0, v), x, gy, T, T);
+    for (let k = 1; k * T < chao + T; k++) g.drawImage(G('solidTile')('forest', 0, Math.min(3, k - 1), v), x, gy + k * T, T, T);
+  }
+  return { c, gy };
+}
+function corDoTopo(img) { const t = tela(1, 1), g = t.getContext('2d'); g.drawImage(img, 0, 0, 1, 1, 0, 0, 1, 1); const d = g.getImageData(0, 0, 1, 1).data; return `rgb(${d[0]},${d[1]},${d[2]})`; }
+// sprite do herói (resolução HR) recortado nos pixels visíveis
+function heroi(ch, pose = 'idle', f = 0) {
+  const img = G('buildPlayerSprites')(ch).get(pose, f), c = tela(img.width, img.height), g = c.getContext('2d');
+  g.drawImage(img, 0, 0);
+  const d = g.getImageData(0, 0, c.width, c.height).data;
+  let x0 = c.width, y0 = c.height, x1 = -1, y1 = -1;
+  for (let y = 0; y < c.height; y++) for (let x = 0; x < c.width; x++) if (d[(y * c.width + x) * 4 + 3] > 8) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y); }
+  const o = tela(x1 - x0 + 1, y1 - y0 + 1); o.getContext('2d').drawImage(c, -x0, -y0);
+  return o;
+}
+// contorno escuro de 1 px em volta do sprite (lê melhor em ícone pequeno)
+function contorno(img, cor = FUNDO) {
+  const o = tela(img.width + 2, img.height + 2), g = o.getContext('2d');
+  const s = tela(img.width, img.height), sg = s.getContext('2d');
+  sg.drawImage(img, 0, 0); sg.globalCompositeOperation = 'source-in'; sg.fillStyle = cor; sg.fillRect(0, 0, s.width, s.height);
+  for (const [dx, dy] of [[0, 1], [2, 1], [1, 0], [1, 2]]) g.drawImage(s, dx, dy);
+  g.drawImage(img, 1, 1);
+  return o;
+}
+function sombra(g, cx, y, w, k) { g.fillStyle = 'rgba(10,5,20,.35)'; g.fillRect(Math.round(cx - w / 2), y, w, k); g.fillRect(Math.round(cx - w / 2 + k), y + k, w - 2 * k, k); }
+// amplia sem borrar (pixel art)
+function amplia(src, w, h, sx = 0, sy = 0, sw = src.width, sh = src.height) {
+  const o = tela(w, h), g = o.getContext('2d'); g.imageSmoothingEnabled = false; g.drawImage(src, sx, sy, sw, sh, 0, 0, w, h); return o;
+}
+// reduz com qualidade (ícones pequenos: reduções sucessivas pela metade)
+function reduz(src, w, h) {
+  let c = src;
+  while (c.width / 2 >= w * 1.01) { const n = tela(Math.round(c.width / 2), Math.round(c.height / 2)), g = n.getContext('2d'); g.imageSmoothingQuality = 'high'; g.drawImage(c, 0, 0, n.width, n.height); c = n; }
+  const o = tela(w, h), g = o.getContext('2d'); g.imageSmoothingQuality = 'high'; g.drawImage(c, 0, 0, w, h); return o;
+}
+// texto com a fonte do jogo, contorno grosso e sombra (estilo do título do menu)
+function titulo(g, txt, cx, y, px, cor = '#ffd23f', cor2 = '#ff8a1f') {
+  g.font = `${px}px 'Press Start 2P'`; g.textAlign = 'center'; g.textBaseline = 'top';
+  const k = Math.max(2, Math.round(px / 8));
+  g.fillStyle = 'rgba(0,0,0,.45)'; g.fillText(txt, cx + k * 2, y + k * 2 + k);
+  g.fillStyle = FUNDO;
+  for (let dx = -k; dx <= k; dx += k) for (let dy = -k; dy <= k; dy += k) g.fillText(txt, cx + dx, y + dy);
+  const gr = g.createLinearGradient(0, y, 0, y + px); gr.addColorStop(0, '#fff3a0'); gr.addColorStop(0.45, cor); gr.addColorStop(1, cor2);
+  g.fillStyle = gr; g.fillText(txt, cx, y);
+}
+
+// ---------- Ícone ----------
+// arte quadrada em pixels do jogo; o herói fica 2× maior que o cenário para ler bem pequeno.
+// `zona` = fração do lado onde o herói precisa caber (ícone adaptativo do Android corta as bordas)
+function iconeArte(lado, { fundo = true, zona = 0.8 } = {}) {
+  const GW = 64, HR = G('HR');
+  const h = contorno(heroi(G('DEFAULT_CHAR'), 'idle', 0));
+  const base = tela(GW * HR, GW * HR), g = base.getContext('2d'); g.imageSmoothingEnabled = false;
+  const chao = 14;
+  if (fundo) { const s = cena(GW, GW, chao, 52); g.drawImage(s.c, 0, 0); g.drawImage(G('vignette')(), 0, 0, base.width, base.height); }
+  if (zona <= 0) return amplia(base, lado, lado);
+  // herói: escala inteira que caiba na zona segura, pés no chão
+  const kz = Math.floor(Math.min(base.width * zona / h.width, base.height * zona / h.height));
+  const k = Math.max(1, Math.min(kz, 3));
+  const hw = h.width * k, hh = h.height * k, cx = base.width / 2;
+  const pes = fundo ? base.height - chao * HR + 3 * k : Math.round((base.height + hh) / 2);
+  if (fundo) sombra(g, cx, pes - k, Math.round(hw * 0.7), k);
+  g.drawImage(h, Math.round(cx - hw / 2), pes - hh, hw, hh);
+  return amplia(base, lado, lado);
+}
+function cantosRedondos(src, r) {
+  const o = tela(src.width, src.height), g = o.getContext('2d');
+  g.beginPath(); g.roundRect(0, 0, o.width, o.height, r); g.clip(); g.drawImage(src, 0, 0); return o;
+}
+function circulo(src) {
+  const o = tela(src.width, src.height), g = o.getContext('2d');
+  g.beginPath(); g.arc(o.width / 2, o.height / 2, o.width / 2, 0, Math.PI * 2); g.clip(); g.drawImage(src, 0, 0); return o;
+}
+
+// ---------- Banner largo (Play: 1024×500 · Microsoft: 1920×1080 · cápsulas) ----------
+const ELENCO = () => { const P = G('PRESETS'); return [P[0], P[3], P[4] || P[2], P[6] || P[1]].filter(Boolean); };
+function banner(W, H, { texto = true, sub = true, herois = true, escalaHeroi } = {}) {
+  const HR = G('HR');
+  // escolhe quantos pixels do jogo cabem: ~6 px de tela por px do jogo em 1024 de largura
+  const px = Math.max(2, 2 * Math.round(W / 400)),   // par: cada pixel do sprite (meio pixel do jogo) vira um quadrado inteiro
+   gw = Math.ceil(W / px), gh = Math.ceil(H / px);
+  const chao = Math.round(gh * 0.2);
+  const s = cena(gw, gh, chao, 120), g = s.c.getContext('2d'); g.setTransform(1, 0, 0, 1, 0, 0); g.imageSmoothingEnabled = false;
+  g.drawImage(G('vignette')(), 0, 0, s.c.width, s.c.height);
+  if (herois) {
+    const lista = ELENCO(), n = lista.length, alto = heroi(lista[0]).height, largo = Math.max(...lista.map(c => contorno(heroi(c, 'idle', 0)).width)) * 1.25;
+    const k = escalaHeroi || Math.max(1, Math.min(Math.round(s.c.height * (texto ? 0.34 : 0.5) / alto), Math.floor(s.c.width * 0.94 / (n * largo))));
+    const larg = Math.min(s.c.width * (texto ? (W / H > 1.5 ? 0.66 : 0.92) : 0.8), n * alto * k * 1.05), passo = larg / n;
+    lista.forEach((ch, i) => {
+      const pose = ['atk', 'cast', 'aim', 'idle'][i] || 'idle';
+      let img; try { img = heroi(ch, pose, pose === 'idle' ? 0 : 2); } catch (e) { img = heroi(ch, 'idle', 0); }
+      img = contorno(img);
+      const cx = (s.c.width - larg) / 2 + passo * (i + 0.5), pes = s.gy * HR + 3 * k, w = img.width * k, h = img.height * k;
+      sombra(g, cx, pes - k, Math.round(w * 0.6), k);
+      g.drawImage(img, Math.round(cx - w / 2), pes - h, w, h);
+    });
+  }
+  const o = amplia(s.c, gw * px, gh * px), og = o.getContext('2d');
+  if (texto) {
+    const duas = W / H < 1.2;                      // quadrado ou em pé: título em duas linhas, bem grande
+    const tam = Math.round(duas ? W / 9.5 : Math.min(W / 17, H / 6));
+    if (duas) { titulo(og, 'HERÓIS', W / 2, Math.round(H * 0.09), tam); titulo(og, 'DE PIXEL', W / 2, Math.round(H * 0.09 + tam * 1.3), tam); }
+    else titulo(og, 'HERÓIS DE PIXEL', W / 2, Math.round(H * 0.1), tam);
+    if (sub) {
+      const st = Math.round(Math.min(tam * 0.4, W * 0.86 / 40)); og.font = `${st}px 'Press Start 2P'`; og.textAlign = 'center';
+      const y = Math.round(H * 0.1 + tam * 1.45), txt = 'Crie seu herói · 7 mundos · multiplayer';
+      og.fillStyle = 'rgba(27,20,35,.7)'; const tw = og.measureText(txt).width; og.fillRect(W / 2 - tw / 2 - st, y - st * 0.6, tw + st * 2, st * 2.2);
+      og.fillStyle = '#fff'; og.fillText(txt, W / 2, y);
+    }
+  }
+  const f = tela(W, H); f.getContext('2d').drawImage(o, 0, 0); return f;
+}
+
+// ---------- Splash (tela de abertura do app) ----------
+function splash(W, H) {
+  const o = tela(W, H), g = o.getContext('2d');
+  g.fillStyle = FUNDO; g.fillRect(0, 0, W, H);
+  const lado = Math.round(Math.min(W, H) * 0.42), ic = cantosRedondos(iconeArte(lado), lado * 0.18);
+  g.drawImage(ic, Math.round((W - lado) / 2), Math.round(H / 2 - lado * 0.62));
+  const tam = Math.max(10, Math.round(Math.min(W / 18, H / 11)));
+  titulo(g, 'HERÓIS DE PIXEL', W / 2, Math.round(H / 2 + lado * 0.5), tam);
+  return o;
+}
+
+// ---------- Tudo que vai para disco ----------
+function gerar() {
+  const out = {};
+  const png = (nome, c) => { out[nome] = c.toDataURL('image/png'); };
+  const mestre = iconeArte(1024), mestreFg = iconeArte(1024, { fundo: false, zona: 0.6 }), mestreBg = iconeArte(1024, { fundo: true, zona: 0 });
+  // loja / PWA
+  png('loja/icone-1024.png', mestre);
+  png('loja/google-play/icone-512.png', reduz(mestre, 512, 512));
+  png('loja/google-play/banner-1024x500.png', banner(1024, 500));
+  png('loja/microsoft/arte-caixa-1080x1080.png', banner(1080, 1080, { sub: false }));
+  png('loja/microsoft/poster-720x1080.png', banner(720, 1080, { sub: false }));
+  png('loja/microsoft/arte-heroi-1920x1080.png', banner(1920, 1080, { texto: false }));
+  png('loja/microsoft/logo-loja-300.png', reduz(mestre, 300, 300));
+  png('icons/icon-192.png', reduz(mestre, 192, 192));
+  png('icons/icon-512.png', reduz(mestre, 512, 512));
+  png('icons/maskable-512.png', reduz(iconeArte(1024, { zona: 0.62 }), 512, 512));
+  png('icons/apple-touch-icon-180.png', reduz(mestre, 180, 180));
+  // Android: ícone antigo (48dp), redondo e adaptativo (108dp: frente + fundo)
+  const DPI = { mdpi: 1, hdpi: 1.5, xhdpi: 2, xxhdpi: 3, xxxhdpi: 4 };
+  const R = 'android/app/src/main/res/';
+  for (const [d, k] of Object.entries(DPI)) {
+    const n = Math.round(48 * k), a = Math.round(108 * k);
+    png(`${R}mipmap-${d}/ic_launcher.png`, reduz(cantosRedondos(mestre, 1024 * 0.16), n, n));
+    png(`${R}mipmap-${d}/ic_launcher_round.png`, reduz(circulo(mestre), n, n));
+    png(`${R}mipmap-${d}/ic_launcher_foreground.png`, reduz(mestreFg, a, a));
+    png(`${R}mipmap-${d}/ic_launcher_background.png`, reduz(mestreBg, a, a));
+  }
+  // splash nos tamanhos que o Capacitor já criou
+  const SPL = { mdpi: [480, 320], hdpi: [800, 480], xhdpi: [1280, 720], xxhdpi: [1600, 960], xxxhdpi: [1920, 1280] };
+  png(`${R}drawable/splash.png`, splash(480, 320));
+  for (const [d, [w, h]] of Object.entries(SPL)) { png(`${R}drawable-land-${d}/splash.png`, splash(w, h)); png(`${R}drawable-port-${d}/splash.png`, splash(h, w)); }
+  return out;
+}
+
+jogo.onload = () => {
+  J = jogo.contentWindow;
+  try { J.Game.mode = 'pause'; } catch (e) {}
+  // espera as folhas PNG dos sprites e a fonte
+  setTimeout(async () => {
+    await document.fonts.load("20px 'Press Start 2P'");
+    const out = gerar();
+    document.getElementById('out').textContent = JSON.stringify(out);
+    if (!location.hash.includes('silencio')) for (const [k, v] of Object.entries(out)) {
+      if (k.includes('/res/') && !/xxxhdpi|drawable\//.test(k)) continue;
+      const f = document.createElement('figure'), i = new Image(); i.src = v; f.append(i, Object.assign(document.createElement('figcaption'), { textContent: k }));
+      document.getElementById('prev').append(f);
+    }
+    document.title = 'PRONTO';
+  }, 2500);
+};
+</script>
+</body></html>

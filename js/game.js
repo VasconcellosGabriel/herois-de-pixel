@@ -131,19 +131,42 @@ const Game = { mode: 'title', world: null, save: null, t: 0 };
 
 // Vários heróis salvos: cada um tem o próprio visual, fases liberadas, recordes, moedas, vidas e evolução.
 // O herói escolhido fica "aberto" direto em Game.save (save.char, save.coins...); persist() devolve para save.heroes[cur].
-const HERO_KEYS = ['char', 'unlocked', 'best', 'coins', 'lives', 'prog', 'sp'];
+const HERO_KEYS = ['char', 'unlocked', 'best', 'coins', 'lives', 'prog', 'sp', 'story', 'cris'];
 const MAX_HEROES = 4;
-function newHero(ch) { return { char: ch, unlocked: 1, best: {}, coins: 0, lives: START_LIVES, prog: {}, sp: 0 }; }
+function newHero(ch) { return { char: ch, unlocked: 1, best: {}, coins: 0, lives: START_LIVES, prog: {}, sp: 0, story: {}, cris: [] }; }
 // abre o herói i (−1 = nenhum)
 function useHero(sv, i) {
   sv.cur = sv.heroes[i] ? i : -1;
   const h = { ...newHero(null), ...(sv.heroes[sv.cur] || {}) };
   for (const k of HERO_KEYS) sv[k] = h[k];
 }
+// No app (Android/iOS) o save também vai para o armazenamento nativo (Capacitor Preferences): o sistema pode limpar
+// o localStorage do WebView, mas não apaga as Preferences. O localStorage continua sendo a cópia rápida usada no jogo.
+const SAVE_KEY = 'heroisdepixel_v1';
+const NativeSave = (() => {
+  const C = window.Capacitor, P = C && C.isNativePlatform && C.isNativePlatform() && C.Plugins && C.Plugins.Preferences;
+  if (!P) return null;
+  // até conferir o nativo (sync), nada é gravado nele: um localStorage limpo não pode sobrescrever o save guardado
+  let ready = false, pending = null;
+  const write = txt => P.set({ key: SAVE_KEY, value: txt }).catch(() => {});
+  return {
+    set(txt) { if (ready) write(txt); else pending = txt; },
+    // ao abrir: se o localStorage sumiu e o nativo tem save, devolve o save e recarrega; senão o localStorage vale e vai para o nativo
+    async sync() {
+      let nat = null; try { nat = (await P.get({ key: SAVE_KEY })).value; } catch (e) { ready = true; return; }
+      if (nat && !this.hadLocal) { try { localStorage.setItem(SAVE_KEY, nat); location.reload(); return; } catch (e) {} }
+      ready = true;
+      let loc = null; try { loc = localStorage.getItem(SAVE_KEY); } catch (e) {}
+      const txt = pending || loc; pending = null;
+      if (txt && txt !== nat) write(txt);
+    },
+    hadLocal: (() => { try { return !!localStorage.getItem(SAVE_KEY); } catch (e) { return false; } })(),
+  };
+})();
 function loadSave() {
   const base = { mute: false, heroes: [], cur: -1 };
   let s = null;
-  try { s = JSON.parse(localStorage.getItem('heroisdepixel_v1') || 'null'); } catch (e) {}
+  try { s = JSON.parse(localStorage.getItem(SAVE_KEY) || 'null'); } catch (e) {}
   if (s && typeof s === 'object') {
     Object.assign(base, s);
     if (!Array.isArray(s.heroes)) {                // save antigo (um herói só): vira o primeiro herói da lista
@@ -166,7 +189,9 @@ function persist() {
   const sv = Game.save, out = {};
   if (sv.cur >= 0 && sv.heroes[sv.cur]) { const h = sv.heroes[sv.cur]; for (const k of HERO_KEYS) h[k] = sv[k]; }
   for (const k in sv) if (!HERO_KEYS.includes(k)) out[k] = sv[k];
-  try { localStorage.setItem('heroisdepixel_v1', JSON.stringify(out)); } catch (e) {}
+  const txt = JSON.stringify(out);
+  try { localStorage.setItem(SAVE_KEY, txt); } catch (e) {}
+  if (NativeSave) NativeSave.set(txt);
 }
 // troca o herói aberto (guarda o atual antes)
 function selectHero(i) { persist(); useHero(Game.save, i); persist(); Game.titleSpr = null; }
@@ -360,6 +385,7 @@ function startLevel(idx, roster = [{ id: 0, ch: Game.save.char, b: myBuild() }],
     // as vidas extras (1UP) passam de uma fase para a outra
     lives: clamp(Game.save.lives || START_LIVES, START_LIVES, MAX_LIVES), nextLife: COINS_PER_LIFE, lifeT: 0, overT: 0,
     state: 'play', bossActive: false, boss: null, bossDrops: 0, flash: 0,
+    gem: lv.gem || null, gemGot: false, rule: def.rule || null, ruleN: 0, failWhy: '',   // cristal escondido e regra da fase extra (js/cristais.js)
     nextId: lv.spawns.length, local: roster.length > 1 && roster.every(r => r.dev),   // local: vários heróis no mesmo aparelho
   };
   w.hide = secretHide(lv, w.secrets); w.depth = computeDepth(lv, w.hide);
@@ -373,7 +399,8 @@ function startLevel(idx, roster = [{ id: 0, ch: Game.save.char, b: myBuild() }],
   Game.mode = 'play'; Input.enabled = true; Input.clear();
   setupTouch(p);
   Snd.music(THEMES[def.theme].song);
-  banner(def.name, def.boss ? 'Chefe · Mundo ' + def.wn : `Mundo ${def.wn} · Fase ${def.ln}`);
+  if (def.rule) banner(def.name, `${RULES[def.rule].icon} ${RULES[def.rule].nome}: ${RULES[def.rule].desc}`, 4200);
+  else banner(def.name, def.boss ? 'Chefe · Mundo ' + def.wn : `Mundo ${def.wn} · Fase ${def.ln}`);
   if (Net.role === 'host') Net.started(w);
 }
 // Cria o herói de um jogador no último checkpoint (os jogadores ficam lado a lado)
@@ -472,6 +499,7 @@ function dotHit(w, e, d, col) {
 // o: { by (jogador que atacou), dir, status, chance, kb, rect (área do golpe, p/ ponto fraco do chefe), back, noCrit, dot }
 function damageEnemy(w, e, dmg, o = {}) {
   if (e.dead || e.invul) return;
+  if (w.rule === 'stomponly' && !o.stomp) { if (!o.dot) ruleNote(w, cxOf(e), e.y - 4, 'IMUNE'); return; }   // regra: só pisões ferem
   const p = o.by || w.p;
   if (o.by) e.lastBy = o.by;
   let crit = false, weak = false;
@@ -509,6 +537,7 @@ function killEnemy(w, e) {
   addFx(w, { type: 'corpse', es, x: r1(cxOf(e)), y: r1(e.y + e.h + 1 + enemyYOff(e)), flip: e.dir < 0, vy: e.boss ? 0 : -150, t: e.boss ? 2.6 : 0.5, max: e.boss ? 2.6 : 0.5, boss: !!e.boss });
   burst(w, cxOf(e), cyOf(e), e.boss ? '#ffb347' : '#fff', e.boss ? 40 : 10, e.boss ? 160 : 90, 0.7);
   if (ON_KILL[e.type]) ON_KILL[e.type](w, e);
+  if (w.rule) ruleKill(w, e);
   w.coinsGot += e.coin; checkLifeUp(w, e.lastBy); sfx('coin');
   for (let i = 0; i < Math.min(e.coin, 6); i++) addFx(w, { type: 'coinpop', x: r1(cxOf(e)), y: r1(cyOf(e)), vx: r1(rnd(-40, 40)), vy: r1(rnd(-150, -90)), t: 0.7, max: 0.7 });
   floatText(w, cxOf(e), e.y - 8, '+' + e.coin, '#ffd23f');
@@ -550,6 +579,7 @@ function hurtPlayer0(w, p, dmg, srcX, srcY) {
     return false;
   }
   if (p.crouch) standUp(p, true);
+  if (w.rule === 'glass') ruleBreak(w, 'VOCE SE MACHUCOU');
   p.hp -= dmg; p.inv = 1.3; p.hurtT = 0.3; p.act = null; p.melee = null; p.dash = 0; p.diving = false; p.diveWait = false;
   p.vx = (pc < srcX ? -1 : 1) * 130; p.vy = -170; force(p);
   feel(w, p, 0, 0.18, 0.05); sfx('hurt');
@@ -559,6 +589,7 @@ function hurtPlayer0(w, p, dmg, srcX, srcY) {
 }
 // Zerar os corações custa 1 vida (estilo Sonic). As vidas são do time; sem vidas, quem cai fica esperando.
 function playerDie(w, p) {
+  if (w.rule === 'glass') ruleBreak(w, 'VOCE CAIU');
   w.lives = Math.max(0, w.lives - 1); w.deaths++; p.diving = false; p.diveWait = false; p.flamer = 0;
   if (p.crouch) standUp(p, true);
   p.dead = true; p.deadT = 1.6; p.vy = -230; p.vx = 0; p.dash = 0; p.melee = null; p.act = null; p.glide = false; p.block = false; force(p);
@@ -1015,10 +1046,13 @@ function updatePlayer(w, dt, p, ctl) {
   if (ctl && p.hurtT <= 0) {
     if (p.dash <= 0 && p.flamer <= 0) {
       if (c.isDown('a')) skillA(w, p);
-      if (c.isDown('b')) skillB(w, p);
-      if (c.hit('c')) skillC(w, p);
+      if (w.rule === 'basic') { if (c.hit('b') || c.hit('c') || c.hit('special')) ruleNote(w, cxOf(p), p.y - 6, 'BLOQUEADO'); }   // regra: só o ataque básico
+      else {
+        if (c.isDown('b')) skillB(w, p);
+        if (c.hit('c')) skillC(w, p);
+      }
     }
-    if (c.hit('special')) special(w, p);
+    if (c.hit('special') && w.rule !== 'basic') special(w, p);
     if (c.hit('elem')) cycleElem(w, p);
   }
 
@@ -1067,8 +1101,10 @@ function updatePlayer(w, dt, p, ctl) {
     else if (c.t === 'mana' && p.mana < p.maxMana) { p.mana = Math.min(p.maxMana, p.mana + 50); c.got = true; sfx('heal'); }
     if (c.got) { burst(w, c.x, c.y, c.t === 'heart' ? '#ff6b7a' : '#6bb8ff', 8, 60, 0.5, 0); emit(['pk', w.picks]); }
   }
+  gemTouch(w, p);
   if (w.lv.goal && w.state === 'play' && Math.abs(cxOf(p) - w.lv.goal.x) < 14 && p.y + p.h > w.lv.goal.y - 64 && p.y < w.lv.goal.y) {
-    w.state = 'win'; w.winT = 0.9; sfx('win'); burst(w, w.lv.goal.x, w.lv.goal.y - 16, '#ffd23f', 24, 120, 0.9);
+    if (!ruleGoalOpen(w)) ruleNote(w, w.lv.goal.x, w.lv.goal.y - 56, 'PORTAL FECHADO');
+    else { w.state = 'win'; w.winT = 0.9; sfx('win'); burst(w, w.lv.goal.x, w.lv.goal.y - 16, '#ffd23f', 24, 120, 0.9); }
   }
   if (w.lv.bossGate && !w.bossActive && cxOf(p) > w.lv.bossGate) {
     const bi = (w.boss && BOSS_INFO[w.boss.type]) || BOSS_INFO.golem;
@@ -1456,7 +1492,8 @@ function updateEnemies(w, dt) {
       if (overlap(p, e)) {
         if (p.stompT > 0) continue;   // acabou de quicar (o convidado ainda pode mandar a posição de antes do quique)
         if (e.stomp && p.vy > 60 && p.y + p.h - e.y < 11 && p.hurtT <= 0) {
-          asOwner(p, () => damageEnemy(w, e, 1, { by: p, noCrit: true })); p.vy = -240; p.stompT = 0.2; if (DJUMP[p.cls.id]) p.jumps = 1;
+          if (w.rule === 'nostomp') { ruleBreak(w, 'VOCE PISOU EM UM INIMIGO'); continue; }   // regra: sem pisões
+          asOwner(p, () => damageEnemy(w, e, 1, { by: p, noCrit: true, stomp: true })); p.vy = -240; p.stompT = 0.2; if (DJUMP[p.cls.id]) p.jumps = 1;
           if (p.remote) emit(['bo', p.id]);   // o convidado faz o quique na hora, no próprio aparelho
         } else if (!frozen(e)) hurtPlayer(w, p, 1, cxOf(e), cyOf(e));
       }
@@ -1690,6 +1727,12 @@ function update(w, dt) {
   if (w.state === 'play') {
     if (w.lives > 0) for (const p of w.players) if (p.out) respawn(w, p, false, true);   // o time ganhou vida: volta quem esperava
     if (w.players.every(p => p.out)) { w.state = 'over'; w.overT = 3.2; sfx('over'); music(null); }
+    else if (w.rule === 'clock' && w.t > RULES.clock.time) ruleBreak(w, 'O TEMPO ACABOU');
+  } else if (w.state === 'fail') {                          // regra quebrada: recomeça a fase com as mesmas vidas
+    const s0 = Math.ceil(w.overT);
+    w.overT -= dt;
+    if (w.overT <= 0) { startLevel(w.idx, w.roster, w.p.id); return; }
+    if (Math.ceil(w.overT) < s0) asOwner(null, () => sfx('no'));      // tique da contagem regressiva
   } else if (w.state === 'win') {
     w.winT -= dt;
     if (w.winT <= 0 && !w.finished) { w.finished = true; finishLevel(w); }
@@ -2083,6 +2126,7 @@ function render(w) {
     }
     g.fillStyle = '#ffd23f'; g.fillRect(x - 2, y - 55, 4, 5); g.fillStyle = '#fff2a0'; g.fillRect(x - 2, y - 55, 1, 5);
     g.globalCompositeOperation = 'lighter'; drawGlow(g, x, y - 22, 40, '#8a6cff', 0.35 + Math.sin(w.t * 3) * 0.1); g.globalAlpha = 1; g.globalCompositeOperation = 'source-over';
+    if (w.rule) drawGoalLock(g, w, x, y);
   }
 
   // baús
@@ -2102,6 +2146,7 @@ function render(w) {
     g.drawImage(img, Math.round(c.x - img.width / 2 - cx), Math.round(c.y - img.height / 2 - cy + bob));
   }
 
+  drawGem(g, w, cx, cy);                                   // cristal escondido (o túnel fechado o cobre)
   // túneis secretos ainda fechados: o interior parece terra maciça
   for (const s of w.secrets) if (s.fade > 0 && inView(s.x0 * T, (s.x1 - s.x0 + 2) * T)) {
     g.globalAlpha = s.fade;
@@ -2123,6 +2168,7 @@ function render(w) {
     const sqk = e.sq > 0 ? e.sq / 0.14 : 0;
     drawSprite(g, spr, cxOf(e) + shake, e.y + e.h + 1 + yOff + bob, e.dir < 0, cx, cy, 1 + 0.16 * sqk, 1 - 0.14 * sqk);
     g.globalAlpha = 1;
+    if (w.th.crys && !e.boss) crysGlint(g, w, e, cx, cy);                  // Dimensão Prisma: brilho do cristal
     const S = e.sts, flip = e.dir < 0;
     const ov = (col, a) => { g.globalAlpha = a; drawSprite(g, tintOf(img, col), cxOf(e) + shake, e.y + e.h + 1 + yOff, flip, cx, cy); g.globalAlpha = 1; };
     if (S.freeze > 0) ov('#8fe0ff', e.boss ? 0.3 : 0.55);
@@ -2487,6 +2533,7 @@ function drawHud(g, w) {
       g.drawImage(p.spr.face(), fx, fy, 18, 18); drawTextO(g, 'x', fx + 22, fy + 8, '#ffd23f', 1); drawTextO(g, w.lives, fx + 28, fy + 5, '#fff', 2);
     }
   }
+  drawRuleHud(g, w);
   if (w.state === 'over') {
     const a = clamp(1 - w.overT / 3.2 + 0.2, 0, 0.82);
     g.fillStyle = `rgba(0,0,0,${a})`; g.fillRect(0, 0, W, H);
@@ -2522,7 +2569,7 @@ function drawShadow2(g, x, y, wd) { g.fillStyle = 'rgba(10,5,20,.3)'; g.fillRect
 
 // ---------- Fim de fase ----------
 function finishLevel(w) {
-  const r = { idx: w.idx, coins: w.coinsGot, deaths: w.deaths, secs: Math.round(w.t), stars: w.deaths === 0 ? 3 : w.deaths <= 2 ? 2 : 1,
+  const r = { idx: w.idx, gem: w.gemGot && w.gem ? w.gem.id : null, coins: w.coinsGot, deaths: w.deaths, secs: Math.round(w.t), stars: w.deaths === 0 ? 3 : w.deaths <= 2 ? 2 : 1,
     lives: w.lives, xp: Object.fromEntries(w.players.map(p => [p.id, p.xpGot])), sp: Object.fromEntries(w.players.map(p => [p.id, Math.round(p.sp)])),
     local: w.local ? Object.fromEntries(w.players.map(p => [p.id, p.cls.id])) : null };
   if (Net.role === 'host') Net.finished(r);
@@ -2533,7 +2580,9 @@ function levelResult(r) {
   const sv = Game.save, id = LEVELS[r.idx].id;
   const old = sv.best[id] || { coins: 0, stars: 0 };
   sv.best[id] = { coins: Math.max(old.coins, r.coins), stars: Math.max(old.stars, r.stars) };
-  sv.unlocked = Math.max(sv.unlocked, r.idx + 2);
+  if (!LEVELS[r.idx].extra) sv.unlocked = Math.max(sv.unlocked, r.idx + 2);   // as fases extras não mexem na campanha
+  // cristal achado nesta fase: fica guardado no herói
+  if (r.gem && gemById(r.gem)) { sv.cris = crisOf(sv); if (!sv.cris.includes(r.gem)) { sv.cris.push(r.gem); r.newGem = r.gem; } }
   // o que se ganhou na fase fica guardado: moedas na carteira, XP no herói, vidas extras para a próxima fase
   sv.coins = (sv.coins || 0) + (r.coins | 0);
   sv.lives = clamp(r.lives | 0, START_LIVES, MAX_LIVES);
@@ -2549,5 +2598,6 @@ function levelResult(r) {
   persist();
   Game.mode = 'menu'; Input.enabled = false; Input.clear();
   Snd.music('menu');
-  showWin(r);
+  // chefe vencido pela primeira vez: a cena da história (HQ) vem antes da tela de vitória
+  if (!hqAfter(r.idx, () => showWin(r))) showWin(r);
 }

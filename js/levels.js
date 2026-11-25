@@ -66,7 +66,37 @@ const LEVELS = [
   { id: 'ceu3', world: 7, name: 'Portão da Tempestade', theme: 'sky', len: 175, seed: 1003, hpK: 2.3,
     enemies: ['ghost', 'knight', 'guard', 'hawk'], density: 0.88, gaps: 0.26, stones: 0.2, spikes: 0.16, plats: 0.2 },
   { id: 'tita', world: 7, name: 'Olho da Tempestade', theme: 'sky', len: 36, seed: 1004, boss: 'titan' },
+  // ---- Mundo extra (segredo): Dimensão Prisma. Abre com os 7 cristais; cada fase tem uma regra (RULES em js/cristais.js) ----
+  // extra: fica fora do mapa e da campanha (sem desbloquear "unlocked"); a fase seguinte abre ao vencer a anterior
+  { id: 'prisma1', world: 8, extra: true, rule: 'nostomp', name: 'Salto Proibido', theme: 'prisma1', len: 130, seed: 1101, hpK: 1.6,
+    enemies: ['shard', 'bat', 'skeleton', 'prism', 'ghost', 'shard'], density: 1.3, gaps: 0.2, stones: 0.16, spikes: 0.1, plats: 0.24 },
+  { id: 'prisma2', world: 8, extra: true, rule: 'stomponly', name: 'Dança dos Pisões', theme: 'prisma2', len: 135, seed: 1102, hpK: 1,
+    enemies: ['shard', 'shard', 'slime', 'frog', 'geode', 'prism'], density: 1.5, gaps: 0.18, stones: 0.14, spikes: 0.1, plats: 0.24 },
+  { id: 'prisma3', world: 8, extra: true, rule: 'pacifist', name: 'Caminho da Paz', theme: 'prisma3', len: 135, seed: 1103, hpK: 2,
+    enemies: ['geode', 'knight', 'oracle', 'prism', 'guard'], density: 0.9, gaps: 0.2, stones: 0.16, spikes: 0.12, plats: 0.24 },
+  { id: 'prisma4', world: 8, extra: true, rule: 'glass', name: 'Coração de Vidro', theme: 'prisma4', len: 130, seed: 1104, hpK: 1.6,
+    enemies: ['shard', 'bat', 'skeleton', 'spider', 'oracle'], density: 0.9, gaps: 0.2, stones: 0.16, spikes: 0.14, plats: 0.22 },
+  { id: 'prisma5', world: 8, extra: true, rule: 'clock', name: 'Fuga Escarlate', theme: 'prisma5', len: 140, seed: 1105, hpK: 1.6,
+    enemies: ['wolf', 'shard', 'prism', 'geode'], density: 0.8, gaps: 0.24, stones: 0.18, spikes: 0.12, plats: 0.2 },
+  { id: 'prisma6', world: 8, extra: true, rule: 'hunt', name: 'Caçada Branca', theme: 'prisma6', len: 120, seed: 1106, hpK: 1.6,
+    enemies: ['shard', 'skeleton', 'geode', 'prism', 'oracle'], density: 0.9, gaps: 0.18, stones: 0.14, spikes: 0.1, plats: 0.24 },
+  { id: 'prisma7', world: 8, extra: true, rule: 'basic', name: 'Lâmina Nua', theme: 'prisma7', len: 140, seed: 1107, hpK: 1.8,
+    enemies: ['skeleton', 'knight', 'geode', 'oracle', 'guard'], density: 1.1, gaps: 0.2, stones: 0.16, spikes: 0.14, plats: 0.22 },
 ];
+WORLDS[8] = 'Dimensão Prisma';
+// última fase da campanha (as extras vêm depois dela na lista)
+const LAST_MAIN = LEVELS.findIndex(lv => lv.id === 'tita');
+// Os 7 cristais (cores dos cristais clássicos dos jogos de plataforma): um escondido no túnel secreto de uma fase de cada mundo
+const CRISTAIS = [
+  { id: 'verde',    nome: 'Verde',    fase: 'caverna',  cor: ['#0e7a2a', '#22c04a', '#7cf28a', '#e2ffe6'] },
+  { id: 'ciano',    nome: 'Ciano',    fase: 'neve3',    cor: ['#0a6a8a', '#1ec0e8', '#8cf0ff', '#eafcff'] },
+  { id: 'roxo',     nome: 'Roxo',     fase: 'pantano2', cor: ['#4a1a8a', '#8a3ae8', '#c89aff', '#f4eaff'] },
+  { id: 'amarelo',  nome: 'Amarelo',  fase: 'deserto2', cor: ['#8a6a0a', '#e8c01e', '#fff07a', '#fffce0'] },
+  { id: 'vermelho', nome: 'Vermelho', fase: 'vulcao2',  cor: ['#7a0a14', '#e0202e', '#ff7a7a', '#ffe6e6'] },
+  { id: 'branco',   nome: 'Branco',   fase: 'vamp2',    cor: ['#6a6a84', '#b8bad0', '#eceef8', '#ffffff'] },
+  { id: 'azul',     nome: 'Azul',     fase: 'ceu2',     cor: ['#0a2a8a', '#2a5ae8', '#7aa8ff', '#e6eeff'] },
+];
+const gemOfLevel = id => CRISTAIS.find(c => c.fase === id) || null;
 // número do mundo e da fase dentro dele (para os menus e o aviso de início)
 { const n = {}; for (const lv of LEVELS) { lv.wn = lv.world; lv.ln = lv.boss ? 0 : (n[lv.world] = (n[lv.world] || 0) + 1); } }
 // inimigos voadores nascem no ar
@@ -82,6 +112,7 @@ function genLevel(def) {
   const L = { w, h, tiles, theme: def.theme, spawns: [], coins: [], picks: [], checks: [], chests: [], secrets: [], goal: null, start: null };
   if (def.theme2) { L.theme2 = def.theme2; L.split = Math.round(w * (def.split || 0.5)); }
   if (def.lakes) L.water = [];
+  const gem = gemOfLevel(def.id);         // fase com cristal: ele fica no meio do primeiro túnel secreto
   const ground = (x0, x1, g) => { for (let x = x0; x < x1 && x < w; x++) for (let y = g; y < h; y++) tiles[y][x] = 1; };
   const rint = (a, b) => a + Math.floor(R() * (b - a + 1));
   const coinRow = (tx, n, ty) => { for (let i = 0; i < n; i++) L.coins.push({ x: (tx + i) * T + 8, y: ty * T + 8 }); };
@@ -132,6 +163,7 @@ function genLevel(def) {
     L.chests.push({ x: (x + len - 3) * T + 8, y: gy * T, big: true });
     // o interior fica coberto (parece terra maciça) até alguém quebrar uma das paredes falsas
     L.secrets.push({ x0: x + 1, x1: x + len - 2, y0: gy - 2, y1: gy - 1, wx: [x, x + len - 1] });
+    if (gem && !L.gem) L.gem = { id: gem.id, x: (x + (len >> 1)) * T + 8, y: (gy - 2) * T + 9 };
     coinRow(x + 4, 3, top - 2);
     addEnemies(x, len, top);
     x += len; sinceCheck += len; secrets++;

@@ -1,0 +1,6 @@
+{
+  "appId": "com.macaconhista.heroisdepixel",
+  "appName": "Heróis de Pixel",
+  "webDir": "www",
+  "android": { "backgroundColor": "#1b1423" }
+}

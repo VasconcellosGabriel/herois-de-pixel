@@ -47,6 +47,7 @@ function skinned(img, k) {
   const fx = SKIN_FX[k]; if (!fx) return img;
   const m = _skinC[k] || (_skinC[k] = new WeakMap());
   let c = m.get(img); if (c) return c;
+  if (fx.crys) return crysSkin(img, fx.crys, m);                                // cristalizado (Dimensão Prisma: js/dimensao.js)
   c = mk(img.width, img.height); const g = c.getContext('2d'); g.drawImage(img, 0, 0);
   const id = g.getImageData(0, 0, c.width, c.height), d = id.data;
   for (let i = 0; i < d.length; i += 4) {
@@ -59,7 +60,11 @@ function skinned(img, k) {
   g.putImageData(id, 0, 0); m.set(img, c);
   return c;
 }
-const skinOf = (e, lv) => { const s = ENEMY_SKIN[lv && lv.theme]; return s && s[e.type]; };
+const skinOf = (e, lv) => {
+  const th = lv && THEMES[lv.theme];
+  if (th && th.crys) return CRYS_NATIVE.has(e.type) ? null : th.crys;          // fases da Dimensão Prisma: tudo vira cristal
+  const s = ENEMY_SKIN[lv && lv.theme]; return s && s[e.type];
+};
 
 // ---------- Lobo (cinza, marrom no outono, branco na neve, cão infernal no vulcão, sombrio no castelo) ----------
 const WOLF_PAL = {

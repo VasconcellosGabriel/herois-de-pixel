@@ -1,3 +1,5 @@
+/* fonte embutida (SIL OFL 1.1, ver fonts/OFL.txt): o jogo funciona offline e nos apps das lojas */
+@font-face { font-family: 'Press Start 2P'; src: url('fonts/PressStart2P-Regular.ttf') format('truetype'); font-display: swap; }
 :root {
   --bg: #1b1423; --panel: #2a2040; --panel2: #3a2e58; --line: #0e0a14; --ink: #f3ecff; --mute: #b3a6d4;
   --acc: #ffd23f; --good: #4ade80; --pix: 'Press Start 2P', ui-monospace, 'Courier New', monospace;
@@ -32,6 +34,10 @@ h2 { font-size: clamp(12px, 2.6vw, 18px); margin: 0 0 10px; color: var(--acc); }
 .btn.small { font-size: 9px; padding: 8px 12px; min-width: 0; background: #3e3560; }
 .btn:disabled { opacity: .4; cursor: not-allowed; }
 .row { display: flex; gap: 10px; justify-content: center; margin-top: 10px; flex-wrap: wrap; }
+.row.tight { margin-top: 0; }
+.credits .cd-role { color: var(--mute); font-size: 9px; margin: 6px 0 0; text-transform: uppercase; }
+.credits .cd-names { font-size: 12px; margin: 0; line-height: 1.8; font-family: var(--pix), "Segoe UI Symbol", "Noto Sans Symbols", "Noto Sans Thai", sans-serif; }
+.credits .cd-thanks { color: var(--acc); font-size: 10px; margin: 8px 0 0; }
 .row.end { justify-content: space-between; }
 
 /* ---------- Fases: mapa do mundo (js/mapa.js) ---------- */
@@ -50,13 +56,29 @@ h2 { font-size: clamp(12px, 2.6vw, 18px); margin: 0 0 10px; color: var(--acc); }
 .map-world { position: absolute; top: 4%; transform: translateX(-50%); font-size: calc(4.5px * var(--ms, 2)); line-height: 1; color: #fff3c4; white-space: nowrap; pointer-events: none; text-shadow: 1px 1px 0 #14101e, -1px 1px 0 #14101e, 1px -1px 0 #14101e, -1px -1px 0 #14101e, 0 2px 0 #14101e; }
 .map-world.off { color: #8a84a4; }
 .panel.map .hint { max-width: none; }
-#map-info { display: flex; align-items: center; justify-content: space-between; gap: 12px; background: var(--panel2); border: 3px solid var(--line); padding: 8px 12px; }
-#map-info .mi-t { display: flex; flex-direction: column; gap: 6px; min-width: 0; text-align: left; }
-#map-info b { font-size: 12px; color: var(--acc); line-height: 1.5; }
-#map-info small { font-size: 8px; color: var(--mute); line-height: 1.6; }
-#map-info .st { color: var(--acc); font-size: 12px; letter-spacing: 2px; margin: 0 6px; white-space: nowrap; }
-#map-info .st i { color: #5b4f80; font-style: normal; }
-#map-info .btn { min-width: 150px; flex: none; }
+#map-info, #pz-info { display: flex; align-items: center; justify-content: space-between; gap: 12px; background: var(--panel2); border: 3px solid var(--line); padding: 8px 12px; }
+#map-info .mi-t, #pz-info .mi-t { display: flex; flex-direction: column; gap: 6px; min-width: 0; text-align: left; }
+#map-info b, #pz-info b { font-size: 12px; color: var(--acc); line-height: 1.5; }
+#map-info small, #pz-info small { font-size: 8px; color: var(--mute); line-height: 1.6; }
+#map-info .st, #pz-info .st { color: var(--acc); font-size: 12px; letter-spacing: 2px; margin: 0 6px; white-space: nowrap; }
+#map-info .st i, #pz-info .st i { color: #5b4f80; font-style: normal; }
+#map-info .btn, #pz-info .btn { min-width: 150px; flex: none; }
+/* cristais achados (embaixo do mapa) e a Dimensão Prisma: js/cristais.js */
+#map-cris { display: flex; align-items: center; justify-content: center; gap: 10px; flex-wrap: wrap; }
+#map-cris[hidden] { display: none; }
+#map-cris-slots { display: flex; gap: 4px; }
+#map-cris small { font-size: 8px; color: var(--mute); line-height: 1.6; }
+.map-node.portal { width: 2.4%; height: 26%; }
+.map-world.prisma { color: #d8b8ff; top: 22%; }
+/* Dimensão Prisma: as fases são ilhas flutuando no vazio (js/cristais.js) */
+.panel.prisma { background: linear-gradient(160deg, #20163a, #2a1a48 50%, #142a40); }
+#pz-box { border: 4px solid var(--line); background: #06040e; display: flex; justify-content: center; }
+#pz-inner { position: relative; width: min(100%, calc((100vh - 270px) * 16 / 9)); aspect-ratio: 16 / 9; line-height: 0; }
+#pz-cv { display: block; width: 100%; height: 100%; image-rendering: pixelated; image-rendering: crisp-edges; }
+.pz-node { position: absolute; width: 11%; height: 24%; transform: translate(-50%, -50%); background: transparent; border: 0; padding: 0; border-radius: 50%; cursor: pointer; }
+.pz-node:disabled { cursor: not-allowed; }
+.pz-node:focus { outline: none; }
+.gem-ico { image-rendering: pixelated; display: block; }
 /* ---------- Multiplayer local ---------- */
 #lc-slots { display: grid; gap: 8px; min-width: min(560px, 88vw); }
 .lc-slot { display: flex; align-items: center; gap: 10px; padding: 8px 10px; background: var(--panel2); border: 3px solid var(--line); text-align: left; }
@@ -201,7 +223,8 @@ body.touch.playing #touch { display: block; }
   .cr-left input { padding: 6px; font-size: 9px; } .cr-dice { width: 32px; height: 32px; font-size: 14px; }
   .cr-cls img { width: 28px; height: 28px; } .cr-cinfo > p:first-child { display: none; } .cr-row { min-height: 34px; padding: 2px 5px; } .cr-sw { width: 22px; height: 22px; }
   .chip { padding: 5px 7px; font-size: 8px; }
-  .panel.map { padding: 8px 10px; gap: 6px; } .panel.map .hint { display: none; } #map-info { padding: 5px 8px; } #map-info b { font-size: 10px; } #map-info .btn { min-width: 110px; }
+  .panel.map { padding: 8px 10px; gap: 6px; } .panel.map .hint { display: none; } #map-info, #pz-info { padding: 5px 8px; } #map-info b, #pz-info b { font-size: 10px; } #map-info .btn, #pz-info .btn { min-width: 110px; }
+  #pz-inner { width: min(100%, calc((100vh - 150px) * 16 / 9)); }
 }
 /* celular em pé: a tela inteira rola (assim a faixa do título não é cortada) */
 @media (max-width: 640px) {
@@ -326,3 +349,15 @@ body.touch #chat-btn { width: calc(44px * var(--chat-k, 1)); height: calc(40px *
 #s-win .gain { color: #c8a8ff; }
 /* celulares baixos na horizontal: botões um pouco menores (a área de toque acompanha) */
 @media (max-height: 430px) { .pl { transform: scale(.84); transform-origin: bottom left; } .pr { transform: scale(.84); transform-origin: bottom right; } }
+
+/* ---------- História em quadrinhos (js/hq.js) ---------- */
+#s-hq { background: #0b0710; padding: 0; }
+#hq-cv { display: block; cursor: pointer; box-shadow: 0 0 0 3px #000; }
+#s-hq .hq-bar { position: fixed; right: 8px; bottom: 8px; display: flex; gap: 8px; opacity: .92; }
+#s-hq .hq-bar .btn { box-shadow: 2px 2px 0 rgba(0,0,0,.6); }
+#b-hq-next { background: #19a05a; }
+.panel.hist { width: min(760px, 96vw); }
+#hist-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 8px; }
+.hist-cap { display: flex; flex-direction: column; gap: 6px; text-align: left; padding: 10px 12px; }
+.hist-cap b { color: var(--acc); font-size: 8px; font-weight: normal; }
+.hist-cap span { font-size: 9px; line-height: 1.5; }

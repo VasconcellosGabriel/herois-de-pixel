@@ -5,7 +5,9 @@
 // setas do teclado ou direcional do controle). O fundo (terreno, enfeites, trilha) é desenhado uma vez só, por código,
 // na resolução dos heróis; por cima, a cada quadro: trilha já liberada, pontos, estrelas, névoa dos mundos fechados e o herói.
 // Para mudar a posição dos pontos: mapNodes(). Para o visual de cada mundo: BIOMAS e os enfeites em mapBuild().
-const MAPA = { W: 1820, H: 216, WW: 260, HERO: 0.75 };   // tamanho do mapa e largura de cada mundo, em pixels; escala do herói
+const MAPA = { W: 1900, H: 216, WW: 260, HERO: 0.75, END: 1820 };   // tamanho do mapa e largura de cada mundo, em pixels; escala do herói
+// END: onde acaba a terra do último mundo. Depois dela só há céu, e é ali que nasce o portal da Dimensão Prisma
+// (com os 7 cristais: js/cristais.js). O portal é o "ponto" de índice mapNodes().length, ligado ao último chefe.
 const Mapa = {
   on: false, bg: null, nodes: null, segs: null, len: null,
   sel: 0,            // fase escolhida (para onde o herói vai)
@@ -29,8 +31,9 @@ const BIOMAS = [null,
 function mapNodes() {
   if (Mapa.nodes) return Mapa.nodes;
   const per = {}, cnt = {};
-  for (const lv of LEVELS) per[lv.world] = (per[lv.world] || 0) + 1;
-  const nodes = LEVELS.map((lv, i) => {
+  const main = LEVELS.filter(lv => !lv.extra);       // as fases extras (Dimensão Prisma) ficam fora do mapa: ver js/cristais.js
+  for (const lv of main) per[lv.world] = (per[lv.world] || 0) + 1;
+  const nodes = main.map((lv, i) => {
     const k = cnt[lv.world] = (cnt[lv.world] || 0) + 1, n = per[lv.world], x0 = (lv.world - 1) * MAPA.WW;
     return { i, lv, x: Math.round(x0 + 36 + (k - 1) * (MAPA.WW - 72) / Math.max(1, n - 1)), y: Math.round(128 + Math.sin(i * 1.7 + lv.world * 0.9) * 30 - (lv.boss ? 6 : 0)) };
   });
@@ -42,15 +45,34 @@ function mapNodes() {
     let L = 0; for (let k = 1; k < pts.length; k++) L += Math.hypot(pts[k][0] - pts[k - 1][0], pts[k][1] - pts[k - 1][1]);
     segs.push(pts); len.push(L);
   }
+  // portal da Dimensão Prisma: no céu depois do fim da terra; a trilha até ele só aparece quando ele abre
+  const a = nodes[nodes.length - 1], P = Mapa.portal = { x: MAPA.END + 44, y: 118 }, pts = [], mx = (a.x + P.x) / 2, my = (a.y + P.y) / 2 + 16;
+  for (let k = 0; k <= 18; k++) { const t = k / 18, u = 1 - t; pts.push([u * u * a.x + 2 * u * t * mx + t * t * P.x, u * u * a.y + 2 * u * t * my + t * t * P.y]); }
+  let L = 0; for (let k = 1; k < pts.length; k++) L += Math.hypot(pts[k][0] - pts[k - 1][0], pts[k][1] - pts[k - 1][1]);
+  segs.push(pts); len.push(L);
   Mapa.nodes = nodes; Mapa.segs = segs; Mapa.len = len;
   return nodes;
 }
+const mapPortalOn = () => prismaOpen(Game.save);
+// pode escolher o ponto i? (fase liberada, ou o portal aberto)
+function mapCanSel(i) {
+  const nodes = mapNodes();
+  if (i === nodes.length) return mapPortalOn();
+  return i >= 0 && i < nodes.length && i + 1 <= clamp(Game.save.unlocked | 0, 1, nodes.length);
+}
+const mapPt = i => i < mapNodes().length ? mapNodes()[i] : Mapa.portal;
+// sprites do herói aberto (para o mapa e para a tela da Dimensão Prisma)
+function mapHeroSprites() {
+  const ch = Game.save.char || DEFAULT_CHAR, key = JSON.stringify(ch);
+  if (key !== Mapa.sprKey) { Mapa.sprKey = key; Mapa.spr = buildPlayerSprites({ ...DEFAULT_CHAR, ...ch }); }
+  return Mapa.spr;
+}
 // ponto da trilha na posição u (ver Mapa.u)
 function mapPoint(u) {
-  const nodes = mapNodes(), n = nodes.length - 1;
+  const nodes = mapNodes(), n = nodes.length - (u > nodes.length - 1 ? 0 : 1);     // além do último ponto: a trilha do portal
   u = clamp(u, 0, n);
   const i = Math.min(n - 1, Math.floor(u)), f = u - i;
-  if (f <= 0 || n < 1) return [nodes[Math.round(u)].x, nodes[Math.round(u)].y];
+  if (f <= 0 || n < 1) { const P = mapPt(Math.round(u)); return [P.x, P.y]; }
   const pts = Mapa.segs[i], q = f * (pts.length - 1), k = Math.min(pts.length - 2, Math.floor(q)), r = q - k;
   return [pts[k][0] + (pts[k + 1][0] - pts[k][0]) * r, pts[k][1] + (pts[k + 1][1] - pts[k][1]) * r];
 }
@@ -62,18 +84,20 @@ function mapBuild() {
   const top = x => 30 + (pn(x, 0, 40, 4096, 11) - 0.5) * 18, bot = x => 197 + (pn(x, 0, 46, 4096, 23) - 0.5) * 16;
   // de qual mundo é cada ponto: as divisas ondulam em vez de serem retas
   const worldAt = (x, y) => clamp(1 + Math.floor((x + Math.sin(y / 21) * 9 + (pn(x, y, 14, 4096, 5) - 0.5) * 14) / WW), 1, 7);
-  const isLand = (x, y) => y > top(x) + 3 && y < bot(x) - 3;
+  const end = y => MAPA.END + 6 + (pn(0, y, 10, 4096, 3) - 0.5) * 12;      // borda direita da terra (o fim do mundo)
+  const isLand = (x, y) => y > top(x) + 3 && y < bot(x) - 3 && x < end(y) - 6;
+  const roads = Mapa.segs.slice(0, nodes.length - 1);
   for (let x = 0; x < W; x++) {
     const t0 = top(x), b0 = bot(x);
     for (let y = 0; y < H; y++) {
-      const wi = worldAt(x, y), B = BIOMAS[wi], n = pn(x, y, 9, 4096, wi * 7) + (hash2(x, y, wi) - 0.5) * 0.22;
+      const wi = worldAt(x, y), B = BIOMAS[wi], n = pn(x, y, 9, 4096, wi * 7) + (hash2(x, y, wi) - 0.5) * 0.22, ex = end(y);
       let col;
-      if (y < t0 || y > b0) {                                      // mar (no último mundo, o céu)
-        const d = y < t0 ? t0 - y : y - b0, wave = (y + Math.round(Math.sin(x / 13 + y) * 1.5)) % 9 === 0 && hash2(x >> 3, y, 3) > 0.45;
+      if (y < t0 || y > b0 || x > ex) {                            // mar (no último mundo, o céu)
+        const d = Math.max(y < t0 ? t0 - y : y > b0 ? y - b0 : 0, x > ex ? x - ex : 0), wave = (y + Math.round(Math.sin(x / 13 + y) * 1.5)) % 9 === 0 && hash2(x >> 3, y, 3) > 0.45;
         if (wi === 7) col = d < 2.5 ? '#bfe0ff' : pn(x, y, 22, 4096, 61) > 0.68 ? '#a6d6ff' : y < 60 ? '#62aee8' : '#78c0f2';
         else col = d < 2 ? '#8fc4ee' : d < 4.5 ? '#3f74b8' : wave ? '#3565a8' : n > 0.62 ? '#234a86' : '#1d3f76';
       } else {
-        const e = Math.min(y - t0, b0 - y);
+        const e = Math.min(y - t0, b0 - y, ex - x);
         col = e < 2.5 ? B.shore : B.land[n < 0.4 ? 0 : n < 0.72 ? 1 : 2];
         if (e >= 2.5) {
           const m = pn(x, y, 18, 4096, 77 + wi);
@@ -90,7 +114,7 @@ function mapBuild() {
     }
   }
   // --- enfeites: longe da trilha e dos pontos, desenhados de trás para a frente ---
-  const road = []; for (const s of Mapa.segs) for (let k = 0; k < s.length; k += 2) road.push(s[k]);
+  const road = []; for (const s of roads) for (let k = 0; k < s.length; k += 2) road.push(s[k]);
   const far = (x, y, d) => road.every(p => Math.abs(p[0] - x) > d || Math.abs(p[1] - y) > d * 0.8) && nodes.every(n => Math.hypot(n.x - x, n.y - y) > d + 8);
   const tree = (x, y) => { g.rect(x - 1, y - 2, 2, 4, '#5a3a1e'); g.lit(x, y - 6, 5.5, 5, ['#1f5a2a', '#2f7a34', '#49a043', '#7cc85a'], x * 7 + y); };
   const pine = (x, y) => { g.rect(x - 1, y - 1, 2, 3, '#4a3020'); g.poly([[x, y - 13], [x + 5, y - 1], [x - 5, y - 1]], '#2f6652', { hi: '#5c9a7a', lo: '#1c3a30', depth: 2 }); g.poly([[x, y - 13], [x + 2.4, y - 8], [x - 2.4, y - 8]], '#ffffff', { flat: true }); g.px(x - 3, y - 4, '#f4faff'); g.px(x + 2, y - 5, '#f4faff'); };
@@ -142,8 +166,8 @@ function mapBuild() {
     }
   }
   // --- trilha: borda escura e miolo na cor de cada mundo ---
-  for (const s of Mapa.segs) for (const [x, y] of s) g.rect(x - 2, y - 1, 5, 4, '#2a1c14');
-  for (const s of Mapa.segs) for (const [x, y] of s) g.rect(x - 1, y, 3, 2, shade(BIOMAS[worldAt(x, y)].road, -0.28));
+  for (const s of roads) for (const [x, y] of s) g.rect(x - 2, y - 1, 5, 4, '#2a1c14');
+  for (const s of roads) for (const [x, y] of s) g.rect(x - 1, y, 3, 2, shade(BIOMAS[worldAt(x, y)].road, -0.28));
   return (Mapa.bg = g.toCanvas());             // (o nome de cada mundo é texto da página, por cima do mapa: ver openMap)
 }
 // texto da fonte 3x5 com contorno, direto nos pixels do mapa
@@ -183,11 +207,14 @@ function openMap() {
   // próxima fase a jogar: a primeira liberada e ainda sem recorde (ou a última liberada)
   let next = nodes.findIndex(n => n.i + 1 <= open && !sv.best[n.lv.id]);
   if (next < 0) next = open - 1;
-  const same = Mapa.hero === sv.cur && Mapa.at >= 0 && Mapa.at + 1 <= open;
+  const same = Mapa.hero === sv.cur && mapCanSel(Mapa.at);
   Mapa.hero = sv.cur; Mapa.moving = false; Mapa.pend = false; Mapa.follow = true; Mapa.t = 0;
   Mapa.u = Mapa.sel = same ? Mapa.at : next;
-  const ch = sv.char || DEFAULT_CHAR, key = JSON.stringify(ch);
-  if (key !== Mapa.sprKey) { Mapa.sprKey = key; Mapa.spr = buildPlayerSprites({ ...DEFAULT_CHAR, ...ch }); }
+  mapHeroSprites();
+  // o portal acabou de abrir (primeira vez deste herói com os 7 cristais): ele nasce na tela e o herói vai até ele
+  const born = mapPortalOn() && !(sv.story && sv.story.portal);
+  Mapa.born = born ? 0 : 99;
+  if (born) { sv.story = sv.story || {}; sv.story.portal = 1; persist(); }
   const inner = $('#map-inner');
   $$('.map-node, .map-world', inner).forEach(b => b.remove());
   for (let wi = 1; wi <= 7; wi++) {                 // nome de cada mundo no alto (apagado enquanto o mundo está fechado)
@@ -207,8 +234,20 @@ function openMap() {
     b.addEventListener('click', e => { Snd.init(); if (e.detail === 0 || Mapa.wasSel) mapPlay(); else mapSelect(n.i); });
     inner.appendChild(b);
   }
-  mapInfo();
-  if (same && next > Mapa.at && !sv.best[nodes[next].lv.id]) mapSelect(next);          // fase nova liberada: o herói já sai andando até ela
+  if (mapPortalOn()) {                              // portal da Dimensão Prisma (depois do último chefe)
+    const P = Mapa.portal, pi = nodes.length, b = document.createElement('button'), el = document.createElement('span');
+    el.className = 'map-world prisma'; el.textContent = 'Dimensão Prisma'; el.style.left = (P.x / MAPA.W * 100) + '%';
+    inner.appendChild(el);
+    b.className = 'map-node portal'; b.type = 'button';
+    b.style.left = (P.x / MAPA.W * 100) + '%'; b.style.top = ((P.y - 14) / MAPA.H * 100) + '%';
+    b.title = 'Portal · Dimensão Prisma'; b.setAttribute('aria-label', b.title);
+    b.addEventListener('pointerdown', () => { Mapa.wasSel = Mapa.sel === pi; });
+    b.addEventListener('focus', () => mapSelect(pi));
+    b.addEventListener('click', e => { Snd.init(); if (e.detail === 0 || Mapa.wasSel) mapPlay(); else mapSelect(pi); });
+    inner.appendChild(b);
+  }
+  mapInfo(); crisMapInfo();
+  if (!born && same && next > Mapa.at && Mapa.at < nodes.length && !sv.best[nodes[next].lv.id]) mapSelect(next);   // fase nova liberada: o herói já sai andando até ela
 }
 function mapLayout() {
   const tight = innerHeight < 520, avail = innerHeight - (tight ? 132 : 230);
@@ -223,34 +262,47 @@ function mapCenter(now) {
   return Math.abs(want - sc.scrollLeft);
 }
 function mapInfo() {
+  $('#b-map-play').textContent = Mapa.sel === mapNodes().length ? '🌀 Entrar' : '▶ Jogar';
+  if (Mapa.sel === mapNodes().length) {             // portal
+    const done = EXTRA.filter(i => Game.save.best[LEVELS[i].id]).length;
+    $('#map-name').textContent = '🌀 Portal · Dimensão Prisma';
+    $('#map-sub').innerHTML = `Um mundo em outra dimensão, aberto pelos 7 cristais. Fases vencidas: ${done}/${EXTRA.length}`;
+    $('#b-map-play').style.display = Net.role === 'client' ? 'none' : '';
+    return;
+  }
   const n = mapNodes()[Mapa.sel], lv = n.lv, best = Game.save.best[lv.id];
   $('#map-name').textContent = (lv.boss ? '☠ Chefe' : lv.wn + '-' + lv.ln) + ' · ' + lv.name;
   const stars = best ? '★'.repeat(best.stars) + '<i>' + '★'.repeat(3 - best.stars) + '</i>' : '<i>★★★</i>';
-  $('#map-sub').innerHTML = `Mundo ${lv.world} · ${WORLDS[lv.world]} <span class="st">${stars}</span> ` + (best ? 'Moedas: ' + best.coins : lv.boss ? (n.i === LEVELS.length - 1 ? 'Chefe final' : 'Chefe do mundo') : 'Nova!');
+  $('#map-sub').innerHTML = `Mundo ${lv.world} · ${WORLDS[lv.world]} <span class="st">${stars}</span> ` + (best ? 'Moedas: ' + best.coins : lv.boss ? (n.i === LAST_MAIN ? 'Chefe final' : 'Chefe do mundo') : 'Nova!');
   $('#b-map-play').style.display = Net.role === 'client' ? 'none' : '';
 }
 // escolhe a fase i: o herói anda pela trilha até lá (mais rápido se for longe)
 function mapSelect(i) {
-  const nodes = mapNodes(), open = clamp(Game.save.unlocked | 0, 1, nodes.length);
-  if (i < 0 || i + 1 > open || i === Mapa.sel) return;
+  if (!mapCanSel(i) || i === Mapa.sel) return;
   let d = 0; for (let k = Math.floor(Math.min(Mapa.u, i)); k < Math.ceil(Math.max(Mapa.u, i)) && k < Mapa.len.length; k++) d += Mapa.len[k];
   Mapa.sel = i; Mapa.v = clamp(d * 1.5, 170, 900); Mapa.pend = false; Mapa.follow = true;
   Snd.sfx('click'); mapInfo();
 }
 function mapStep(dir) {
-  const btns = $$('#map-inner .map-node'), b = btns[Mapa.sel + dir];
-  if (b && !b.disabled) b.focus({ preventScroll: true });
+  const btns = $$('#map-inner .map-node');           // pula fases fechadas (o portal pode abrir antes do último chefe)
+  for (let k = Mapa.sel + dir; k >= 0 && k < btns.length; k += dir) if (!btns[k].disabled) { btns[k].focus({ preventScroll: true }); return; }
 }
 // começa a fase escolhida (se o herói ainda está a caminho, assim que ele chegar)
 function mapPlay() {
   if (Net.role === 'client') return;
   if (Mapa.moving || Mapa.u !== Mapa.sel) { Mapa.pend = true; Mapa.v = Math.max(Mapa.v, 520); return; }
+  if (Mapa.sel === mapNodes().length) { Snd.sfx('secret'); openPrisma(); return; }      // entra no portal
   Snd.sfx('check'); beginLevel(Mapa.sel);
 }
 // chamado a cada quadro enquanto o mapa está na tela
 function mapFrame(dt) {
   if (!Mapa.bg || !Mapa.nodes) return;
   Mapa.t += dt;
+  if (Mapa.born < 99) {                             // portal nascendo: som, e depois o herói anda até ele
+    const b0 = Mapa.born; Mapa.born += dt;
+    if (b0 < 0.6 && Mapa.born >= 0.6) { Snd.sfx('secret'); Mapa.follow = true; mapSelect(Mapa.nodes.length); Mapa.v = Math.min(Mapa.v, 420); }
+    if (Mapa.born > 3) Mapa.born = 99;
+  }
   // anda pela trilha até a fase escolhida
   if (Mapa.u !== Mapa.sel) {
     const dir = Mapa.sel > Mapa.u ? 1 : -1, seg = clamp(dir > 0 ? Math.floor(Mapa.u + 1e-6) : Math.ceil(Mapa.u - 1e-6) - 1, 0, Mapa.len.length - 1);
@@ -282,6 +334,7 @@ function mapDraw() {
     g.fillStyle = 'rgba(12, 8, 24, .55)'; g.fillRect((wi - 1) * WW, 0, WW, H);
     const lk = mapDisc('lock'); g.drawImage(lk, Math.round((wi - 0.5) * WW - lk.cx), 24);
   }
+  if (mapPortalOn()) mapPortal(g, t);
   // pontos das fases
   for (const n of nodes) {
     const best = sv.best[n.lv.id], locked = n.i + 1 > open, kind = (n.lv.boss ? 'boss' : '') + (locked ? 'lock' : best ? 'done' : 'novo'), img = mapDisc(kind);
@@ -304,6 +357,32 @@ function mapDraw() {
     const K = MAPA.HERO, sz = Math.round(96 * K), x = Math.round(hx - 48 * K), y = Math.round(hy + 4 - 92 * K);
     if (Mapa.face < 0) { g.save(); g.translate(x + sz, y); g.scale(-1, 1); g.drawImage(img, 0, 0, sz, sz); g.restore(); } else g.drawImage(img, x, y, sz, sz);
   }
+}
+// portal da Dimensão Prisma: trilha de arco-íris, anel de 7 cores girando em volta do vazio estrelado e os 7 cristais em órbita.
+// Na primeira vez ele "nasce" (Mapa.born: cresce a partir de um ponto, com um clarão).
+function mapPortal(g, t) {
+  const P = Mapa.portal, k = clamp((Mapa.born < 99 ? Mapa.born : 9) / 1.4, 0, 1), cx = P.x, cy = P.y - 14, cols = CRISTAIS.map(c => c.cor[1]);
+  const seg = Mapa.segs[Mapa.nodes.length - 1], show = Math.floor(seg.length * clamp(k * 1.4, 0, 1));
+  for (let i = 0; i < show; i++) { const [x, y] = seg[i]; g.fillStyle = '#2a1c14'; g.fillRect(Math.round(x) - 2, Math.round(y) - 1, 5, 4); }
+  for (let i = 0; i < show; i++) { const [x, y] = seg[i]; g.fillStyle = cols[(i + 700 - Math.floor(t * 8)) % 7]; g.fillRect(Math.round(x) - 1, Math.round(y), 3, 2); }
+  if (k < 0.08) return;
+  const rx = 10 * k, ry = 14 * k;
+  g.globalCompositeOperation = 'lighter'; drawGlow(g, cx, cy, 34 * k, '#b48aff', 0.3 + Math.sin(t * 3) * 0.08); g.globalCompositeOperation = 'source-over'; g.globalAlpha = 1;
+  for (let y = Math.floor(cy - ry); y <= cy + ry; y++) for (let x = Math.floor(cx - rx); x <= cx + rx; x++) {
+    const d = ((x + 0.5 - cx) / rx) ** 2 + ((y + 0.5 - cy) / ry) ** 2;
+    if (d > 1) continue;
+    const st = hash2(x, y + Math.floor(t * 3), 7);
+    g.fillStyle = st > 0.96 ? '#ffffff' : st > 0.93 ? cols[(x + y) % 7] : d > 0.6 ? '#1a0e34' : '#0a0618'; g.fillRect(x, y, 1, 1);
+  }
+  for (let a = 0; a < Math.PI * 2; a += 0.07) {                 // anel de arco-íris girando
+    const i = Math.floor((a / (Math.PI * 2)) * 14 + t * 6) % 7;
+    g.fillStyle = cols[i]; g.fillRect(Math.round(cx + Math.cos(a) * (rx + 1)) - 1, Math.round(cy + Math.sin(a) * (ry + 1)) - 1, 2, 2);
+  }
+  for (let i = 0; i < 7; i++) {                                 // os 7 cristais em órbita
+    const a = t * 1.2 + i * Math.PI * 2 / 7, x = Math.round(cx + Math.cos(a) * (rx + 7)), y = Math.round(cy + Math.sin(a) * (ry * 0.45 + 3) + 2);
+    g.fillStyle = '#14101e'; g.fillRect(x - 1, y - 2, 4, 5); g.fillStyle = cols[i]; g.fillRect(x, y - 1, 2, 3); g.fillStyle = '#ffffff'; g.fillRect(x, y - 1, 1, 1);
+  }
+  if (Mapa.born < 1.4) { g.globalAlpha = clamp(1 - Mapa.born / 1.4, 0, 1) * 0.8; g.fillStyle = '#ffffff'; g.fillRect(cx - 40 * k, cy - 1, 80 * k, 2); g.fillRect(cx - 1, cy - 30 * k, 2, 60 * k); g.globalAlpha = 1; }
 }
 // teclado: ← → (ou A D) andam entre as fases liberadas; Enter/Espaço começam
 addEventListener('keydown', e => {

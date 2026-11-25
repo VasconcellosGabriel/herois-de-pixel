@@ -64,7 +64,7 @@ function banner(title, sub = '', ms = 2200) {
 }
 function show(name) {
   $$('.screen').forEach(s => s.classList.toggle('on', s.id === 's-' + name));
-  Mapa.on = name === 'levels';
+  Mapa.on = name === 'levels'; Prisma.on = name === 'prisma';
   document.body.classList.toggle('playing', name === null);
 }
 function hideScreens() { show(null); }
@@ -84,6 +84,7 @@ function goTitle() { Net.toLobby(); Local.on = false; Game.mode = 'menu'; Input.
 function goLevels() {
   Net.toLobby();
   Game.mode = 'menu'; Input.enabled = false;
+  if (Prisma.ret) { openPrisma(); return; }          // saiu de uma fase extra: volta para a tela da Dimensão Prisma
   // a seleção de fases é o mapa do mundo (js/mapa.js): o herói fica na fase escolhida e anda pela trilha até a próxima
   openMap();
   show('levels');
@@ -94,7 +95,13 @@ function goLevels() {
 function beginLevel(i) {
   if (Net.role === 'client') return;                 // no multiplayer quem escolhe a fase é o anfitrião
   if (!Game.save.char) { openHeroes('play'); return; }
-  Mapa.at = i; Mapa.hero = Game.save.cur;            // ao voltar ao mapa, o herói sai desta fase
+  // primeira fase de um mundo: a abertura da história (HQ) vem antes
+  if (hqBefore(i, () => startChosen(i))) { goFullscreen(); return; }
+  startChosen(i);
+}
+function startChosen(i) {
+  Prisma.ret = !!LEVELS[i].extra;
+  if (!Prisma.ret) { Mapa.at = i; Mapa.hero = Game.save.cur; }   // ao voltar ao mapa, o herói sai desta fase
   hideScreens();
   if (Net.role === 'host') { Net.roster[0].ch = Game.save.char; Net.roster[0].b = myBuild(); startLevel(i, Net.roster, 0); }
   else if (Local.on) startLevel(i, localRoster(), 0);
@@ -113,12 +120,15 @@ function goFullscreen() {
 }
 // r: { idx, coins, deaths, secs, stars }
 function showWin(r) {
-  const last = r.idx >= LEVELS.length - 1, guest = Net.role === 'client', lvd = LEVELS[r.idx], bi = lvd.boss && BOSS_INFO[lvd.boss];
+  const guest = Net.role === 'client', lvd = LEVELS[r.idx], bi = lvd.boss && BOSS_INFO[lvd.boss];
+  const last = r.idx === LAST_MAIN || r.idx >= LEVELS.length - 1 || (lvd.extra && !extraOpen(Game.save, EXTRA.indexOf(r.idx) + 1));
   $('#win-title').textContent = last ? '🏆 VITÓRIA! 🏆' : 'FASE COMPLETA!';
   $('#win-stars').innerHTML = '★'.repeat(r.stars) + '<i>' + '★'.repeat(3 - r.stars) + '</i>';
   const m = Math.floor(r.secs / 60), s = String(r.secs % 60).padStart(2, '0');
   const pr = progOf((Game.save.char || DEFAULT_CHAR).cls);
-  $('#win-stats').innerHTML = `Moedas: ${r.coins} <span class="gain">(carteira: ${Game.save.coins || 0})</span><br>XP: +${r.myXp || 0} <span class="gain">· Nível ${pr.lvl}${r.ups ? ' — SUBIU ' + r.ups + '!' : ''}</span><br>Vidas para a próxima fase: ${Game.save.lives}<br>Quedas: ${r.deaths} · Tempo: ${m}:${s}` + (bi ? `<br><br>${Net.role || Local.on ? 'Vocês derrotaram' : 'Você derrotou'} ${bi.title}!` + (last ? '<br>Você salvou o reino! Parabéns!' : `<br>Próximo: Mundo ${lvd.world + 1} · ${WORLDS[lvd.world + 1]}`) : '');
+  $('#win-stats').innerHTML = `Moedas: ${r.coins} <span class="gain">(carteira: ${Game.save.coins || 0})</span><br>XP: +${r.myXp || 0} <span class="gain">· Nível ${pr.lvl}${r.ups ? ' — SUBIU ' + r.ups + '!' : ''}</span><br>Vidas para a próxima fase: ${Game.save.lives}<br>Quedas: ${r.deaths} · Tempo: ${m}:${s}` + (bi ? `<br><br>${Net.role || Local.on ? 'Vocês derrotaram' : 'Você derrotou'} ${bi.title}!` + (last ? '<br>Você salvou o reino! Parabéns!' : `<br>Próximo: Mundo ${lvd.world + 1} · ${WORLDS[lvd.world + 1]}`) : '')
+    + (lvd.rule ? `<br><br>${RULES[lvd.rule].icon} Regra cumprida: ${RULES[lvd.rule].nome}!` + (r.idx === EXTRA[EXTRA.length - 1] ? '<br>Você dominou a Dimensão Prisma!' : '') : '')
+    + (r.newGem ? `<br><br>💎 Cristal ${gemById(r.newGem).nome} guardado! (${crisOf(Game.save).length}/7)` + (prismaOpen(Game.save) ? '<br>Os 7 cristais brilham juntos... um portal para outra dimensão se abriu no mapa, depois do último chefe!' : '') : '');
   $('#b-win-up').textContent = pr.pts ? `⬆ Evolução (${pr.pts} ponto${pr.pts > 1 ? 's' : ''}!)` : '⬆ Evolução';
   $('#b-next').style.display = last || guest ? 'none' : '';
   $('#b-retry').style.display = $('#b-win-menu').style.display = guest ? 'none' : '';
@@ -454,8 +464,8 @@ function drawPreviews(t) {
 }
 // onde o herói está na campanha
 function heroStage(h) {
-  if (h.best && h.best[LEVELS[LEVELS.length - 1].id]) return '🏆 Campanha completa';
-  const lv = LEVELS[Math.min(h.unlocked || 1, LEVELS.length) - 1];
+  if (h.best && h.best[LEVELS[LAST_MAIN].id]) return '🏆 Campanha completa';
+  const lv = LEVELS[Math.min(h.unlocked || 1, LAST_MAIN + 1) - 1];
   return lv.boss ? `☠ Chefe do Mundo ${lv.world}` : `Fase ${lv.wn}-${lv.ln}`;
 }
 function openHeroes(from = 'play') {
@@ -790,6 +800,8 @@ click('#b-win-leave', () => leaveRoom());
 $('#mp-code').addEventListener('keydown', e => { if (e.key === 'Enter') mpJoin(); });
 $('#mp-code').addEventListener('input', e => { e.target.value = cleanCode(e.target.value); });
 click('#b-sound', toggleSound);
+click('#b-credits', () => show('credits'));
+click('#b-credits-back', goTitle);
 click('#b-lv-up', () => openUpgrades('levels'));
 click('#b-win-up', () => openUpgrades('win'));
 click('#b-up-back', closeUpgrades);
@@ -851,7 +863,8 @@ const fsOn = () => !!(document.fullscreenElement || document.webkitFullscreenEle
 const fsCan = () => { const de = document.documentElement; return !!(de.requestFullscreen || de.webkitRequestFullscreen); };
 function fsPrompt() {
   const el = $('#fs-ask');
-  el.hidden = FsAsk.skip || fsOn() || !fsCan() || !document.body.classList.contains('touch');
+  // no app (NativeSave) a tela cheia já é nativa: não pergunta
+  el.hidden = FsAsk.skip || !!NativeSave || fsOn() || !fsCan() || !document.body.classList.contains('touch');
 }
 $('#fs-ask').addEventListener('click', e => {
   if (e.target.closest('#fs-no')) FsAsk.skip = true; else goFullscreen();
@@ -956,6 +969,7 @@ function frame(now) {
     acc = 0; renderTitle(Game.t);
   }
   if (Mapa.on) mapFrame(dt);                               // mapa do mundo: herói andando pela trilha
+  if (Prisma.on) prismaFrame(dt);                          // Dimensão Prisma: herói pulando entre as ilhas
   if (Game.world) elemSync(Game.world);
   if (Creator.wardrobe) drawPreview(Game.t);             // trocando de roupa na pausa
   if (Previews.length) drawPreviews(Game.t);             // retratos da seleção de heróis / Meu personagem
@@ -977,6 +991,7 @@ function boot() {
   goTitle();
   if (new URLSearchParams(location.search).get('sala')) openMp();   // abriu um link de convite
   requestAnimationFrame(frame);
-  if ('serviceWorker' in navigator && location.protocol.startsWith('http')) navigator.serviceWorker.register('sw.js').catch(() => {});
+  if (NativeSave) NativeSave.sync();                         // app: confere o save guardado no armazenamento nativo
+  if (!NativeSave && 'serviceWorker' in navigator && location.protocol.startsWith('http')) navigator.serviceWorker.register('sw.js').catch(() => {});
 }
 boot();

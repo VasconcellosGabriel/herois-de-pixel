@@ -1,15 +1,23 @@
 {
+  "id": "./",
   "name": "Heróis de Pixel",
   "short_name": "Heróis de Pixel",
   "description": "Plataforma 2D em pixel art com personagens totalmente personalizáveis.",
+  "lang": "pt-BR",
   "start_url": "./index.html",
   "scope": "./",
   "display": "fullscreen",
   "orientation": "landscape",
   "background_color": "#1b1423",
   "theme_color": "#1b1423",
-  "lang": "pt-BR",
+  "categories": [
+    "games",
+    "entertainment"
+  ],
   "icons": [
-    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icons/maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" },
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
   ]
 }

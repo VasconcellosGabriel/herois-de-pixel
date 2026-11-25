@@ -9,9 +9,9 @@
 <title>Heróis de Pixel</title>
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap">
+<link rel="icon" href="icons/icon-192.png" type="image/png" sizes="192x192">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon-180.png">
+<link rel="preload" href="fonts/PressStart2P-Regular.ttf" as="font" type="font/ttf" crossorigin>
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -69,9 +69,22 @@
     <button class="btn" id="b-local">🎮 Multiplayer local</button>
     <button class="btn" id="b-create">🧙 Meu personagem</button>
     <button class="btn" id="b-controls">⌨ Controles</button>
-    <button class="btn small" id="b-sound">🔊 Som: ligado</button>
+    <div class="row tight"><button class="btn small" id="b-sound">🔊 Som: ligado</button><button class="btn small" id="b-credits">★ Créditos</button></div>
     <p class="hint">Setas/WASD mover · S/↓ agachar · Espaço pular · J / K habilidades (ou mouse) · Q esquiva/escudo · E especial · G troca o elemento (mago) · Esc pausa · Controle (gamepad) também funciona</p>
     <p class="ver" id="ver"></p>
+  </div>
+</section>
+
+<!-- Créditos -->
+<section id="s-credits" class="screen">
+  <div class="panel center credits">
+    <h2>CRÉDITOS</h2>
+    <p class="cd-role">Criação e desenvolvimento</p>
+    <p class="cd-names">Macaconhista</p>
+    <p class="cd-role">Avaliação e testes</p>
+    <p class="cd-names">≼oMorcego⋟<br>Snk<br>IRøรรi<br>jgdreugh</p>
+    <p class="cd-thanks">Obrigado por jogar!</p>
+    <div class="row"><button class="btn small" id="b-credits-back">← Voltar</button></div>
   </div>
 </section>
 
@@ -90,13 +103,29 @@
   <!-- mapa do mundo: o herói anda pela trilha até a fase escolhida (js/mapa.js) -->
   <div class="panel map">
     <h2>Mapa do mundo</h2>
-    <div id="map-scroll"><div id="map-inner"><canvas id="map-cv" width="1820" height="216"></canvas></div></div>
+    <div id="map-scroll"><div id="map-inner"><canvas id="map-cv" width="1900" height="216"></canvas></div></div>
     <div id="map-info">
       <div class="mi-t"><b id="map-name"></b><small id="map-sub"></small></div>
       <button class="btn big" id="b-map-play">▶ Jogar</button>
     </div>
-    <div class="row"><button class="btn small" id="b-lv-back">← Voltar</button><button class="btn small" id="b-lv-up">🧙 Meu personagem</button></div>
+    <!-- cristais achados (só aparece depois do primeiro); com os 7, o portal da Dimensão Prisma surge no mapa: js/cristais.js -->
+    <div id="map-cris" hidden><span id="map-cris-slots"></span><small id="map-cris-txt"></small></div>
+    <div class="row"><button class="btn small" id="b-lv-back">← Voltar</button><button class="btn small" id="b-lv-up">🧙 Meu personagem</button><button class="btn small" id="b-lv-hist">📖 História</button></div>
     <p class="hint">Clique num ponto (ou use as setas) para o herói ir até a fase. Clique de novo, Enter ou Jogar para começar.</p>
+  </div>
+</section>
+
+<!-- Dimensão Prisma: fases extras secretas, cada uma com uma regra. As fases são ilhas flutuando no vazio (js/cristais.js) -->
+<section id="s-prisma" class="screen">
+  <div class="panel map prisma">
+    <h2>🌀 Dimensão Prisma</h2>
+    <div id="pz-box"><div id="pz-inner"><canvas id="pz-cv" width="640" height="360"></canvas></div></div>
+    <div id="pz-info">
+      <div class="mi-t"><b id="pz-name"></b><small id="pz-sub"></small></div>
+      <button class="btn big" id="b-pz-play">▶ Jogar</button>
+    </div>
+    <p id="prisma-sub" class="hint"></p>
+    <div class="row"><button class="btn small" id="b-prisma-back">← Mapa do mundo</button></div>
   </div>
 </section>
 
@@ -278,6 +307,20 @@
   </div>
 </section>
 
+<!-- História em quadrinhos (js/hq.js, roteiro em js/historia.js) -->
+<section id="s-hq" class="screen">
+  <canvas id="hq-cv" width="960" height="540"></canvas>
+  <div class="hq-bar"><button class="btn small" id="b-hq-back">Pular ⏭</button><button class="btn small" id="b-hq-next">Continuar ▶</button></div>
+</section>
+<!-- Galeria da história -->
+<section id="s-hist" class="screen">
+  <div class="panel hist">
+    <h2>📖 História</h2>
+    <div id="hist-list"></div>
+    <div class="row"><button class="btn small" id="b-hist-back">← Voltar</button></div>
+  </div>
+</section>
+
 <!-- Pausa -->
 <section id="s-pause" class="screen">
   <div class="panel center">
@@ -310,11 +353,15 @@
 <script src="js/game.js"></script>
 <script src="js/bestiary.js"></script>
 <script src="js/fauna.js"></script>
+<script src="js/dimensao.js"></script>
 <script src="js/net.js"></script>
 <script src="js/local.js"></script>
 <script src="js/mapa.js"></script>
 <script src="js/ferreiro.js"></script>
 <script src="js/academia.js"></script>
+<script src="js/historia.js"></script>
+<script src="js/hq.js"></script>
+<script src="js/cristais.js"></script>
 <script src="js/ui.js"></script>
 </body>
 </html>

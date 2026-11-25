@@ -64,7 +64,7 @@ function banner(title, sub = '', ms = 2200) {
 }
 function show(name) {
   $$('.screen').forEach(s => s.classList.toggle('on', s.id === 's-' + name));
-  Mapa.on = name === 'levels'; Prisma.on = name === 'prisma';
+  Mapa.on = name === 'levels'; Prisma.on = name === 'prisma'; tutHide();
   document.body.classList.toggle('playing', name === null);
 }
 function hideScreens() { show(null); }
@@ -100,6 +100,7 @@ function beginLevel(i) {
   startChosen(i);
 }
 function startChosen(i) {
+  if (tutPending(i)) { startTutorial(() => startChosen(i)); return; }   // primeira vez: o treino vem antes da Fase 1
   Prisma.ret = !!LEVELS[i].extra;
   if (!Prisma.ret) { Mapa.at = i; Mapa.hero = Game.save.cur; }   // ao voltar ao mapa, o herói sai desta fase
   hideScreens();
@@ -834,6 +835,9 @@ $('#mp-code').addEventListener('keydown', e => { if (e.key === 'Enter') mpJoin()
 $('#mp-code').addEventListener('input', e => { e.target.value = cleanCode(e.target.value); });
 click('#b-sound', toggleSound);
 click('#b-credits', () => show('credits'));
+// treino: refaz o tutorial e volta para a tela inicial (sem herói ainda, cria um como no Jogar)
+click('#b-tut', () => { goFullscreen(); if (!Game.save.heroes.length) openCreator('new', 'play'); else if (!Game.save.char) openHeroes('play'); else startTutorial(goTitle); });
+click('#b-tut-ok', () => { const f = Tut.then || goTitle; Tut.then = null; f(); });
 click('#b-credits-back', goTitle);
 click('#b-lv-up', () => openUpgrades('levels'));
 click('#b-win-up', () => openUpgrades('win'));
@@ -1002,6 +1006,7 @@ function frame(now) {
     acc = 0; renderTitle(Game.t);
   }
   if (Mapa.on) mapFrame(dt);                               // mapa do mundo: herói andando pela trilha
+  if (Game.mode === 'play' && Game.world && Game.world.def.tut) tutFrame(Game.world);   // dicas do treino
   if (Prisma.on) prismaFrame(dt);                          // Dimensão Prisma: herói pulando entre as ilhas
   if (Game.world) elemSync(Game.world);
   if (Creator.wardrobe) drawPreview(Game.t);             // trocando de roupa na pausa

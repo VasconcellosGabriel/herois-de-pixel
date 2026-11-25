@@ -31,7 +31,7 @@ const BIOMAS = [null,
 function mapNodes() {
   if (Mapa.nodes) return Mapa.nodes;
   const per = {}, cnt = {};
-  const main = LEVELS.filter(lv => !lv.extra);       // as fases extras (Dimensão Prisma) ficam fora do mapa: ver js/cristais.js
+  const main = LEVELS.filter(lv => !lv.extra && !lv.tut);   // o treino (js/tutorial.js) e fases extras (Dimensão Prisma) ficam fora do mapa: ver js/cristais.js
   for (const lv of main) per[lv.world] = (per[lv.world] || 0) + 1;
   const nodes = main.map((lv, i) => {
     const k = cnt[lv.world] = (cnt[lv.world] || 0) + 1, n = per[lv.world], x0 = (lv.world - 1) * MAPA.WW;

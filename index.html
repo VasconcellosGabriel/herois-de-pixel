@@ -18,6 +18,7 @@
 
 <canvas id="game" width="640" height="360"></canvas>
 <div id="banner"><b></b><span></span></div>
+<div id="tut" hidden><b></b><span></span></div>
 
 <!-- Controles de toque -->
 <div id="touch">
@@ -69,9 +70,17 @@
     <button class="btn" id="b-local">🎮 Multiplayer local</button>
     <button class="btn" id="b-create">🧙 Meu personagem</button>
     <button class="btn" id="b-controls">⌨ Controles</button>
-    <div class="row tight"><button class="btn small" id="b-sound">🔊 Som: ligado</button><button class="btn small" id="b-credits">★ Créditos</button></div>
-    <p class="hint">Setas/WASD mover · S/↓ agachar · Espaço pular · J / K habilidades (ou mouse) · Q esquiva/escudo · E especial · G troca o elemento (mago) · Esc pausa · Controle (gamepad) também funciona</p>
+    <div class="row tight"><button class="btn small" id="b-sound">🔊 Som: ligado</button><button class="btn small" id="b-tut">🎓 Treino</button><button class="btn small" id="b-credits">★ Créditos</button></div>
     <p class="ver" id="ver"></p>
+  </div>
+</section>
+
+<!-- Fim do treino (js/tutorial.js) -->
+<section id="s-tut" class="screen">
+  <div class="panel center">
+    <h2>TREINO COMPLETO!</h2>
+    <p class="sub tut-msg">Você pode editar os controles a qualquer momento no menu Controles</p>
+    <button class="btn big" id="b-tut-ok">▶ Continuar</button>
   </div>
 </section>
 
@@ -361,6 +370,7 @@
 <script src="js/world.js"></script>
 <script src="js/worlds.js"></script>
 <script src="js/levels.js"></script>
+<script src="js/tutorial.js"></script>
 <script src="js/game.js"></script>
 <script src="js/bestiary.js"></script>
 <script src="js/fauna.js"></script>

@@ -2616,6 +2616,7 @@ function drawShadow2(g, x, y, wd) { g.fillStyle = 'rgba(10,5,20,.3)'; g.fillRect
 
 // ---------- Fim de fase ----------
 function finishLevel(w) {
+  if (w.def.tut) { tutFinish(); return; }           // fim do treino: aviso dos controles e segue para a Fase 1
   const r = { idx: w.idx, gem: w.gemGot && w.gem ? w.gem.id : null, coins: w.coinsGot, deaths: w.deaths, secs: Math.round(w.t), stars: w.deaths === 0 ? 3 : w.deaths <= 2 ? 2 : 1,
     lives: w.lives, xp: Object.fromEntries(w.players.map(p => [p.id, p.xpGot])), sp: Object.fromEntries(w.players.map(p => [p.id, Math.round(p.sp)])),
     local: w.local ? Object.fromEntries(w.players.map(p => [p.id, p.cls.id])) : null };

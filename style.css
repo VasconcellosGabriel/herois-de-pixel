@@ -11,6 +11,13 @@ html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink); 
 
 #banner { position: fixed; left: 0; right: 0; top: 24%; text-align: center; pointer-events: none; opacity: 0; transition: opacity .35s; text-shadow: 2px 2px 0 #000, -1px -1px 0 #000; z-index: 5; }
 #banner.show { opacity: 1; }
+/* dicas do treino (js/tutorial.js) */
+#tut { position: fixed; left: 59%; top: 3%; transform: translateX(-50%); width: min(560px, 42vw); text-align: center; pointer-events: none; z-index: 5; background: rgba(20,14,32,.82); border: 3px solid var(--line); box-shadow: 0 0 0 3px var(--panel2); padding: 8px 12px; }
+#tut[hidden] { display: none; }
+#tut b { display: block; font-size: clamp(10px, 2.2vw, 14px); color: var(--acc); }
+#tut span { display: block; margin-top: 6px; font-size: clamp(8px, 1.6vw, 11px); color: #fff; line-height: 1.7; }
+#tut kbd { font: inherit; color: #1b1423; background: #f4e6c8; border-bottom: 2px solid #9a8a6a; padding: 0 4px; margin: 0 1px; white-space: nowrap; }
+.tut-msg { max-width: 380px; font-size: 10px; }
 #banner b { display: block; font-size: clamp(14px, 4vw, 26px); color: var(--acc); }
 #banner span { display: block; margin-top: 8px; font-size: clamp(8px, 1.8vw, 12px); color: #fff; }
 

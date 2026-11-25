@@ -107,6 +107,7 @@ const FLYERS = new Set(['bat', 'ghost', 'hawk', 'imp']);
 const LV_H = 15, GY0 = 12, GY_MIN = 9, GY_MAX = 13;
 
 function genLevel(def) {
+  if (def.build) return def.build(def);   // fase feita à mão (treino: js/tutorial.js)
   const R = rng(def.seed), w = def.len, h = LV_H;
   const tiles = Array.from({ length: h }, () => new Uint8Array(w));
   const L = { w, h, tiles, theme: def.theme, spawns: [], coins: [], picks: [], checks: [], chests: [], secrets: [], goal: null, start: null };

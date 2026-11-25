@@ -128,11 +128,14 @@ function showWin(r) {
   const pr = progOf((Game.save.char || DEFAULT_CHAR).cls);
   $('#win-stats').innerHTML = `Moedas: ${r.coins} <span class="gain">(carteira: ${Game.save.coins || 0})</span><br>XP: +${r.myXp || 0} <span class="gain">· Nível ${pr.lvl}${r.ups ? ' — SUBIU ' + r.ups + '!' : ''}</span><br>Vidas para a próxima fase: ${Game.save.lives}<br>Quedas: ${r.deaths} · Tempo: ${m}:${s}` + (bi ? `<br><br>${Net.role || Local.on ? 'Vocês derrotaram' : 'Você derrotou'} ${bi.title}!` + (last ? '<br>Você salvou o reino! Parabéns!' : `<br>Próximo: Mundo ${lvd.world + 1} · ${WORLDS[lvd.world + 1]}`) : '')
     + (lvd.rule ? `<br><br>${RULES[lvd.rule].icon} Regra cumprida: ${RULES[lvd.rule].nome}!` + (r.idx === EXTRA[EXTRA.length - 1] ? '<br>Você dominou a Dimensão Prisma!' : '') : '')
+    + (r.newSkin ? `<br><br>💠 Skin de cristal liberada para ${CLASSES[r.newSkin].name}! Aplique em Editar herói ou Trocar de roupa.` : '')
     + (r.newGem ? `<br><br>💎 Cristal ${gemById(r.newGem).nome} guardado! (${crisOf(Game.save).length}/7)` + (prismaOpen(Game.save) ? '<br>Os 7 cristais brilham juntos... um portal para outra dimensão se abriu no mapa, depois do último chefe!' : '') : '');
   $('#b-win-up').textContent = pr.pts ? `⬆ Evolução (${pr.pts} ponto${pr.pts > 1 ? 's' : ''}!)` : '⬆ Evolução';
   $('#b-next').style.display = last || guest ? 'none' : '';
   $('#b-retry').style.display = $('#b-win-menu').style.display = guest ? 'none' : '';
   $('#win-wait').style.display = $('#b-win-leave').style.display = guest ? '' : 'none';
+  // venceu o 7º desafio com todos os outros já vencidos: a tela do fim da Dimensão Prisma vem antes
+  if (r.idx === EXTRA[EXTRA.length - 1] && EXTRA.every(i => Game.save.best[LEVELS[i].id])) { openPrismaEnd(r); return; }
   show('win');
 }
 function pauseGame() {
@@ -207,8 +210,8 @@ function updateTouchHud(w) {
   if (L.sp !== sp) { L.sp = sp; $('#tb-sp b').style.height = sp + '%'; $('#tb-sp').classList.toggle('ready', sp >= 100); $('#sp-fire').hidden = sp < 100; }
   // especial pronto: anel de fogo em pixels em volta do botão (mais alto em cima, como chama de verdade)
   const ft = sp >= 100 ? fireT(w.t) : -1;
-  if (ft >= 0 && L.ft !== ft) {
-    L.ft = ft;
+  if (ft >= 0 && (L.ft !== ft || L.fb !== !!p.blue)) {
+    L.ft = ft; L.fb = !!p.blue;
     const c = $('#sp-fire'), g = c.getContext('2d'), R = 9.7;
     g.clearRect(0, 0, c.width, c.height);
     for (let y = 0; y < c.height; y++) for (let x = 0; x < c.width; x++) {
@@ -216,7 +219,7 @@ function updateTouchHud(w) {
       if (d < R - 1) continue;
       const up = Math.max(0, -dy / d), v = fnoise(x * 0.42, y * 0.36 + ft) * 1.3 - (d - R) / (2.6 + 9 * up * up);
       if (v < 0.14) continue;
-      g.fillStyle = SP_FIRE[v > 0.66 ? 3 : v > 0.46 ? 2 : v > 0.28 ? 1 : 0]; g.fillRect(x, y, 1, 1);
+      g.fillStyle = spFire(p)[v > 0.66 ? 3 : v > 0.46 ? 2 : v > 0.28 ? 1 : 0]; g.fillRect(x, y, 1, 1);
     }
   }
 }
@@ -317,6 +320,7 @@ function renderClasses() {
     b.onclick = () => {
       if (ch.cls === id) return;
       Object.assign(ch, lookOf(id, ch.body | 0), { name: ch.name, elem: ch.elem, height: ch.height, build: ch.build, face: ch.face });
+      if (!crysOK(id)) delete ch.crys;
       Snd.sfx('click'); changed(true);
     };
     el.appendChild(b);
@@ -363,6 +367,35 @@ function renderPanel() {
     row.appendChild(cols);
     el.appendChild(row);
   }
+  if (crysOK(ch.cls)) el.appendChild(crystalRow(ch));
+}
+// Skin de cristal (venceu os 7 desafios com esta classe): liga/desliga o cristal em cada parte, ou em tudo de uma vez
+function crystalRow(ch) {
+  const row = document.createElement('div'); row.className = 'cr-row'; row.style.gridTemplateColumns = '1fr';
+  const lb = document.createElement('span'); lb.className = 'cr-lb'; lb.textContent = '💠 Cristal'; lb.title = 'Prêmio dos 7 desafios da Dimensão Prisma';
+  const box = document.createElement('div'); box.style.cssText = 'display:flex;flex-wrap:wrap;gap:4px;margin-top:3px';
+  const parts = crysParts(ch), on = new Set(crystalParts(ch)), all = parts.every(p => on.has(p.id));
+  const chip = (txt, active, click, tip) => {
+    const b = document.createElement('button'); b.textContent = txt; b.title = tip; b.setAttribute('aria-pressed', active);
+    b.style.cssText = 'font:inherit;font-size:8px;padding:4px 6px;cursor:pointer;border:3px solid ' + (active ? '#9ae8ff' : 'var(--line)') +
+      ';background:' + (active ? 'linear-gradient(#5aa0ea,#2a5ab8)' : '#2a2040') + ';color:' + (active ? '#ffffff' : '#b8b0d0');
+    b.onclick = () => { Snd.sfx('click'); click(); ch.crys = [...on]; if (!ch.crys.length) delete ch.crys; changed(true); };
+    return b;
+  };
+  box.appendChild(chip('Tudo', all, () => { if (all) on.clear(); else parts.forEach(p => on.add(p.id)); }, 'Corpo todo de cristal'));
+  for (const p of parts) box.appendChild(chip(crysName(p, ch), on.has(p.id), () => { if (on.has(p.id)) on.delete(p.id); else on.add(p.id); }, 'Cristal: ' + crysName(p, ch)));
+  // cor: os 7 cristais das fases
+  const cores = document.createElement('div'); cores.style.cssText = 'display:flex;gap:4px;margin-top:4px;align-items:center';
+  CRISTAIS.forEach((g, n) => {
+    const b = document.createElement('button'), sel = crysCor(ch) === n;
+    b.className = 'cr-sw'; b.title = 'Cristal ' + g.nome; b.setAttribute('aria-label', 'Cristal ' + g.nome); b.setAttribute('aria-pressed', sel);
+    b.style.background = 'linear-gradient(135deg,' + g.cor[3] + ' 0 22%,' + g.cor[2] + ' 22% 48%,' + g.cor[1] + ' 48% 76%,' + g.cor[0] + ' 76%)';
+    if (sel) b.style.outline = '3px solid #ffffff';
+    b.onclick = () => { Snd.sfx('click'); ch.crysCor = n; changed(true); };
+    cores.appendChild(b);
+  });
+  row.append(lb, box, cores);
+  return row;
 }
 // balão com a paleta de um item (fecha ao escolher, ao clicar fora ou com Esc / B do controle)
 function openSwatchPop(anchor, k, pal, name) {

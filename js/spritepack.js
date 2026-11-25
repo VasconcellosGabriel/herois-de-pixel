@@ -88,6 +88,51 @@ function packLut(ch) {
 }
 const DEF_COLORS = { skin: '#f1c27d', hairColor: '#5a3825', primary: '#3b6fd6', secondary: '#8a5a2b', accent: '#ffd23f', weaponColor: '#dfe6f0', headColor: '#9aa5b1', capeColor: '#c0392b', eyes: '#2b6cb0' };
 
+// ---------- Skin de cristal (prêmio por vencer os 7 desafios da Dimensão Prisma; só para a classe que venceu) ----------
+// Cada parte é um ou mais canais da paleta-chave: na montagem, os pixels desses canais viram cristal facetado.
+// when: a parte só aparece no criador quando o herói tem aquilo (chapéu, capa...).
+const CRYS_PARTS = [
+  { id: 'arma', name: 'Arma', ch: ['weaponColor'], when: c => c.cls !== 'dragonico' },
+  { id: 'armadura', name: 'Armadura', ch: ['armor'] },
+  { id: 'roupa', name: 'Roupa', ch: ['primary', 'secondary', 'vest'] },
+  { id: 'chapeu', name: 'Chapéu', ch: ['headColor'], when: c => c.head > 0 },
+  { id: 'capa', name: 'Capa', ch: ['capeColor'], when: c => c.cape > 0 || c.cls === 'guerreiro' },
+  { id: 'detalhes', name: c => c.cls === 'dragonico' ? 'Asas' : 'Detalhes', ch: ['accent', 'accColor'] },
+  { id: 'cabelo', name: 'Cabelo', ch: ['hairColor'], when: c => c.hair > 0 },
+  { id: 'pele', name: c => c.cls === 'dragonico' ? 'Escamas' : 'Pele', ch: ['skin', 'cheek'] },
+];
+const CRYS_IDS = new Set(CRYS_PARTS.map(p => p.id));
+const crysParts = ch => CRYS_PARTS.filter(p => !p.when || p.when(ch));
+const crysName = (p, ch) => typeof p.name === 'function' ? p.name(ch) : p.name;
+// lista de partes de cristal de um herói, conferida (vem do save ou da rede)
+const crystalParts = ch => Array.isArray(ch && ch.crys) ? ch.crys.filter(x => CRYS_IDS.has(x)) : [];
+// canais (índices de KEY_CH) que viram cristal
+function crysChannels(ch) {
+  const on = new Set(crystalParts(ch)), out = new Set();
+  for (const p of CRYS_PARTS) if (on.has(p.id)) for (const k of p.ch) out.add(KEY_CH.findIndex(c => c[0] === k));
+  out.delete(-1);
+  return out;
+}
+// cor do cristal: um dos 7 cristais das fases (CRISTAIS, em js/levels.js); sem escolha = ciano
+const crysCor = ch => Number.isInteger(ch && ch.crysCor) && ch.crysCor >= 0 && ch.crysCor < CRISTAIS.length ? ch.crysCor : 1;
+// rampa de 8 tons a partir das 4 cores do cristal: sombra funda, corpo, luz e o branco do brilho
+const _crysRamp = {};
+function crysRamp(ch) {
+  const n = crysCor(ch);
+  if (_crysRamp[n]) return _crysRamp[n];
+  const [d, m, l, w] = CRISTAIS[n].cor;
+  return (_crysRamp[n] = [toneLo(d, 0.5), toneLo(d, 0.2), mix(d, m, 0.5), m, mix(m, l, 0.5), l, mix(l, w, 0.55), '#ffffff'].map(hexToRgb));
+}
+// cor de um pixel de cristal: o tom vem da sombra original (v); as facetas (losangos grandes) somam/tiram um degrau,
+// a borda de cada faceta acende como aresta lapidada e alguns pontos brilham, mudando de quadro em quadro
+function crysPixel(v, x, y, f, ramp) {
+  const u = (x * 0.75 + y) / 7, w = (x * 0.75 - y) / 6, fu = Math.floor(u), fw = Math.floor(w);
+  const h = hash2(fu, fw, 71), edge = u - fu < 0.14 || w - fw < 0.12;
+  let i = Math.floor(clamp(v, 0, 1.15) * 6.4) + (h < 0.33 ? -1 : h > 0.72 ? 1 : 0) + (edge && v > 0.35 ? 1 : 0);
+  if (v > 0.45 && hash2(x, y, 13 + f * 7) > 0.985) i = 7;                   // cintilar
+  return ramp[clamp(i, 0, 7)];
+}
+
 function packChar(ch, pose, f) {
   if (!Pack.on || RIG) return null;                                  // no rig (?rig) o herói é montado por drawChar + js/rig.js
   if (pose === 'roll' || pose === 'flip') {
@@ -126,11 +171,12 @@ function packChar(ch, pose, f) {
   let id;
   try { id = g.getImageData(0, 0, PACK_CELL, PACK_CELL); }
   catch (e) { Pack.on = false; Pack.gen++; return null; }
-  const d = id.data, L = packLut(ch);
+  const d = id.data, L = packLut(ch), crys = crysChannels(ch), cr = crys.size ? crysRamp(ch) : null;
   for (let i = 0; i < d.length; i += 4) {
     if (!d[i + 3]) continue;
     const k = keyRGB(d[i], d[i + 1], d[i + 2]);
     if (!k) continue;
+    if (crys.has(k.i)) { const px = i >> 2, c = crysPixel(k.v, px % PACK_CELL, (px / PACK_CELL) | 0, f, cr); d[i] = c[0]; d[i + 1] = c[1]; d[i + 2] = c[2]; continue; }
     const t = L[k.i], j = Math.round(k.v * 255) * 3;
     d[i] = t[j]; d[i + 1] = t[j + 1]; d[i + 2] = t[j + 2];
   }

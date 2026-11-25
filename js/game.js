@@ -121,7 +121,9 @@ function addXp(pr, n, cls) {
 function xpPreview(pr, extra) { const c = { lvl: pr.lvl, xp: pr.xp, pts: 0 }; addXp(c, extra || 0); return c; }
 // Evolução do herói deste aparelho (vai junto com o personagem para a sala no multiplayer)
 // sp = barra do especial guardada: passa de uma fase para a outra, como as vidas
-function myBuild() { const pr = progOf((Game.save.char || DEFAULT_CHAR).cls); return { st: { ...pr.st }, up: { ...pr.up }, sp: Game.save.sp | 0 }; }
+// blue = Chama Azul: o herói já venceu o Dragão de Magma (a história conta que o fogo do dragônico fica azul)
+function myBuild() { const pr = progOf((Game.save.char || DEFAULT_CHAR).cls); return { st: { ...pr.st }, up: { ...pr.up }, sp: Game.save.sp | 0, blue: blueFireOwned() }; }
+const blueFireOwned = () => !!(Game.save && Game.save.best && Game.save.best.dragao);
 // Força do herói (0 a 1) pela evolução: melhorias compradas pesam mais (dano e habilidades), depois vida e os outros atributos.
 // Os chefes acompanham essa força (BOSS_PW_*), para a luta não virar passeio quando o herói está todo evoluído.
 function heroPower(b) {
@@ -134,6 +136,7 @@ function cleanBuild(b) {
   for (const k in STAT_MAX) o.st[k] = num(src.st && src.st[k], STAT_MAX[k]);
   for (const k in UP_MAX) o.up[k] = num(src.up && src.up[k], UP_MAX[k]);
   o.sp = num(src.sp, SPECIAL_MAX);
+  o.blue = src.blue === true;
   return o;
 }
 
@@ -193,8 +196,22 @@ function loadSave() {
     for (const h of base.heroes) { const c = h.char; c.face = c.acc === 4 ? 4 : c.face === 4 ? 1 : 0; if (c.acc === 4) c.acc = 0; }
     base.faceV = 2;
   }
+  // heróis que já tinham vencido os desafios antes da skin de cristal existir
+  base.crysCls = Array.isArray(base.crysCls) ? base.crysCls : [];
+  for (const h of base.heroes) if (challengesDone(h.best) && !base.crysCls.includes(h.char.cls)) base.crysCls.push(h.char.cls);
   useHero(base, base.cur | 0);
   return base;
+}
+// Skin de cristal: classes que já venceram todos os desafios (fases extras da Dimensão Prisma). Fica no save geral
+// (vale para todo herói daquela classe), em crysCls. Devolve true se a classe acabou de ser liberada.
+function challengesDone(best) { return LEVELS.every(l => !l.extra || (best && best[l.id])); }
+function crysOK(cls) { return !!(Game.save && Array.isArray(Game.save.crysCls) && Game.save.crysCls.includes(cls)); }
+function crysUnlock(sv, cls) {
+  if (!challengesDone(sv.best)) return false;
+  sv.crysCls = Array.isArray(sv.crysCls) ? sv.crysCls : [];
+  if (sv.crysCls.includes(cls)) return false;
+  sv.crysCls.push(cls);
+  return true;
 }
 function persist() {
   const sv = Game.save, out = {};
@@ -252,7 +269,7 @@ const WATER_SLOW = 0.5;
 function waterAt(lv, b) {
   if (!lv.water) return null;
   const x = b.x + b.w / 2, f = b.y + b.h;
-  for (const q of lv.water) if (x > q.x && x < q.x + q.w && f > q.y - 7 && f < q.y + 3) return q;
+  for (const q of lv.water) if (x > q.x && x < q.x + q.w && f > q.y - 7 && f < q.y + (q.d || 0) + 3) return q;
   return null;
 }
 function moveBody(b, dt, lv) {
@@ -427,6 +444,7 @@ function addPlayer(w, r) {
     arrows: cls.id === 'arqueiro' ? QUIVER : 0, maxArrows: cls.id === 'arqueiro' ? QUIVER : 0, arrowDelay: 0, arrowT: ARROW_REGEN,
     cd: { a: 0, b: 0, c: 0 }, act: null, actT: 0, actDur: 0, inv: 0, hurtT: 0, block: false, dash: 0, dashSpd: 0, dashKind: null, dashHit: null,
     melee: null, anim: 0, dead: false, deadT: 0, out: false, drop: 0, landT: 0, flipT: 0, jumps: 0, glide: false, diving: false, diveWait: false, combo: 0, comboT: 0, atkIdx: 0, dustT: 0,
+    blue: cls.id === 'dragonico' && cleanBuild(r.b).blue,   // Chama Azul (venceu o Dragão de Magma): todo o fogo do dragônico fica azul
     elem: clamp(ch.elem | 0, 0, ELEMENTS.length - 1),      // elemento da magia do mago (troca durante a fase: cycleElem)
     kaim: 0, aimDeg: 0, aimFace: 1, lastVy: 0, shotAim: false, sp, xpGot: 0, crouch: false, flamer: 0, flameDir: 1, flameTk: 0, ep: 0, rp: null, remote: false, stompT: 0,
     // evolução: atributos (XP) e melhorias (moedas)
@@ -530,7 +548,7 @@ function damageEnemy(w, e, dmg, o = {}) {
   const dir = o.dir || 0;
   if (!e.boss && dir) { e.vx = dir * 110 * (o.kb || 1); e.vy = -80; e.hurt = 0.25; }
   if (o.status === 'freeze') e.slow = Math.max(e.slow, 2.5);
-  if (o.status) applyStatus(w, e, o.status, o.chance === undefined ? 1 : o.chance);
+  if (o.status && applyStatus(w, e, o.status, o.chance === undefined ? 1 : o.chance) && o.status === 'burn') e.burnBlue = !!(o.by && o.by.blue);
   const sz = crit ? 2 : 1;
   floatText(w, cxOf(e) + rnd(-4, 4), e.y - 4, Math.max(1, Math.round(dmg)) + (crit ? '!' : ''), crit ? (weak ? '#ff9a3a' : '#ffe94d') : '#fff', crit);
   burst(w, cxOf(e), cyOf(e), crit ? '#ffe94d' : '#fff', crit ? 10 : 4, crit ? 110 : 60, crit ? 0.4 : 0.3);
@@ -777,7 +795,7 @@ function skillB(w, p) {
     const mx = cxOf(p) + f * 9, my = p.y + (p.crouch ? 4 : 7);
     for (let i = 0; i < 8; i++) {
       const a = (i - 3.5) * 0.1 + rnd(-0.04, 0.04), sp = rnd(130, 215), life = rnd(0.3, 0.44);
-      shoot(w, p, { type: 'flame', x: mx - 3, y: my - 3, w: 7, h: 7, vx: Math.cos(a) * f * sp, vy: Math.sin(a) * sp - 6, g: -35, dmg: 0.7, status: 'burn', chance: 0.25, life, max: life, pierce: 99, quiet: true, sk: 1 });
+      shoot(w, p, { type: 'flame', x: mx - 3, y: my - 3, w: 7, h: 7, vx: Math.cos(a) * f * sp, vy: Math.sin(a) * sp - 6, g: -35, dmg: 0.7, status: 'burn', chance: 0.25, life, max: life, pierce: 99, quiet: true, sk: 1, blue: p.blue });
     }
     flamePuff(w, mx, my, f * 60, 0, 0.15, 3, 5, { hot: 1 });
   }
@@ -936,8 +954,9 @@ function explode(w, q) {
   const cx = q.x + q.w / 2, cy = q.y + q.h / 2, R = q.R || 30, rect = { x: cx - R, y: cy - R, w: R * 2, h: R * 2 };
   sfx('bomb'); feel(w, q.by, 0.06, 0.3);
   const k = R / 30;
-  burst(w, cx, cy, '#ffb347', 20 * k, 140 * k, 0.6, 100); burst(w, cx, cy, '#ff5a2a', 14 * k, 100 * k, 0.5, 60); burst(w, cx, cy, '#fff2b0', 8, 60, 0.3, 0);
-  addFx(w, { type: 'ring', x: r1(cx), y: r1(cy), t: 0.3, max: 0.3, r: R });
+  const blue = !!(q.by && q.by.blue), bo = firePal(blue).boom;
+  burst(w, cx, cy, bo[0], 20 * k, 140 * k, 0.6, 100); burst(w, cx, cy, bo[1], 14 * k, 100 * k, 0.5, 60); burst(w, cx, cy, bo[2], 8, 60, 0.3, 0);
+  addFx(w, { type: 'ring', x: r1(cx), y: r1(cy), t: 0.3, max: 0.3, r: R, ...(blue ? { tint: bo[0] } : {}) });
   for (const e of w.enemies) if (!e.dead && e.active && overlap(rect, e)) {
     const d = Math.hypot(cxOf(e) - cx, cyOf(e) - cy);
     if (d < R + Math.max(e.w, e.h) / 2) damageEnemy(w, e, q.dmg, { by: q.by, dir: Math.sign(cxOf(e) - cx) || 1, rect, status: q.noFire ? null : 'burn', chance: q.special ? 1 : 0.5, kb: 1.4, sk: q.sk, special: q.special });
@@ -995,7 +1014,7 @@ function bodyStep(w, dt, p, ctl, mode) {
         p.vy = -JUMP * p.jumpK; p.jbuf = 0; p.coyote = 0; sfx('jump');
         burst(w, cxOf(p), p.y + p.h, '#ddd', 4, 30, 0.3, 0);
       } else if (p.jumps > 0 && p.dash <= 0) { // pulo duplo: batida de asas do dragônico / cambalhota do arqueiro
-        const col = DJUMP[p.cls.id];
+        const col = p.blue ? FIRE_PAL.blue.wing : DJUMP[p.cls.id];
         p.vy = -JUMP * 0.92 * p.jumpK; p.jbuf = 0; p.jumps--; p.flipT = 0.36; sfx('djump');
         addFx(w, { type: 'ring', x: r1(cxOf(p)), y: r1(p.y + p.h), t: 0.25, max: 0.25, r: 12, col });
         burst(w, cxOf(p), p.y + p.h, col, 8, 50, 0.4, 0);
@@ -1589,22 +1608,23 @@ function cosmetics(w, dt) {
   const k = dt * 60, part = o => w.parts.push(o);
   for (const p of w.players) {
     if (p.dead) continue;
-    if (p.glide && Math.random() < 0.25 * k) part({ x: cxOf(p) - p.face * 6, y: p.y + 6, vx: rnd(-8, 8), vy: rnd(5, 20), life: 0.3, max: 0.3, col: '#ffd27a', g: 0, sz: 1 });
+    const pal = firePal(p.blue), bl = { blue: p.blue };
+    if (p.glide && Math.random() < 0.25 * k) part({ x: cxOf(p) - p.face * 6, y: p.y + 6, vx: rnd(-8, 8), vy: rnd(5, 20), life: 0.3, max: 0.3, col: pal.wing, g: 0, sz: 1 });
     if (p.flamer > 0) {          // jato do lança-chamas (gerado em cada aparelho a partir do estado)
       const m = flameMouth(p), len = flameLen(w.lv, p), f = p.flameDir;
       for (let i = 0; i < 3 * k; i++) {   // labaredas: nascem finas e quentes, engrossam e esfriam até o fim do jato
         const sp = rnd(190, 250), life = Math.min(0.6, len / sp) * rnd(0.8, 1);
-        flamePuff(w, m.x + f * rnd(0, 4), m.y + rnd(-1.5, 1.5), f * sp, rnd(-22, 22), life, rnd(1, 1.6), rnd(4.5, 7.5), { drag: 0.6, g: -55 });
+        flamePuff(w, m.x + f * rnd(0, 4), m.y + rnd(-1.5, 1.5), f * sp, rnd(-22, 22), life, rnd(1, 1.6), rnd(4.5, 7.5), { drag: 0.6, g: -55, ...bl });
       }
-      if (Math.random() < 0.7 * k) flamePuff(w, m.x + f * 2, m.y, f * rnd(60, 110), rnd(-8, 8), 0.12, 2.2, 3, { hot: 1 });   // brilho no focinho
-      if (Math.random() < 0.5 * k) part({ x: m.x + f * rnd(10, len), y: m.y + rnd(-5, 5), vx: f * rnd(40, 90), vy: rnd(-70, -25), life: 0.45, max: 0.45, col: Math.random() < 0.5 ? '#ffe27a' : '#fff6d0', g: 30, sz: 1 });   // faíscas
-      if (Math.random() < 0.35 * k) flamePuff(w, m.x + f * rnd(len * 0.5, len), m.y - rnd(2, 6), f * rnd(5, 20), rnd(-35, -18), 0.9, 3, 7, { smoke: 1 });
+      if (Math.random() < 0.7 * k) flamePuff(w, m.x + f * 2, m.y, f * rnd(60, 110), rnd(-8, 8), 0.12, 2.2, 3, { hot: 1, ...bl });   // brilho no focinho
+      if (Math.random() < 0.5 * k) part({ x: m.x + f * rnd(10, len), y: m.y + rnd(-5, 5), vx: f * rnd(40, 90), vy: rnd(-70, -25), life: 0.45, max: 0.45, col: pal.spark[Math.random() < 0.5 ? 0 : 1], g: 30, sz: 1 });   // faíscas
+      if (Math.random() < 0.35 * k) flamePuff(w, m.x + f * rnd(len * 0.5, len), m.y - rnd(2, 6), f * rnd(5, 20), rnd(-35, -18), 0.9, 3, 7, { smoke: 1, ...bl });
       if (len < FLAMER_LEN && Math.random() < 0.8 * k) {   // bateu na parede: o fogo se espalha para cima e para baixo
         const wx = m.x + f * (len - 4), up = Math.random() < 0.65 ? -1 : 1;
-        flamePuff(w, wx, m.y + rnd(-3, 3), -f * rnd(10, 40), up * rnd(50, 110), 0.3, 3, 6, { g: -60 });
+        flamePuff(w, wx, m.y + rnd(-3, 3), -f * rnd(10, 40), up * rnd(50, 110), 0.3, 3, 6, { g: -60, ...bl });
       }
     }
-    if (p.diving && Math.random() < k) part({ x: cxOf(p) + rnd(-4, 4), y: p.y + rnd(-2, 10), vx: rnd(-10, 10), vy: rnd(-40, -10), life: 0.35, max: 0.35, col: Math.random() < 0.5 ? '#ff8a1f' : '#ffe27a', g: 0, sz: 2 });
+    if (p.diving && Math.random() < k) part({ x: cxOf(p) + rnd(-4, 4), y: p.y + rnd(-2, 10), vx: rnd(-10, 10), vy: rnd(-40, -10), life: 0.35, max: 0.35, col: pal.ember[Math.random() < 0.5 ? 0 : 1], g: 0, sz: 2 });
     if (p.inWater && Math.abs(p.vx) > 20 && Math.random() < 0.25 * k) part({ x: cxOf(p) - p.face * rnd(2, 6), y: p.y + p.h - 5, vx: -p.face * rnd(5, 25), vy: rnd(-50, -20), life: 0.35, max: 0.35, col: Math.random() < 0.5 ? '#8ac0a0' : '#d8f0e0', g: 260, sz: 1 });
     // poeira ao correr
     else if (p.ground && Math.abs(p.vx) > 60 && p.dash <= 0) { p.dustT -= dt; if (p.dustT <= 0) { p.dustT = 0.13; part({ x: cxOf(p) - p.face * 4, y: p.y + p.h - 1, vx: -p.face * rnd(5, 18), vy: rnd(-14, -4), life: 0.3, max: 0.3, col: '#cfc6b8', g: 0, sz: 1 }); } }
@@ -1612,7 +1632,7 @@ function cosmetics(w, dt) {
   for (const e of w.enemies) {
     if (e.dead || !e.active) continue;
     if (e.type === 'smith' && Math.random() < 0.1 * k) part({ x: cxOf(e) - e.dir * 12 + rnd(-2, 2), y: e.y + e.h - 42, vx: -e.dir * rnd(2, 8), vy: rnd(-26, -14), life: 0.9, max: 0.9, col: Math.random() < 0.5 ? '#4a4450' : '#6a6470', g: -6, sz: 2 });   // chaminé do ferreiro
-    if (e.sts.burn > 0 && Math.random() < 0.5 * k) part({ x: cxOf(e) + rnd(-e.w / 2, e.w / 2), y: e.y + rnd(0, e.h), vx: rnd(-6, 6), vy: rnd(-40, -15), life: 0.4, max: 0.4, col: Math.random() < 0.5 ? '#ff8a1f' : '#ffe27a', g: 0, sz: 1 });
+    if (e.sts.burn > 0 && Math.random() < 0.5 * k) part({ x: cxOf(e) + rnd(-e.w / 2, e.w / 2), y: e.y + rnd(0, e.h), vx: rnd(-6, 6), vy: rnd(-40, -15), life: 0.4, max: 0.4, col: firePal(e.burnBlue).ember[Math.random() < 0.5 ? 0 : 1], g: 0, sz: 1 });
     if (e.sts.poison > 0 && Math.random() < 0.3 * k) part({ x: cxOf(e) + rnd(-e.w / 2, e.w / 2), y: e.y + rnd(0, e.h), vx: rnd(-4, 4), vy: rnd(-25, -8), life: 0.5, max: 0.5, col: '#7bd34a', g: 0, sz: 1 });
   }
   for (const q of w.proj) {
@@ -1620,8 +1640,8 @@ function cosmetics(w, dt) {
     if (q.type === 'spell' && Math.random() < 0.7 * k) part({ x: q.x + 3, y: q.y + 3, vx: rnd(-10, 10), vy: q.el.status === 'burn' ? rnd(-25, -5) : rnd(-10, 10), life: 0.3, max: 0.3, col: Math.random() < 0.5 ? q.el.col : q.el.col2, g: 0, sz: 1 });
     if (q.type === 'flame') {
       const age = clamp(1 - q.life / (q.max || 0.44), 0, 1);   // convidado não recebe max
-      if (Math.random() < 0.75 * k) flamePuff(w, q.x + 3 + rnd(-2, 2), q.y + 3 + rnd(-2, 2), q.vx * 0.25, q.vy * 0.25 + rnd(-10, 4), rnd(0.16, 0.26), 1.2 + age * 2, 3 + age * 3.5, { g: -50, heat: age * 0.35 });
-      if (Math.random() < 0.25 * k) part({ x: q.x + 3, y: q.y + 3, vx: q.vx * 0.3 + rnd(-20, 20), vy: rnd(-60, -20), life: 0.35, max: 0.35, col: '#ffe27a', g: 40, sz: 1 });
+      if (Math.random() < 0.75 * k) flamePuff(w, q.x + 3 + rnd(-2, 2), q.y + 3 + rnd(-2, 2), q.vx * 0.25, q.vy * 0.25 + rnd(-10, 4), rnd(0.16, 0.26), 1.2 + age * 2, 3 + age * 3.5, { g: -50, heat: age * 0.35, blue: q.blue });
+      if (Math.random() < 0.25 * k) part({ x: q.x + 3, y: q.y + 3, vx: q.vx * 0.3 + rnd(-20, 20), vy: rnd(-60, -20), life: 0.35, max: 0.35, col: firePal(q.blue).spark[0], g: 40, sz: 1 });
     }
     if (q.type === 'bomb' && Math.random() < 0.5 * k) part({ x: q.x + 3, y: q.y - 1, vx: rnd(-10, 10), vy: rnd(-30, -10), life: 0.25, max: 0.25, col: Math.random() < 0.5 ? '#ffe27a' : '#ff8a1f', g: 0, sz: 1 });
   }
@@ -1631,8 +1651,17 @@ function cosmetics(w, dt) {
 // Cada labareda é um disco pixelado que cresce de r0 até r1 e esfria pela rampa de cor; a fumaça sobe escura e some.
 const FIRE_RAMP = ['#fffdf0', '#fff3a8', '#ffd84a', '#ffaa2e', '#ff7f1f', '#ec4f1c', '#b8301a', '#7a2418'];
 const FIRE_CORE = ['#ffffff', '#ffffff', '#fffbe0', '#fff0a0', '#ffd84a', '#ffaa2e', '#ff7f1f', '#d8401a'];
+// Chama Azul (depois do Dragão de Magma): a mesma rampa, do branco ao azul-marinho, com o miolo quase branco
+const FIRE_RAMP_BLUE = ['#f4fdff', '#c8f4ff', '#7ae0ff', '#3ab8ff', '#1f8aff', '#1a5ae8', '#1a2ab8', '#141a6a'];
+const FIRE_CORE_BLUE = ['#ffffff', '#ffffff', '#f0fcff', '#c8f4ff', '#7ae0ff', '#3ab8ff', '#1f8aff', '#1a4ad0'];
+// cores de cada papel do fogo: faísca, brasa, brilho, fumaça, explosão, rastro das asas e bola de fogo
+const FIRE_PAL = {
+  warm: { ramp: FIRE_RAMP, core: FIRE_CORE, spark: ['#ffe27a', '#fff6d0'], ember: ['#ff8a1f', '#ffe27a'], glow: '#ff7a2a', smoke: ['#3a2c30', '#4e3c40'], boom: ['#ffb347', '#ff5a2a', '#fff2b0'], wing: '#ffd27a', ball: ['#ffd84a', '#ffaa2e', '#ffffff', '#fff3a8'] },
+  blue: { ramp: FIRE_RAMP_BLUE, core: FIRE_CORE_BLUE, spark: ['#9ae8ff', '#e8fbff'], ember: ['#2a8aff', '#9ae8ff'], glow: '#2a8aff', smoke: ['#20263a', '#2e3650'], boom: ['#5ac8ff', '#2a6aff', '#e8fbff'], wing: '#9ae8ff', ball: ['#7ae0ff', '#3ab8ff', '#ffffff', '#c8f4ff'] },
+};
+const firePal = blue => blue ? FIRE_PAL.blue : FIRE_PAL.warm;
 function flamePuff(w, x, y, vx, vy, life, r0, r1, o = {}) {
-  (w.fire || (w.fire = [])).push({ x, y, vx, vy, life, max: life, r0, r1, g: o.g || 0, drag: o.drag || 0, smoke: !!o.smoke, hot: !!o.hot, heat: o.heat || 0, ph: Math.random() * 6.28 });
+  (w.fire || (w.fire = [])).push({ x, y, vx, vy, life, max: life, r0, r1, g: o.g || 0, drag: o.drag || 0, smoke: !!o.smoke, hot: !!o.hot, heat: o.heat || 0, blue: !!o.blue, ph: Math.random() * 6.28 });
   if (w.fire.length > 300) w.fire.splice(0, w.fire.length - 300);
 }
 function updateFire(w, dt) {
@@ -1663,7 +1692,7 @@ function drawFire(g, w, cx, cy) {
   // fumaça por baixo
   for (const q of w.fire) if (q.smoke) {
     const t = 1 - q.life / q.max, r = Math.round((q.r0 + (q.r1 - q.r0) * t) * 2) / 2;
-    g.globalAlpha = 0.35 * Math.min(1, t * 4) * (1 - t); put(fireDisc(r, '#3a2c30', '#4e3c40'), q.x, q.y);
+    const sm = firePal(q.blue).smoke; g.globalAlpha = 0.35 * Math.min(1, t * 4) * (1 - t); put(fireDisc(r, sm[0], sm[1]), q.x, q.y);
   }
   // labaredas: as mais frias (velhas) primeiro, as quentes por cima
   const fl = w.fire.filter(q => !q.smoke).sort((a, b) => (b.max - b.life) / b.max - (a.max - a.life) / a.max);
@@ -1671,13 +1700,14 @@ function drawFire(g, w, cx, cy) {
     const t = Math.min(1, 1 - q.life / q.max + q.heat), i = Math.min(FIRE_RAMP.length - 1, Math.floor(t * FIRE_RAMP.length + (q.hot ? -2 : 0)));
     const r = Math.max(1, Math.round((q.r0 + (q.r1 - q.r0) * t) * (t > 0.85 ? 1 - (t - 0.85) * 3 : 1) * 2) / 2);
     g.globalAlpha = t > 0.7 ? 1 - (t - 0.7) / 0.3 * 0.8 : 1;
-    put(fireDisc(r, FIRE_RAMP[Math.max(0, i)], t < 0.75 ? FIRE_CORE[Math.max(0, i)] : null), q.x, q.y);
+    const pal = firePal(q.blue);
+    put(fireDisc(r, pal.ramp[Math.max(0, i)], t < 0.75 ? pal.core[Math.max(0, i)] : null), q.x, q.y);
   }
   // brilho aditivo
   g.globalCompositeOperation = 'lighter';
   for (let n = 0; n < fl.length; n += 4) {
     const q = fl[n], t = 1 - q.life / q.max;
-    if (t < 0.7) drawGlow(g, q.x - cx, q.y - cy, 10, '#ff7a2a', 0.16 * (1 - t));
+    if (t < 0.7) drawGlow(g, q.x - cx, q.y - cy, 10, firePal(q.blue).glow, 0.16 * (1 - t));
   }
   g.globalAlpha = 1; g.globalCompositeOperation = 'source-over';
 }
@@ -1934,11 +1964,12 @@ function fnoise(x, y) {
   const u = fx * fx * (3 - 2 * fx), v = fy * fy * (3 - 2 * fy);
   return a + (b - a) * u + (c - a) * v + (a - b - c + d) * u * v;
 }
-const SP_FIRE = ['#b8301a', '#ff7f1f', '#ffc24a', '#fff3a8'];
+const SP_FIRE = ['#b8301a', '#ff7f1f', '#ffc24a', '#fff3a8'], SP_FIRE_BLUE = ['#1a2ab8', '#1f8aff', '#6ad8ff', '#e8fbff'];
+const spFire = p => p && p.blue ? SP_FIRE_BLUE : SP_FIRE;      // a barra do especial pega fogo na cor do fogo do herói
 const fireT = t => Math.floor(t * 14) * 0.2;         // anda em passos: chama "quadro a quadro", como pixel art
 // Labaredas subindo de uma linha de base (x..x+wd, de y para cima, até ht pixels). shape(i) = altura relativa da coluna
 // fy = "esticada" das línguas de fogo (menor = mais compridas); boost = base mais cheia
-function pixelFire(g, x, y, wd, ht, t, seed = 0, shape = null, fy = 0.36, boost = 0) {
+function pixelFire(g, x, y, wd, ht, t, seed = 0, shape = null, fy = 0.36, boost = 0, pal = SP_FIRE) {
   const tt = fireT(t);
   for (let i = 0; i < wd; i++) {
     const hk = ht * (shape ? shape(i) : 1);
@@ -1946,7 +1977,7 @@ function pixelFire(g, x, y, wd, ht, t, seed = 0, shape = null, fy = 0.36, boost 
     for (let j = 0; j < ht; j++) {
       const v = fnoise((i + seed) * 0.42, j * fy - tt) * 1.3 - j / hk + boost * (1 - j / hk);
       if (v < 0.14) { if (j > hk) break; continue; }
-      g.fillStyle = SP_FIRE[v > 0.66 ? 3 : v > 0.46 ? 2 : v > 0.28 ? 1 : 0]; g.fillRect(x + i, y - 1 - j, 1, 1);
+      g.fillStyle = pal[v > 0.66 ? 3 : v > 0.46 ? 2 : v > 0.28 ? 1 : 0]; g.fillRect(x + i, y - 1 - j, 1, 1);
     }
   }
 }
@@ -2079,16 +2110,16 @@ function drawTiles(g, w, cx, cy) {
 function drawWater(g, w, cx, cy) {
   for (const q of w.lv.water) {
     if (q.x + q.w < cx - 4 || q.x > cx + W + 4) continue;
-    const x0 = Math.round(q.x - cx), y0 = Math.round(q.y - cy) - 6, wd = q.w;
-    // margens de lama, corpo d'água (os pés de quem entra ficam submersos) e reflexos se mexendo
-    g.fillStyle = '#3a2e1c'; g.fillRect(x0 - 4, y0 + 1, 4, 18); g.fillRect(x0 + wd, y0 + 1, 4, 18); g.fillStyle = '#5a4a2a'; g.fillRect(x0 - 4, y0, 3, 2); g.fillRect(x0 + wd + 1, y0, 3, 2);
-    g.globalAlpha = 0.82; g.fillStyle = '#2a6a5a'; g.fillRect(x0, y0, wd, 6);
-    g.fillStyle = '#1e5048'; g.fillRect(x0, y0 + 6, wd, 6);
-    g.fillStyle = '#163a36'; g.fillRect(x0, y0 + 12, wd, 8);
-    g.globalAlpha = 0.9; g.fillStyle = '#9ad8c0';
-    for (let x = 0; x < wd; x += 2) if (Math.sin(x * 0.35 + w.t * 2.6) > 0.35) g.fillRect(x0 + x, y0, 2, 1);
-    g.globalAlpha = 0.55; g.fillStyle = '#d8fff0';
-    for (let k = 0; k < wd - 6; k += 17) { const sx = (k * 7 + Math.floor(w.t * 3) * 2) % (wd - 6); g.fillRect(x0 + sx, y0 + 3 + (k % 3) * 3, 5, 1); }
+    // a água enche a bacia cavada no chão: superfície um pouco abaixo das margens, cobre as pernas de quem entra
+    const x0 = Math.round(q.x - cx), y0 = Math.round(q.y - cy) + 3, wd = q.w, dp = (q.d || T) - 3;
+    g.globalAlpha = 0.78; g.fillStyle = '#2f6e58'; g.fillRect(x0, y0, wd, 4);
+    g.fillStyle = '#245a4a'; g.fillRect(x0, y0 + 4, wd, dp - 4);
+    g.globalAlpha = 0.5; g.fillStyle = '#183c34'; g.fillRect(x0, y0 + dp - 4, wd, 4);
+    g.globalAlpha = 0.9; g.fillStyle = '#8fd0b0';
+    for (let x = 0; x < wd; x += 2) if (Math.sin((q.x + x) * 0.35 + w.t * 2.6) > 0.45) g.fillRect(x0 + x, y0, 2, 1);
+    g.globalAlpha = 0.5; g.fillStyle = '#d8fff0';
+    for (let k = 0; k < wd - 6; k += 19) { const sx = (k * 7 + Math.floor(w.t * 3) * 2) % (wd - 6); g.fillRect(x0 + sx, y0 + 4 + (k % 2) * 4, 4, 1); }
+    g.globalAlpha = 0.35; g.fillStyle = '#0e2620'; g.fillRect(x0, y0, 1, dp); g.fillRect(x0 + wd - 1, y0, 1, dp);   // sombra rente às margens
     g.globalAlpha = 1;
   }
 }
@@ -2263,8 +2294,9 @@ function render(w) {
       g.fillStyle = '#e63946'; g.fillRect(d > 0 ? x : x + 11, y - 1, 2, 4);
     } else if (q.type === 'flame') {   // a bola de fogo em si: miolo quente (o corpo vem das labaredas)
       const k = clamp(1 - q.life / (q.max || 0.44), 0, 1), r = 2.5 + k * 1.5;
-      g.drawImage(fireDisc(r, k < 0.5 ? '#ffd84a' : '#ffaa2e', k < 0.5 ? '#ffffff' : '#fff3a8'), Math.round((x + 3) * HR - r * HR) / HR, Math.round((y + 3) * HR - r * HR) / HR, r * 2, r * 2);
-      g.globalCompositeOperation = 'lighter'; drawGlow(g, x + 3, y + 3, 12, '#ff7a2a', 0.4 * (1 - k * 0.5)); g.globalAlpha = 1; g.globalCompositeOperation = 'source-over';
+      const fb = firePal(q.blue);
+      g.drawImage(fireDisc(r, k < 0.5 ? fb.ball[0] : fb.ball[1], k < 0.5 ? fb.ball[2] : fb.ball[3]), Math.round((x + 3) * HR - r * HR) / HR, Math.round((y + 3) * HR - r * HR) / HR, r * 2, r * 2);
+      g.globalCompositeOperation = 'lighter'; drawGlow(g, x + 3, y + 3, 12, fb.glow, 0.4 * (1 - k * 0.5)); g.globalAlpha = 1; g.globalCompositeOperation = 'source-over';
     } else if (q.type === 'bomb') {
       blob(g, x + 3, y + 3, 3.4, 3.4, '#2a2a38', '#6a6a88', '#14141c');
       g.fillStyle = '#ffe27a'; g.fillRect(x + 4, y - 2, 1, 2); g.fillStyle = Math.floor(w.t * 20) % 2 ? '#ff5a2a' : '#ffe94d'; g.fillRect(x + 4, y - 3, 2, 1);
@@ -2298,7 +2330,7 @@ function render(w) {
       g.globalAlpha = 1;
     } else if (f.type === 'ring') {
       const prog = 1 - f.t / f.max, r = f.r * (0.3 + prog * 0.9);
-      g.globalAlpha = 1 - prog; g.strokeStyle = f.col || '#ffd27a'; g.lineWidth = 2;
+      g.globalAlpha = 1 - prog; g.strokeStyle = f.col || f.tint || '#ffd27a'; g.lineWidth = 2;
       g.beginPath(); g.ellipse(Math.round(f.x - cx), Math.round(f.y - cy), r, f.col ? r * 0.35 : r, 0, 0, 7); g.stroke(); g.globalAlpha = 1;
     } else if (f.type === 'coinpop') {
       g.globalAlpha = clamp(f.t / f.max * 2, 0, 1); g.drawImage(ICON.coin[Math.floor(w.t * 14) & 3], Math.round(f.x - 5 - cx), Math.round(f.y - 5 - cy)); g.globalAlpha = 1;
@@ -2364,7 +2396,7 @@ function render(w) {
 // Ícones das habilidades (26x26 de alta resolução)
 const _skIcons = {};
 function skillIcon(p, i) {
-  const id = p.cls.id, el = id === 'mago' ? (p.elem !== undefined ? p.elem : p.ch.elem) || 0 : 0, key = id + i + el;
+  const id = p.cls.id, el = id === 'mago' ? (p.elem !== undefined ? p.elem : p.ch.elem) || 0 : 0, blue = !!p.blue, key = id + i + el + (blue ? 'b' : '');
   if (_skIcons[key]) return _skIcons[key];
   const g = new PX(26, 26);
   const Y = '#ffd23f';
@@ -2394,9 +2426,11 @@ function skillIcon(p, i) {
       g.poly([[22, 12], [17, 6], [14, 14]], '#ffffff', { depth: 0, flat: true });
     }
   } else {
+    // sopro e mergulho: laranja, ou azul com a Chama Azul (venceu o Dragão de Magma)
+    const F = blue ? ['#1f8aff', '#6ad8ff', '#1a2a9a', '#c8f4ff', '#3ab8ff', '#2a6aff', '#12207a'] : ['#ff7a1f', '#ffc24a', '#a02a0a', '#ffe27a', '#ffb04a', '#ff5a2a', '#8a1a0a'];
     if (i === 0) { for (const dx of [-6, 0, 6]) g.poly([[10 + dx, 3], [16 + dx, 3], [12 + dx, 23], [9 + dx, 23]], '#ffd27a', { hi: '#fff6c8', lo: '#c2561a', depth: 1 }); }
-    else if (i === 1) { g.poly([[2, 13], [22, 3], [24, 8], [24, 18], [22, 23]], '#ff7a1f', { hi: '#ffc24a', lo: '#a02a0a', depth: 2 }); g.poly([[4, 13], [18, 9], [20, 13], [18, 17]], '#ffe27a', { hi: '#ffffff', lo: '#ffb04a', depth: 1 }); }
-    else { g.poly([[13, 24], [4, 8], [10, 10], [13, 2], [16, 10], [22, 8]], '#ff5a2a', { hi: '#ffc24a', lo: '#8a1a0a', depth: 2 }); g.poly([[13, 20], [9, 10], [13, 12], [17, 10]], '#ffe27a', { hi: '#ffffff', lo: '#ff9a2a', depth: 1 }); }
+    else if (i === 1) { g.poly([[2, 13], [22, 3], [24, 8], [24, 18], [22, 23]], F[0], { hi: F[1], lo: F[2], depth: 2 }); g.poly([[4, 13], [18, 9], [20, 13], [18, 17]], F[3], { hi: '#ffffff', lo: F[4], depth: 1 }); }
+    else { g.poly([[13, 24], [4, 8], [10, 10], [13, 2], [16, 10], [22, 8]], F[5], { hi: F[1], lo: F[6], depth: 2 }); g.poly([[13, 20], [9, 10], [13, 12], [17, 10]], F[3], { hi: '#ffffff', lo: F[4], depth: 1 }); }
   }
   return (_skIcons[key] = outline(g.toCanvas(), INK));
 }
@@ -2423,7 +2457,8 @@ function drawHud(g, w) {
   if (w.local) drawTextO(g, 'P1', 24, 24, LOCAL_COLS[0]);
   // corações (mais apertados quando a vida máxima cresce)
   const hx = 45, hs = p.maxHp > 7 ? 7 : 9;
-  for (let i = 0; i < p.maxHp; i++) g.drawImage(i < p.hp ? ICON.heart : ICON.heartEmpty, hx + i * hs, 3);
+  if (w.rule === 'glass') drawGlassHeart(g, w, hx, 3, p.dead || w.state === 'fail');   // coração de vidro: um só (um dano e acabou)
+  else for (let i = 0; i < p.maxHp; i++) g.drawImage(i < p.hp ? ICON.heart : ICON.heartEmpty, hx + i * hs, 3);
   let y = 14;
   const bw = 52;
   if (p.cls.mana) {
@@ -2451,9 +2486,9 @@ function drawHud(g, w) {
   y += 3;                                                   // folga em cima para as labaredas
   const sfr = clamp((p.sp || 0) / SPECIAL_MAX, 0, 1), full = sfr >= 1, fw = Math.round(bw * sfr), bh = 5;
   if (full) {
-    g.globalCompositeOperation = 'lighter'; drawGlow(g, hx + bw / 2, y + 2, 30, '#ff9a2a', 0.34 + Math.sin(w.t * 7) * 0.1); g.globalAlpha = 1; g.globalCompositeOperation = 'source-over';
+    g.globalCompositeOperation = 'lighter'; drawGlow(g, hx + bw / 2, y + 2, 30, p.blue ? '#3a9aff' : '#ff9a2a', 0.34 + Math.sin(w.t * 7) * 0.1); g.globalAlpha = 1; g.globalCompositeOperation = 'source-over';
     // labaredas em volta: em cima da barra inteira e mais altas nas pontas
-    pixelFire(g, hx - 3, y, bw + 6, 9, w.t, 0, i => { const d = Math.min(i, bw + 5 - i); return d < 3 ? 0.5 + d * 0.15 : 0.6 + fnoise(i * 0.3, fireT(w.t) * 0.5) * 0.4; });
+    pixelFire(g, hx - 3, y, bw + 6, 9, w.t, 0, i => { const d = Math.min(i, bw + 5 - i); return d < 3 ? 0.5 + d * 0.15 : 0.6 + fnoise(i * 0.3, fireT(w.t) * 0.5) * 0.4; }, 0.36, 0, spFire(p));
   }
   g.fillStyle = '#0e0a14'; g.fillRect(hx - 1, y - 1, bw + 2, bh + 2);
   g.fillStyle = '#4a3a1a'; g.fillRect(hx, y, bw, bh);
@@ -2464,7 +2499,7 @@ function drawHud(g, w) {
     // moldura em brasa, brilho que corre pela barra e fagulhas subindo
     const tt = fireT(w.t);
     for (let i = -1; i <= bw; i++) {
-      g.fillStyle = SP_FIRE[1 + Math.floor(fnoise(i * 0.5 + tt * 2, 3) * 2.99)]; g.fillRect(hx + i, y + bh, 1, 1);
+      g.fillStyle = spFire(p)[1 + Math.floor(fnoise(i * 0.5 + tt * 2, 3) * 2.99)]; g.fillRect(hx + i, y + bh, 1, 1);
       if (i < 0 || i === bw) g.fillRect(hx + i, y - 1, 1, bh + 2);
     }
     const sx = Math.floor((w.t * 46) % (bw + 30)) - 8;
@@ -2472,13 +2507,13 @@ function drawHud(g, w) {
     for (let k = 1; k < bh - 1; k++) { const a = Math.max(0, sx - k), b = Math.min(bw, sx - k + 5); if (b > a) g.fillRect(hx + a, y + k, b - a, 1); }
     for (let k = 0; k < 5; k++) {
       const ph = (w.t * 0.9 + k * 0.37) % 1, ex = hx + Math.floor(hash2(k, Math.floor(w.t * 0.9 + k * 0.37), 5) * bw);
-      g.fillStyle = ph < 0.5 ? '#fff3a8' : '#ff7f1f'; g.fillRect(ex + Math.round(Math.sin(ph * 9 + k) * 1.5), y - 3 - Math.round(ph * 9), 1, 1);
+      g.fillStyle = spFire(p)[ph < 0.5 ? 3 : 1]; g.fillRect(ex + Math.round(Math.sin(ph * 9 + k) * 1.5), y - 3 - Math.round(ph * 9), 1, 1);
     }
     const lb = spLabel(w, p);
     if (lb) drawKeyCap(g, lb, hx + bw + 6, y - 2, w.t);
   } else if (sfr >= 0.5) {
     // quase lá: uma chaminha na ponta do preenchimento, crescendo conforme enche
-    pixelFire(g, hx + fw - 3, y, 5, Math.round(2 + (sfr - 0.5) * 8), w.t, 9, i => 1 - Math.abs(i - 2) * 0.3);
+    pixelFire(g, hx + fw - 3, y, 5, Math.round(2 + (sfr - 0.5) * 8), w.t, 9, i => 1 - Math.abs(i - 2) * 0.3, 0.36, 0, spFire(p));
   }
   // habilidades (no celular elas aparecem nos próprios botões da tela)
   if (!document.body.classList.contains('touch')) {
@@ -2511,7 +2546,8 @@ function drawHud(g, w) {
     drawPlate(g, x, ty, 11, 11); g.drawImage(q.spr.face(), x, ty, 11, 11);
     const qi = w.players.indexOf(q);
     drawText(g, w.local ? 'P' + (qi + 1) + ' ' + tagName(q.ch.name).slice(0, 4) : tagName(q.ch.name).slice(0, 6), x + 14, ty, w.local ? LOCAL_COLS[qi % 4] : q.ch.accent || '#fff');
-    for (let i = 0; i < q.maxHp; i++) { g.fillStyle = i < q.hp ? '#e63946' : '#3a2a40'; g.fillRect(x + 14 + i * 4, ty + 7, 3, 3); }
+    if (w.rule === 'glass') { g.fillStyle = q.dead ? '#3a2a40' : '#8fd8f0'; g.fillRect(x + 14, ty + 7, 3, 3); }
+    else for (let i = 0; i < q.maxHp; i++) { g.fillStyle = i < q.hp ? '#e63946' : '#3a2a40'; g.fillRect(x + 14 + i * 4, ty + 7, 3, 3); }
     const qs = clamp((q.sp || 0) / SPECIAL_MAX, 0, 1);       // especial (e mana, de quem usa)
     g.fillStyle = '#4a3a1a'; g.fillRect(x + 14, ty + 11, 28, 1); g.fillStyle = qs >= 1 ? '#fff2a0' : '#e0a020'; g.fillRect(x + 14, ty + 11, Math.round(28 * qs), 1);
     if (q.cls.mana) { g.fillStyle = '#23306a'; g.fillRect(x + 14, ty + 13, 28, 1); g.fillStyle = '#4aa3ff'; g.fillRect(x + 14, ty + 13, Math.round(28 * q.mana / q.maxMana), 1); }
@@ -2592,6 +2628,8 @@ function levelResult(r) {
   const old = sv.best[id] || { coins: 0, stars: 0 };
   sv.best[id] = { coins: Math.max(old.coins, r.coins), stars: Math.max(old.stars, r.stars) };
   if (!LEVELS[r.idx].extra) sv.unlocked = Math.max(sv.unlocked, r.idx + 2);   // as fases extras não mexem na campanha
+  // venceu os 7 desafios da Dimensão Prisma: libera a skin de cristal para a classe deste herói
+  if (LEVELS[r.idx].extra && crysUnlock(sv, (sv.char || DEFAULT_CHAR).cls)) r.newSkin = (sv.char || DEFAULT_CHAR).cls;
   // cristal achado nesta fase: fica guardado no herói
   if (r.gem && gemById(r.gem)) { sv.cris = crisOf(sv); if (!sv.cris.includes(r.gem)) { sv.cris.push(r.gem); r.newGem = r.gem; } }
   // o que se ganhou na fase fica guardado: moedas na carteira, XP no herói, vidas extras para a próxima fase

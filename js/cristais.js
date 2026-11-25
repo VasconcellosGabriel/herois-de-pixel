@@ -131,6 +131,24 @@ function drawGoalLock(g, w, x, y) {
   g.fillStyle = '#c8c0e0'; g.fillRect(x - 3, y - 30, 6, 2); g.fillRect(x - 3, y - 30, 1, 5); g.fillRect(x + 2, y - 30, 1, 5);
   g.fillStyle = '#ffd23f'; g.fillRect(x - 4, y - 25, 8, 7); g.fillStyle = '#7a5a10'; g.fillRect(x - 1, y - 23, 2, 3);
 }
+// regra 'glass': o HUD mostra um único coração de vidro (brilho passando); quebrado, vira cacos
+function drawGlassHeart(g, w, x, y, broken) {
+  if (broken) {
+    g.drawImage(ICON.heartEmpty, x, y);
+    g.fillStyle = '#8fd8f0'; g.fillRect(x + 4, y + 1, 1, 2); g.fillRect(x + 3, y + 3, 1, 2); g.fillRect(x + 4, y + 5, 1, 2);   // a rachadura
+    const k = Math.min(1, (FAIL_T - (w.overT || 0)) * 2);                 // cacos caindo
+    g.fillStyle = '#d4f4ff'; g.fillRect(x - 1, Math.round(y + 3 + k * 6), 1, 1); g.fillRect(x + 8, Math.round(y + 2 + k * 8), 1, 1); g.fillRect(x + 6, Math.round(y + 7 + k * 5), 1, 1);
+    return;
+  }
+  const s = (w.t * 0.8) % 2;                                             // brilho atravessando de tempo em tempo
+  if (s >= 1) { g.drawImage(ICON.heartGlass, x, y); return; }
+  const cv = _glassCv || (_glassCv = mk(ICON.heartGlass.width, ICON.heartGlass.height)), c = cv.getContext('2d'), gx = Math.floor(s * 14) - 4;
+  c.globalCompositeOperation = 'copy'; c.drawImage(ICON.heartGlass, 0, 0);
+  c.globalCompositeOperation = 'source-atop'; c.fillStyle = '#ffffff';
+  for (let j = 0; j < 9; j++) c.fillRect(gx + j, 8 - j, 2, 1);           // faixa diagonal só sobre o coração
+  g.drawImage(cv, x, y);
+}
+let _glassCv = null;
 // linha da regra no HUD (embaixo, no centro) e o aviso de regra quebrada
 function drawRuleHud(g, w) {
   const R = w.rule && RULES[w.rule];
@@ -326,3 +344,63 @@ addEventListener('keydown', e => {
 });
 $('#b-pz-play').addEventListener('click', () => { Snd.init(); pzPlay(); });
 $('#b-prisma-back').addEventListener('click', () => { Snd.sfx('click'); goLevels(); });
+
+// --- Fim da Dimensão Prisma: depois de vencer o 7º desafio, uma tela própria antes da tela de vitória ---
+// O herói pula de alegria numa ilha, com os 7 cristais girando em volta, raios de arco-íris e o fundo passando pelas 7 cores.
+const PzEnd = { t: 0, spr: null, sparks: [] };
+function openPrismaEnd(r) {
+  const sv = Game.save, ch = { ...DEFAULT_CHAR, ...(sv.char || {}) };
+  PzEnd.t = 0; PzEnd.sparks.length = 0; PzEnd.spr = buildPlayerSprites(ch);
+  let stars = 0;
+  $('#pze-rules').innerHTML = EXTRA.map((idx, k) => {
+    const lv = LEVELS[idx], R = RULES[lv.rule], st = (sv.best[lv.id] && sv.best[lv.id].stars) | 0; stars += st;
+    return `<li style="--c:${CRISTAIS[k].cor[2]}"><span>${R.icon} ${R.nome}</span><b>${'★'.repeat(st)}<i>${'★'.repeat(3 - st)}</i></b></li>`;
+  }).join('');
+  $('#pze-text').innerHTML = `${Net.role || Local.on ? 'Vocês cumpriram' : 'Você cumpriu'} os 7 desafios!<br>Os cristais reconhecem <b>${String(ch.name || 'o herói').replace(/[<>&"]/g, '')}</b> como mestre da Dimensão Prisma.<br><small>Estrelas: ${stars}/${EXTRA.length * 3}</small>`;
+  Previews.length = 0; Previews.push({ cv: $('#pze-cv'), draw: drawPrismaEnd });
+  show('pzend');
+  Snd.sfx('ready');
+  const b = $('#b-pze-go'); if (!document.body.classList.contains('touch')) b.focus({ preventScroll: true });
+}
+let _pzeLast = 0;
+function drawPrismaEnd(cv, now) {
+  const dt = clamp(now - (_pzeLast || now), 0, 0.1); _pzeLast = now; PzEnd.t += dt;
+  const g = cv.getContext('2d'), t = PzEnd.t, cx = 160, cy = 104;
+  g.setTransform(HR, 0, 0, HR, 0, 0); g.imageSmoothingEnabled = false;
+  // fundo: passa pelas 7 cores da dimensão, misturando uma na outra
+  const per = 2.6, k = Math.floor(t / per) % 7, f = clamp((t % per) / 0.8, 0, 1);
+  pzBg(g, bgOf('prisma' + ((k + 6) % 7 + 1)), t * 10, 1);
+  pzBg(g, bgOf('prisma' + (k + 1)), t * 10, f);
+  g.fillStyle = 'rgba(6,4,14,.45)'; g.fillRect(0, 0, BGW, BGH);
+  // raios de arco-íris girando atrás do herói
+  g.globalCompositeOperation = 'lighter';
+  for (let i = 0; i < 14; i++) {
+    const a = t * 0.35 + i * Math.PI / 7, a2 = a + 0.13;
+    g.globalAlpha = 0.13 + Math.sin(t * 2 + i) * 0.04; g.fillStyle = RAINBOW[i % 7];
+    g.beginPath(); g.moveTo(cx, cy - 20); g.lineTo(cx + Math.cos(a) * 260, cy - 20 + Math.sin(a) * 260); g.lineTo(cx + Math.cos(a2) * 260, cy - 20 + Math.sin(a2) * 260); g.fill();
+  }
+  drawGlow(g, cx, cy - 20, 60, '#ffffff', 0.25 + Math.sin(t * 3) * 0.05);
+  g.globalAlpha = 1; g.globalCompositeOperation = 'source-over';
+  // ilha
+  const isle = pzIsle(k, true), bob = Math.round(Math.sin(t * 1.6) * 2);
+  g.drawImage(isle, cx - isle.width / HR / 2, cy - 13 + bob, isle.width / HR, isle.height / HR);
+  // cristais em órbita: os de trás antes do herói, os da frente depois
+  const gems = CRISTAIS.map((c, i) => { const a = t * 0.9 + i * Math.PI * 2 / 7; return { c, x: cx + Math.cos(a) * 74, y: cy - 26 + Math.sin(a) * 20 + Math.sin(t * 3 + i) * 2, z: Math.sin(a) }; });
+  const gem = q => {
+    g.globalCompositeOperation = 'lighter'; drawGlow(g, q.x, q.y, 14, q.c.cor[1], 0.3 + q.z * 0.12); g.globalAlpha = 1; g.globalCompositeOperation = 'source-over';
+    const img = gemImg(q.c.id); g.globalAlpha = q.z < 0 ? 0.7 : 1; g.drawImage(img, Math.round(q.x - img.width / 2), Math.round(q.y - img.height / 2)); g.globalAlpha = 1;
+  };
+  gems.filter(q => q.z < 0).forEach(gem);
+  // herói pulando de alegria
+  const spr = PzEnd.spr, ph = t % 1.4, air = ph < 0.55, hop = air ? Math.sin(ph / 0.55 * Math.PI) * 18 : 0;
+  const img = air ? spr.get('jump', ph < 0.27 ? 0 : 2) : spr.get('idle', Math.floor(t * 3.5) % 4);
+  g.fillStyle = 'rgba(6,4,14,.4)'; g.fillRect(cx - 6 + Math.round(hop / 6), cy + bob, 12 - Math.round(hop / 3), 2);
+  g.drawImage(img, cx - 24, Math.round(cy + bob - 44 - hop), 48, 48);
+  gems.filter(q => q.z >= 0).forEach(gem);
+  // faíscas coloridas subindo
+  if (Math.random() < dt * 30) PzEnd.sparks.push({ x: Math.random() * BGW, y: BGH + 2, v: 12 + Math.random() * 24, c: RAINBOW[(Math.random() * 7) | 0], l: 0 });
+  for (const s of PzEnd.sparks) { s.y -= s.v * dt; s.l += dt; g.fillStyle = s.c; g.globalAlpha = (Math.sin(s.l * 9) > -0.3) ? 0.9 : 0.3; g.fillRect(Math.round(s.x + Math.sin(s.l * 2 + s.v) * 3), Math.round(s.y), 1, 1); }
+  g.globalAlpha = 1;
+  PzEnd.sparks = PzEnd.sparks.filter(s => s.y > -4);
+}
+$('#b-pze-go').addEventListener('click', () => { Snd.sfx('click'); Previews.length = 0; show('win'); });

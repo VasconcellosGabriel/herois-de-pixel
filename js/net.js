@@ -7,7 +7,7 @@
 // (sem reenvio e fora de ordem) para as fotos e posições: um pacote perdido no Wi-Fi não segura os seguintes.
 // O servidor público e gratuito do PeerJS só apresenta os aparelhos um ao outro; depois a conexão é direta
 // (ou passa por um "relay" TURN gratuito do PeerJS quando a rede não permite a ligação direta).
-const PROTO = 11, MAX_PLAYERS = 4, SNAP_EVERY = 2, FAST_ID = 100;
+const PROTO = 12, MAX_PLAYERS = 4, SNAP_EVERY = 2, FAST_ID = 100;
 const ID_PREFIX = 'heroisdepixel-v1-', CODE_CHARS = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789', CODE_LEN = 5;
 const PEERJS_URLS = ['https://cdnjs.cloudflare.com/ajax/libs/peerjs/1.5.4/peerjs.min.js', 'https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js'];
 
@@ -30,8 +30,8 @@ const PF = ['x', 'y', 'vx', 'vy', 'face', 'hp', 'maxHp', 'mana', 'manaDelay', 'a
   'maxMana', 'sp', 'xpGot', 'h', 'crouch', 'flamer', 'flameDir', 'ep', 'diveWait', 'elem', 'arrows'];
 // campos do corpo que o convidado prevê no próprio herói (não vêm do anfitrião enquanto ele anda livre)
 const OWN_BODY = new Set(['x', 'y', 'vx', 'vy', 'face', 'ground', 'h', 'crouch', 'glide', 'landT', 'flipT', 'block']);
-const EF = ['x', 'y', 'vx', 'vy', 'dir', 'hp', 'flash', 'sq', 'hurt', 'slow', 'stun', 'st', 't', 'throwT', 'ground', 'sts.burn', 'sts.poison', 'sts.freeze'];
-const QF = ['type', 'x', 'y', 'vx', 'vy', 'g', 'life', 'eli', 'stuck'];
+const EF = ['x', 'y', 'vx', 'vy', 'dir', 'hp', 'flash', 'sq', 'hurt', 'slow', 'stun', 'st', 't', 'throwT', 'ground', 'sts.burn', 'sts.poison', 'sts.freeze', 'burnBlue'];
+const QF = ['type', 'x', 'y', 'vx', 'vy', 'g', 'life', 'eli', 'stuck', 'blue'];
 const RF = ['type', 'x', 'y', 'vx', 'vy', 'g', 'rot', 'w', 'h'];
 const WF = ['state', 'lives', 'coinsGot', 'nextLife', 'bossActive', 'cine', 'lifeT', 'gemGot', 'ruleN', 'failWhy', 'overT'];   // clarão/tremida vão por evento, só para quem causou
 const SMOOTH = new Set(['x', 'y']);    // posições: o convidado desliza até elas em vez de pular
@@ -112,6 +112,9 @@ function cleanChar(ch) {
     else if (typeof c[k] === 'number') { if (Number.isInteger(v) && v >= 0 && v < (nOpts[k] || 1)) c[k] = v; }
     else if (typeof v === 'string' && /^#[0-9a-f]{6}$/i.test(v)) c[k] = v;
   }
+  const cr = crystalParts(src).slice(0, CRYS_PARTS.length);                  // partes de cristal (skin dos desafios)
+  if (cr.length) c.crys = cr;
+  if (Number.isInteger(src.crysCor) && src.crysCor >= 0 && src.crysCor < CRISTAIS.length) c.crysCor = src.crysCor;
   return c;
 }
 function playerById(w, id) { return w && w.players.find(p => p.id === id); }

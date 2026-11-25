@@ -1142,6 +1142,12 @@ ICON.heart = fromMap(['.##.##.', '#######', '#######', '.#####.', '..###..', '..
   outline(ICON.heart, INK);
   ICON.heartEmpty = fromMap(['.##.##.', '#######', '#######', '.#####.', '..###..', '...#...'], { '#': '#3a2a3a' });
   outline(ICON.heartEmpty, INK);
+  // coração de vidro (regra 'glass' da Dimensão Prisma): azul claro, transparente e com brilho
+  ICON.heartGlass = fromMap(['.##.##.', '#######', '#######', '.#####.', '..###..', '...#...'], { '#': '#8fd8f0' });
+  { const v = ICON.heartGlass.getContext('2d'); v.fillStyle = '#ffffff'; v.fillRect(1, 1, 2, 1); v.fillRect(1, 2, 1, 1);
+    v.fillStyle = '#d4f4ff'; v.fillRect(4, 1, 1, 1); v.fillRect(2, 3, 1, 1);
+    v.fillStyle = '#4f9fc8'; v.fillRect(5, 3, 1, 1); v.fillRect(4, 4, 1, 1); v.fillRect(3, 5, 1, 1);
+    outline(ICON.heartGlass, '#1c3a5a'); }
   ICON.heartHalf = mk(9, 8); const h = ICON.heartHalf.getContext('2d');
   h.drawImage(ICON.heartEmpty, 0, 0); h.drawImage(ICON.heart, 0, 0, 5, 8, 0, 0, 5, 8);
   ICON.potion = fromMap(['..###..', '...#...', '..###..', '.#####.', '#######', '#######', '#######', '.#####.'], { '#': '#4aa3ff' });

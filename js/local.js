@@ -44,7 +44,7 @@ function localStart() {
 function localRoster() {
   return Local.slots.map((s, i) => {
     const ch = { ...slotChar(s) }, pr = progOf(ch.cls);
-    return { id: i, ch, dev: s.dev, b: i === 0 && s.pick < 0 ? myBuild() : { st: { ...pr.st }, up: { ...pr.up }, sp: 0 } };
+    return { id: i, ch, dev: s.dev, b: i === 0 && s.pick < 0 ? myBuild() : { st: { ...pr.st }, up: { ...pr.up }, sp: 0, blue: blueFireOwned() } };
   });
 }
 const _lcFaces = {};

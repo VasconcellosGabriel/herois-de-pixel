@@ -269,11 +269,33 @@ ENEMY_PRE.geode = (g, e, cx, cy, w) => {
 };
 // projéteis: lasca rasteira, marca no chão (aviso) e espinho de cristal brotando
 EPROJ_DRAW.cshard = (g, q, x, y, w) => { const C = gemOfTheme(w.th); g.fillStyle = C[1]; g.fillRect(x, y + 1, 6, 3); g.fillRect(x + 1, y, 4, 5); g.fillStyle = C[3]; g.fillRect(x + 1, y + 1, 2, 1); g.fillStyle = C[0]; g.fillRect(x + 3, y + 3, 2, 1); };
+// Cores do aviso: o oposto, no círculo de cores, do cristal da fase (verde -> magenta, azul -> laranja...), bem saturado.
+// Na fase do cristal branco (sem cor) vai um vermelho-rosado. Assim a marca nunca se confunde com o cenário.
+const _warnC = {};
+function warnColors(th) {
+  const C = gemOfTheme(th);
+  if (_warnC[C[1]]) return _warnC[C[1]];
+  const [h, sat] = rgb2hsl(...hexToRgb(C[1])), hh = sat < 0.25 ? 0.96 : (h + 0.5) % 1, tone = l => rgbToHex(...hsl2rgb(hh, 1, l));
+  return (_warnC[C[1]] = [tone(0.2), tone(0.5), tone(0.7), '#ffffff']);
+}
+// marca no chão onde o espinho vai brotar: faixa escura de base, faixa de aviso piscando (cor oposta <-> branco),
+// pontas de espinho subindo e um brilho da mesma cor; acelera perto de brotar
 EPROJ_DRAW.cmark = (g, q, x, y, w) => {
-  const C = gemOfTheme(w.th), k = Math.floor(q.rot * 2.5);
-  g.globalCompositeOperation = 'lighter'; drawGlow(g, x + q.w / 2, y + 2, 12, C[2], 0.35 + (k % 2) * 0.25); g.globalAlpha = 1; g.globalCompositeOperation = 'source-over';
-  g.fillStyle = C[2]; g.fillRect(x, y + 2, q.w, 1);
-  for (let i = 0; i < 4; i++) { const h = 1 + ((i + k) % 3); g.fillStyle = i % 2 ? C[3] : C[1]; g.fillRect(x + 2 + i * 4, y + 2 - h, 1, h); }
+  const A = warnColors(w.th), left = q.life !== undefined ? q.life : 0.65, k = Math.floor(q.rot * (left < 0.3 ? 9 : 5)), on = k % 2 === 0, cx = x + q.w / 2;
+  // poça de luz no chão (pintada por cima: aparece até em fundo claro) e brilho somado
+  g.globalAlpha = on ? 0.55 : 0.35; g.fillStyle = A[1];
+  for (let j = 0; j < 4; j++) { const hw = Math.round(q.w / 2 + 6 - j * 2); g.fillRect(Math.round(cx - hw), y + 3 - j, hw * 2, 1); }
+  g.globalAlpha = 1;
+  g.globalCompositeOperation = 'lighter'; drawGlow(g, cx, y, 18, A[1], on ? 0.8 : 0.5); g.globalAlpha = 1; g.globalCompositeOperation = 'source-over';
+  g.fillStyle = '#12081a'; g.fillRect(x - 2, y, q.w + 4, 4);                                            // base escura: contorno em qualquer chão
+  g.fillStyle = on ? A[1] : A[3]; g.fillRect(x - 1, y + 1, q.w + 2, 2);
+  g.fillStyle = on ? A[2] : A[1]; g.fillRect(x, y + 1, q.w, 1);
+  for (let i = 0; i < 4; i++) {                                                                        // pontas: o espinho vem daqui
+    const px = x + 1 + i * 4, h = 3 + ((i + k) % 3);
+    g.fillStyle = '#12081a'; g.fillRect(px - 1, y + 1 - h, 4, h);
+    g.fillStyle = on ? A[1] : A[2]; g.fillRect(px, y + 1 - h, 2, h);
+    g.fillStyle = A[3]; g.fillRect(px, y + 1 - h, 1, 1);
+  }
 };
 EPROJ_DRAW.cspike = (g, q, x, y, w) => {
   const C = gemOfTheme(w.th), k = Math.min(1, q.rot / 0.8), bot = y + q.h;

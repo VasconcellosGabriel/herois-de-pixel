@@ -78,6 +78,18 @@ h2 { font-size: clamp(12px, 2.6vw, 18px); margin: 0 0 10px; color: var(--acc); }
 .pz-node { position: absolute; width: 11%; height: 24%; transform: translate(-50%, -50%); background: transparent; border: 0; padding: 0; border-radius: 50%; cursor: pointer; }
 .pz-node:disabled { cursor: not-allowed; }
 .pz-node:focus { outline: none; }
+/* Fim da Dimensão Prisma: os 7 desafios cumpridos (openPrismaEnd em js/cristais.js) */
+.panel.pzend { background: linear-gradient(160deg, #20163a, #2a1a48 50%, #142a40); display: grid; grid-template-columns: auto minmax(220px, 300px); grid-template-areas: 't t' 'c p' 'c r' 'c b'; gap: 6px 16px; align-items: start; max-width: 96vw; }
+.pzend h2 { grid-area: t; background: linear-gradient(90deg, #ff6a6a, #ffd23f, #7bff9a, #6fd8ff, #b48aff, #ff8ae0); -webkit-background-clip: text; background-clip: text; color: transparent; animation: pze-glow 2s ease-in-out infinite; }
+@keyframes pze-glow { 50% { filter: brightness(1.35) drop-shadow(0 0 6px #fff6); } }
+#pze-cv { grid-area: c; width: min(560px, 58vw, calc((100vh - 110px) * 32 / 15)); height: auto; border: 4px solid var(--line); background: #06040e; image-rendering: pixelated; image-rendering: crisp-edges; }
+#pze-text { grid-area: p; margin: 0; font-size: 10px; line-height: 1.7; text-align: left; }
+#pze-text b { color: #ffd23f; } #pze-text small { color: var(--mute); }
+#pze-rules { grid-area: r; list-style: none; margin: 0; padding: 0; font-size: 8px; text-align: left; }
+#pze-rules li { display: flex; justify-content: space-between; gap: 8px; padding: 3px 6px; border-left: 3px solid var(--c); background: #ffffff0d; margin-bottom: 2px; }
+#pze-rules b { color: var(--acc); font-weight: normal; white-space: nowrap; } #pze-rules i { color: #5b4f80; font-style: normal; }
+#b-pze-go { grid-area: b; justify-self: stretch; }
+@media (max-width: 700px) and (orientation: portrait) { .panel.pzend { grid-template-columns: 1fr; grid-template-areas: 't' 'c' 'p' 'r' 'b'; } #pze-cv { width: 100%; } }
 .gem-ico { image-rendering: pixelated; display: block; }
 /* ---------- Multiplayer local ---------- */
 #lc-slots { display: grid; gap: 8px; min-width: min(560px, 88vw); }

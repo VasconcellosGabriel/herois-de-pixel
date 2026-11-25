@@ -598,7 +598,7 @@ function renderUpgrades() {
   const ch = Game.save.char, cls = CLASSES[ch.cls], pr = progOf(ch.cls), coins = Game.save.coins || 0;
   $('#up-title').textContent = ch.name;
   $('#up-sub').textContent = `${cls.icon} ${cls.name} · Nível ${pr.lvl} · XP ${pr.xp}/${xpNeed(pr.lvl)} · ${heroStage(Game.save)}`;
-  $('#up-pts').textContent = pr.pts ? `(${pr.pts} ponto${pr.pts > 1 ? 's' : ''} para gastar)` : '(sem pontos)';
+  $('#up-pts').textContent = pr.pts ? `(${pr.pts} ponto${pr.pts > 1 ? 's' : ''} para gastar)` : statRoom(pr, ch.cls) ? '(sem pontos)' : '(atributos no máximo)';
   $('#up-coins').textContent = `(🪙 ${coins} moedas)`;
   const stats = $('#up-stats'); stats.innerHTML = '';
   for (const k in STAT_MAX) {

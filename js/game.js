@@ -98,12 +98,23 @@ function progOf(cls) {
   const pr = all[cls] || (all[cls] = {});
   pr.lvl = pr.lvl || 1; pr.xp = pr.xp || 0; pr.pts = pr.pts || 0;
   pr.st = { hp: 0, mana: 0, spd: 0, jump: 0, ...pr.st }; pr.up = { dmg: 0, a: 0, b: 0, c: 0, ...pr.up };
+  pr.pts = Math.min(pr.pts, statRoom(pr, cls));      // saves antigos: pontos que já não têm onde gastar somem
   return pr;
 }
-// soma XP e devolve quantos níveis subiu (cada nível = 1 ponto de atributo)
-function addXp(pr, n) {
+// quantos pontos ainda cabem nos atributos (mana só conta para quem usa mana)
+function statRoom(pr, cls) {
+  const c = CLASSES[cls]; let n = 0;
+  for (const k in STAT_MAX) if (k !== 'mana' || !c || c.mana) n += STAT_MAX[k] - ((pr.st && pr.st[k]) | 0);
+  return Math.max(0, n);
+}
+// soma XP e devolve quantos níveis subiu. Cada nível dá 1 ponto de atributo, enquanto houver atributo para melhorar
+// (com tudo no máximo o nível continua subindo, mas sem ponto). Sem cls (prévia durante a fase) conta só o nível.
+function addXp(pr, n, cls) {
   pr.xp += n; let ups = 0;
-  while (pr.xp >= xpNeed(pr.lvl)) { pr.xp -= xpNeed(pr.lvl); pr.lvl++; pr.pts++; ups++; }
+  while (pr.xp >= xpNeed(pr.lvl)) {
+    pr.xp -= xpNeed(pr.lvl); pr.lvl++; ups++;
+    if (!cls || pr.pts < statRoom(pr, cls)) pr.pts++;
+  }
   return ups;
 }
 // nível/XP "virtuais" durante a fase (o XP só é guardado ao completar a fase)
@@ -2587,9 +2598,10 @@ function levelResult(r) {
   sv.coins = (sv.coins || 0) + (r.coins | 0);
   sv.lives = clamp(r.lives | 0, START_LIVES, MAX_LIVES);
   const me = Net.role === 'client' ? Net.pid : 0, xp = (r.xp && r.xp[me]) | 0;
-  r.ups = addXp(progOf((sv.char || DEFAULT_CHAR).cls), xp); r.myXp = xp;
+  const myCls = (sv.char || DEFAULT_CHAR).cls;
+  r.ups = addXp(progOf(myCls), xp, myCls); r.myXp = xp;
   // multiplayer local: o XP dos outros heróis vai para a evolução da classe de cada um (mesmo aparelho, mesmo save)
-  if (r.local) for (const id in r.local) if (+id !== 0) addXp(progOf(r.local[id]), (r.xp[id] | 0));
+  if (r.local) for (const id in r.local) if (+id !== 0) addXp(progOf(r.local[id]), (r.xp[id] | 0), r.local[id]);
   // a barra do especial também passa para a próxima fase (cada jogador guarda a sua)
   if (r.sp) {
     sv.sp = clamp(r.sp[me] | 0, 0, SPECIAL_MAX);

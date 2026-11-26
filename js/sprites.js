@@ -1041,16 +1041,17 @@ function drawChar(ch, pose, f, o = {}) {
       g.poly(HP([[1, 2], [1, -9], [10, -2]]), hair, { hi: hairL, lo: hairD, depth: 1 }); g.poly(HP([[3, 0], [3, -5], [7, -1]]), '#f4a5b8', { depth: 0 });
       g.poly(HP([[12, -2], [20, -10], [23, 2]]), hair, { hi: hairL, lo: hairD, depth: 1 }); g.poly(HP([[15, -1], [19, -6], [21, 0]]), '#f4a5b8', { depth: 0 });
       break;
-    case 7: { // capuz pontudo: cobre a cabeça e deixa o rosto numa abertura com friso dourado
+    case 7: { // capuz justo: cobre a cabeça rente ao cabelo e deixa o rosto numa abertura com friso dourado;
+      // atrás, uma ponta curta de pano que cai sobre as costas (balança com o vento)
       const tip = Math.round(flow * 0.6);
-      const outer = polyTest(HP([[5, 20], [-1, 18], [-4, 12], [-4, 5], [-6, 1], [-10 - tip, -2], [-8 - tip, -5], [-3, -5], [1, -8], [6, -10], [12, -10], [18, -8], [22, -4], [25, 2], [25, 9], [24, 15], [21, 20], [14, 21]]));
+      const outer = polyTest(HP([[5, 20], [0, 18], [-2, 13], [-3, 9], [-7 - tip, 15], [-9 - tip, 16], [-6 - tip, 10], [-3, 3], [0, -2], [5, -5], [12, -6], [18, -4], [22, 0], [24, 4], [25, 9], [24, 15], [21, 20], [14, 21]]));
       const ox = hx0 + 15.5, oy = hy + 11.5, inOpen = (x, y, k) => Math.pow((x - ox) / (7.2 + k), 2) + Math.pow((y - oy) / (8.6 + k), 2) <= 1;
       const M = g.shape(hx0 - 12 - tip, hy - 10, hx0 + 26, hy + 22, (x, y) => outer(x, y) && !inOpen(x, y, 0), hc, { ...ho, round: 5, spec: hcS });
       g.shape(hx0 + 6, hy + 1, hx0 + 25, hy + 22, (x, y) => outer(x, y) && inOpen(x, y, 1.3) && !inOpen(x, y, 0), gold, { flat: true });   // friso
       g.shape(hx0 + 6, hy + 1, hx0 + 25, hy + 22, (x, y) => outer(x, y) && inOpen(x, y, 1.3) && !inOpen(x, y, 0) && (x - ox) + (y - oy) > 4, goldD, { flat: true });
       g.swap(M, hc, toneLo(hc, 0.2), (x, y) => (x < hx0 + 4 && y > hy + 3) || y > hy + 16);
-      g.line(hx0 + 4, hy - 6, hx0 + 13, hy - 8, hcL); g.line(hx0 + 14, hy - 8, hx0 + 19, hy - 6, hcL);
-      g.line(hx0 - 1, hy + 4, hx0 + 2, hy + 15, hcD); g.line(hx0 - 6 - tip, hy - 2, hx0 + 2, hy + 3, hcD); g.line(hx0 + 5, hy - 5, hx0 + 8, hy + 1, hcD);                     // dobras do tecido
+      g.line(hx0 + 4, hy - 3, hx0 + 12, hy - 5, hcL); g.line(hx0 + 13, hy - 5, hx0 + 18, hy - 3, hcL);
+      g.line(hx0, hy + 4, hx0 + 2, hy + 15, hcD); g.line(hx0 - 5 - tip, hy + 13, hx0 - 2, hy + 6, hcD); g.line(hx0 + 5, hy - 2, hx0 + 7, hy + 2, hcD);                     // dobras do tecido
       // pelerine do capuz sobre os ombros
       lay('capuz_ombro');
       const sh = TORSO_W[bld] / 2, mc = toneLo(hc, 0.12), mo = { hi: hc, lo: hcD, round: 3 };
@@ -1111,7 +1112,40 @@ function drawChar(ch, pose, f, o = {}) {
 
 // Conjunto de sprites com cache preguiçoso (só desenha a pose quando ela é usada).
 // Com as folhas PNG carregadas (js/spritepack.js), o herói é montado com elas; senão, desenhado por código.
+// Cada pose custa ~10 ms para montar (contorno pixel a pixel): o mesmo visual reaproveita o mesmo conjunto
+// em todas as fases, no título, no mapa e nas prévias, em vez de recomeçar do zero (engasgos no começo da fase).
+const _heroSets = new Map(), HERO_SETS_MAX = 16;
 function buildPlayerSprites(ch) {
+  const key = JSON.stringify(ch);
+  let s = _heroSets.get(key);
+  if (s) { _heroSets.delete(key); _heroSets.set(key, s); return s; }      // o mais usado fica por último (sai por último)
+  s = makePlayerSprites(JSON.parse(key));                                  // cópia: quem chamou pode mudar o objeto depois
+  _heroSets.set(key, s);
+  if (_heroSets.size > HERO_SETS_MAX) _heroSets.delete(_heroSets.keys().next().value);
+  return s;
+}
+// Monta as poses que faltam nos momentos livres do navegador (menus), para a fase não precisar montar na hora.
+// Pode ser chamada a cada quadro: não faz nada se já está montando ou se tudo já foi montado com as folhas atuais.
+const packGen = () => (typeof Pack !== 'undefined' ? Pack.gen : 0);
+function warmPlayerSprites(set) {
+  if (!set || set.warming || set.warmGen === packGen()) return;
+  set.warming = true;
+  const idle = window.requestIdleCallback ? (cb => requestIdleCallback(cb, { timeout: 2000 })) : (cb => setTimeout(() => { const t0 = performance.now(); cb({ timeRemaining: () => Math.max(0, 12 - (performance.now() - t0)), didTimeout: false }); }, 50));
+  let todo = null, gen = -1;
+  const step = dl => {
+    // folhas PNG ainda baixando: o que montasse agora seria refeito
+    if (typeof Pack !== 'undefined' && Pack.pend > 0) { idle(step); return; }
+    if (gen !== packGen()) { gen = packGen(); todo = []; for (const pose in POSES) for (let f = 0; f < POSES[pose]; f++) todo.push([pose, f]); }
+    // durante a fase não monta nada aqui (cada pose leva quase um quadro inteiro): só nos menus
+    if (typeof Game === 'undefined' || Game.mode !== 'play') {
+      let n = 0;
+      while (todo.length && (dl.timeRemaining() > 8 || (n === 0 && dl.didTimeout))) { const [p, f] = todo.shift(); set.get(p, f); n++; }
+    }
+    if (todo.length) idle(step); else { set.warming = false; set.warmGen = gen; }
+  };
+  idle(step);
+}
+function makePlayerSprites(ch) {
   const cache = {};
   return {
     ch,

@@ -1,7 +1,7 @@
 // Gerado por tools/exportar-sprites.js — lista das folhas PNG dos heróis (ver sprites/LEIA-ME.md)
 // "versao" muda a cada exportação para o navegador não usar folhas antigas do cache.
 const SPRITE_PACK = {
-  versao: 14,
+  versao: 15,
   canais: [{"canal":"skin","nome":"Pele","matiz":0,"base":"#b30000"},{"canal":"hairColor","nome":"Cabelo","matiz":27,"base":"#b35000"},{"canal":"primary","nome":"Roupa (principal)","matiz":54,"base":"#b3a100"},{"canal":"secondary","nome":"Roupa (secundária)","matiz":81,"base":"#74b300"},{"canal":"accent","nome":"Destaque","matiz":108,"base":"#24b300"},{"canal":"weaponColor","nome":"Metal da arma","matiz":135,"base":"#00b32d"},{"canal":"headColor","nome":"Chapéu/elmo","matiz":162,"base":"#00b37d"},{"canal":"capeColor","nome":"Capa","matiz":189,"base":"#0098b3"},{"canal":"accColor","nome":"Acessório","matiz":216,"base":"#0047b3"},{"canal":"eyes","nome":"Olhos","matiz":243,"base":"#0900b3"},{"canal":"armor","nome":"Armadura (da roupa principal)","matiz":270,"base":"#5900b3"},{"canal":"vest","nome":"Camisa do colete (da pele)","matiz":297,"base":"#aa00b3"},{"canal":"cheek","nome":"Bochecha (da pele)","matiz":324,"base":"#b3006b"}],
   arquivos: [
     "dragonico/acessorio/brinco",

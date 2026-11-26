@@ -874,7 +874,8 @@ addEventListener('keydown', e => {
   if (KEYMAP[e.code] === 'pause' && Game.mode === 'pause' && !Input.capture && e.target.tagName !== 'INPUT') resumeGame();
 });
 addEventListener('touchstart', () => { document.body.classList.add('touch'); fsPrompt(); }, { once: true, passive: true });
-document.addEventListener('visibilitychange', () => { if (document.hidden) pauseGame(); });
+// aba escondida / app minimizado: pausa e desliga o som (a música não fica tocando nem gastando bateria em segundo plano)
+document.addEventListener('visibilitychange', () => { if (document.hidden) pauseGame(); Snd.sleep(document.hidden); });
 
 // ---------- Tamanho da tela ----------
 function resize() {
@@ -975,7 +976,7 @@ addEventListener('keydown', e => {
 });
 
 // ---------- Laço principal ----------
-let last = performance.now(), acc = 0;
+let last = performance.now(), acc = 0, pauseKey = '', pauseT = 0;
 function frame(now) {
   requestAnimationFrame(frame);
   const dt = Math.min(0.1, (now - last) / 1000);
@@ -999,7 +1000,10 @@ function frame(now) {
     // telas de 90/120/144 Hz: só redesenha quando o jogo andou (o mundo roda a 60 passos por segundo)
     if (Game.world && n > 0) { render(Game.world); updateTouchHud(Game.world); }
   } else if (Game.mode === 'pause' && Game.world) {
-    acc = 0; render(Game.world);
+    // pausado sozinho, o mundo está parado: redesenha ao mudar o tamanho da tela e 4x por segundo (não 60)
+    acc = 0;
+    const k = canvas.width + 'x' + canvas.height;
+    if (pauseKey !== k || Game.t - pauseT > 0.25) { pauseKey = k; pauseT = Game.t; render(Game.world); }
   } else if (Game.mode === 'creator') {
     renderTitle(Game.t); drawPreview(Game.t);
   } else {

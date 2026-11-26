@@ -41,7 +41,7 @@ let KEYMODE = false;
 // Protótipo do rig de recortes (js/rig.js): heróis montados com peças desenhadas uma vez. Para ver: ?rig na URL.
 let RIG = typeof location !== 'undefined' && /[?&]rig/.test(location.search);
 // Versão do jogo (aparece no menu inicial). Ao publicar, suba junto com o CACHE do sw.js.
-const VERSAO = '1.37';                 // padrão: 1.28, 1.29, 1.30... (sobe a cada versão publicada)
+const VERSAO = '1.38';                 // padrão: 1.28, 1.29, 1.30... (sobe a cada versão publicada)
 // amt < 0 escurece, amt > 0 clareia (-1..1)
 function shade(hex, amt) {
   if (KEYMODE) { const k = keyOf(hex); if (k) return keyHex(k.h, amt < 0 ? k.v * (1 + amt) : k.v + (1 - k.v) * amt); }
@@ -367,6 +367,12 @@ const Snd = (() => {
   return {
     init, music, tone, noise,
     sfx(n) { if (FX[n]) FX[n](); },
+    // segundo plano: para a música (o relógio dela não acumula notas) e suspende o áudio; na volta retoma a mesma música
+    sleep(off) {
+      if (!ctx) return;
+      if (off) { const w = want; stop(); want = w; if (ctx.state === 'running') ctx.suspend().catch(() => {}); }
+      else { if (ctx.state === 'suspended') ctx.resume().catch(() => {}); if (want && !timer) music(want); }
+    },
     get muted() { return muted; },
     setMuted(m) { muted = m; if (master) master.gain.value = m ? 0 : 0.22; },
   };

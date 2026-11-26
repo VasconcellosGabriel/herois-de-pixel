@@ -2607,6 +2607,7 @@ function renderTitle(t) {
     Game.titleSprFor = JSON.stringify(Game.save.char);
     Game.titleSpr = buildPlayerSprites(Game.save.char || DEFAULT_CHAR);
   }
+  warmPlayerSprites(Game.titleSpr);                          // monta as outras poses nos momentos livres (a fase já começa pronta)
   const f = Math.floor(t * 15) % 8;
   drawShadow2(g, 70, gy, 12);
   drawSprite(g, Game.titleSpr.get('run', f), 70, gy + 2, false, 0, 0);

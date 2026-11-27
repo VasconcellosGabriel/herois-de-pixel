@@ -129,8 +129,8 @@ function showWin(r) {
   const pr = progOf((Game.save.char || DEFAULT_CHAR).cls);
   $('#win-stats').innerHTML = `Moedas: ${r.coins} <span class="gain">(carteira: ${Game.save.coins || 0})</span><br>XP: +${r.myXp || 0} <span class="gain">· Nível ${pr.lvl}${r.ups ? ' — SUBIU ' + r.ups + '!' : ''}</span><br>Vidas para a próxima fase: ${Game.save.lives}<br>Quedas: ${r.deaths} · Tempo: ${m}:${s}` + (bi ? `<br><br>${Net.role || Local.on ? 'Vocês derrotaram' : 'Você derrotou'} ${bi.title}!` + (last ? '<br>Você salvou o reino! Parabéns!' : `<br>Próximo: Mundo ${lvd.world + 1} · ${WORLDS[lvd.world + 1]}`) : '')
     + (lvd.rule ? `<br><br>${RULES[lvd.rule].icon} Regra cumprida: ${RULES[lvd.rule].nome}!` + (r.idx === EXTRA[EXTRA.length - 1] ? '<br>Você dominou a Dimensão Prisma!' : '') : '')
-    + (r.newSkin ? `<br><br>💠 Skin de cristal liberada para ${CLASSES[r.newSkin].name}! Aplique em Editar herói ou Trocar de roupa.` : '')
-    + (r.newGem ? `<br><br>💎 Cristal ${gemById(r.newGem).nome} guardado! (${crisOf(Game.save).length}/7)` + (prismaOpen(Game.save) ? '<br>Os 7 cristais brilham juntos... um portal para outra dimensão se abriu no mapa, depois do último chefe!' : '') : '');
+    + (r.newSkin ? `<br><br>💠 Skin de cristal liberada para ${CLASSES[r.newSkin].name}! Aplique em Editar herói ou Trocar de roupa.` : '');
+  winCris(r, lvd);
   $('#b-win-up').textContent = pr.pts ? `⬆ Evolução (${pr.pts} ponto${pr.pts > 1 ? 's' : ''}!)` : '⬆ Evolução';
   $('#b-next').style.display = last || guest ? 'none' : '';
   $('#b-retry').style.display = $('#b-win-menu').style.display = guest ? 'none' : '';

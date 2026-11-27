@@ -1,6 +1,6 @@
 // Service worker: permite jogar offline depois do primeiro acesso.
 // Estratégia "rede primeiro": sempre pega a versão nova quando há internet.
-const CACHE = 'herois-de-pixel-v1.38';             // suba junto com VERSAO (js/util.js)
+const CACHE = 'herois-de-pixel-v1.39';             // suba junto com VERSAO (js/util.js)
 const FILES = ['./', 'index.html', 'style.css', 'manifest.json', 'icon.svg',
   'js/util.js', 'js/epic.js', 'js/sprites.js', 'sprites/pack.js', 'js/spritepack.js', 'sprites_rig/pecas.js', 'js/rig.js', 'js/enemies.js', 'js/world.js', 'js/worlds.js', 'js/levels.js', 'js/tutorial.js', 'js/game.js', 'js/bestiary.js', 'js/fauna.js', 'js/dimensao.js',
   'js/net.js', 'js/local.js', 'js/mapa.js', 'js/ferreiro.js', 'js/academia.js', 'js/cristais.js', 'js/ui.js', 'fonts/PressStart2P-Regular.ttf'];

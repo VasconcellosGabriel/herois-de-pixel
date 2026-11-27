@@ -209,6 +209,22 @@ function crisMapInfo() {
   for (const c of CRISTAIS) { const cv = gemCanvas(c.id, !have.includes(c.id)); cv.title = have.includes(c.id) ? 'Cristal ' + c.nome : '???'; slots.appendChild(cv); }
   $('#map-cris-txt').textContent = prismaOpen(sv) ? 'Os 7 cristais abriram um portal depois do último chefe!' : `Cristais: ${have.length}/7 · estão escondidos pelos mundos`;
 }
+// tela de fase completa: nas fases com cristal escondido, os 7 espaços (como no mapa), achado ou não
+function winCris(r, lvd) {
+  const gem = gemOfLevel(lvd.id), box = $('#win-cris'), sv = Game.save;
+  box.hidden = !gem;
+  if (!gem) return;
+  const have = crisOf(sv), slots = $('#win-cris-slots');
+  slots.innerHTML = '';
+  for (const c of CRISTAIS) {
+    const got = have.includes(c.id), cv = gemCanvas(c.id, !got);
+    if (c.id === r.newGem) cv.classList.add('new');                    // o que acabou de ser guardado brilha
+    else if (c.id === gem.id && !got) cv.classList.add('here');          // o desta fase, ainda escondido
+    cv.title = got ? 'Cristal ' + c.nome : '???'; slots.appendChild(cv);
+  }
+  $('#win-cris-txt').innerHTML = r.newGem ? `💎 Cristal ${gemById(r.newGem).nome} guardado! (${have.length}/7)` + (prismaOpen(sv) ? '<br>Os 7 cristais brilham juntos... um portal para outra dimensão se abriu no mapa, depois do último chefe!' : '')
+    : have.includes(gem.id) ? `Cristais: ${have.length}/7` : `Um cristal ficou escondido nesta fase... (${have.length}/7)`;
+}
 // ilha flutuante de cada fase (pronta em alta resolução): aberta na cor do cristal, fechada apagada
 const _pzIsle = {};
 function pzIsle(k, open) {
